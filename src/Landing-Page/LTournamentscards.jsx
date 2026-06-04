@@ -3,6 +3,7 @@ import { Share2, MapPin, Calendar, IndianRupee, Trophy } from "lucide-react";
 import { motion } from "framer-motion";
 import defaultImg from "../assets/tournament.avif";
 import { getTournamentType } from "../utils/sportTrack";
+import { assetUrl } from "../shared/lib/assetUrl";
 
 const TournamentsCard = () => {
   const [tournaments, setTournaments] = useState([]);
@@ -12,7 +13,12 @@ const TournamentsCard = () => {
   useEffect(() => {
     const fetchTournaments = async () => {
       try {
-        const response = await fetch("/api/tournaments");
+        const token = localStorage.getItem("token");
+        const response = await fetch("/api/tournaments", {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
         if (!response.ok) throw new Error("Failed to fetch tournaments");
         const data = await response.json();
         setTournaments(data.tournaments || data);
@@ -74,7 +80,7 @@ const TournamentsCard = () => {
             <img
               src={
                 tournament.tournamentLogo
-                  ? `/uploads/tournaments/${tournament.tournamentLogo.split("\\").pop()}`
+                  ? assetUrl('tournaments/' + tournament.tournamentLogo.split("\\").pop())
                   : defaultImg
               }
               alt={tournament.title}

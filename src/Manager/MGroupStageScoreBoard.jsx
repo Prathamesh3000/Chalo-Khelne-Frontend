@@ -146,8 +146,14 @@ const MGroupStageScoreBoard = () => {
             setLoading(true);
 
             // Get current live state from backend - ONLY auto-init when explicitly starting a match
+            const token = localStorage.getItem("token");
             const response = await fetch(
-                `/api/tournaments/matches/${matchId}/live-state?autoInit=false`
+                `/api/tournaments/matches/${matchId}/live-state?autoInit=false`,
+                {
+                    headers: {
+                        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                    },
+                }
             );
 
             if (response.ok) {
@@ -331,11 +337,15 @@ const MGroupStageScoreBoard = () => {
     // Update live score via backend
     const updateLiveScore = async (playerA_points, playerB_points, autoCheck = true) => {
         try {
+            const token = localStorage.getItem("token");
             const response = await fetch(
                 `/api/tournaments/matches/${matchId}/live-score`,
                 {
                     method: "PUT",
-                    headers: { "Content-Type": "application/json" },
+                    headers: {
+                        "Content-Type": "application/json",
+                        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                    },
                     body: JSON.stringify({
                         player1Points: playerA_points,
                         player2Points: playerB_points
@@ -673,11 +683,15 @@ const MGroupStageScoreBoard = () => {
 
 
             // Use the endpoint from groupStageScoreboardController
+            const token = localStorage.getItem("token");
             const response = await fetch(
                 `/api/tournaments/matches/${matchId}/sync-scores`,
                 {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" }
+                    headers: {
+                        "Content-Type": "application/json",
+                        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                    }
                 }
             );
 

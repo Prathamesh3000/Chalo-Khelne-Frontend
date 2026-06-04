@@ -16,6 +16,8 @@ import {
   UserPlusIcon,
   ArrowDownTrayIcon,
   ShieldCheckIcon,
+  TagIcon,
+  MapPinIcon,
 } from "@heroicons/react/24/outline";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -44,9 +46,11 @@ export default function Sidebar() {
     { name: "Inquiries", href: "/inquiries", icon: ChatBubbleLeftRightIcon },
     { name: "Sports", href: "/sports", icon: TrophyIcon },
     { name: "Rule Books", href: "/rule-books", icon: BookOpenIcon },
+    { name: "Category Templates", href: "/category-templates", icon: TagIcon },
     { name: "News", href: "/news", icon: NewspaperIcon },
     { name: "Roles & Permissions", href: "/rbac", icon: ShieldCheckIcon },
     { name: "Vendor Marketplace", href: "/vendor-marketplace", icon: ArrowUpTrayIcon },
+    { name: "Turf Approvals", href: "/turf-approvals", icon: MapPinIcon },
     { name: "Group Chats", href: "/group-chat", icon: ChatBubbleLeftRightIcon },
   ];
 
@@ -77,8 +81,12 @@ export default function Sidebar() {
     formData.append("file", file);
 
     try {
+      const token = localStorage.getItem("token");
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/bulk-upload`, {
         method: "POST",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: formData,
       });
 
@@ -107,9 +115,13 @@ export default function Sidebar() {
     setIsLoading(true);
 
     try {
+      const token = localStorage.getItem("token");
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/bulk-upload/single`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify(singleUser),
       });
 

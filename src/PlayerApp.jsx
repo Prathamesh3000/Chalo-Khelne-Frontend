@@ -1,8 +1,8 @@
 import { Routes, Route } from "react-router-dom";
 import { AppLayout } from "./shared/layout";
-import PTournamentManagement from "./Player/PTournamentManagement";
+import PTournamentManagement from "./pages/tournaments/List";
 import ProtectedRoute from "./components/ProtectedRoute";
-import PHome from "./Player/PHome";
+import PHome from "./pages/player/Home";
 import PSlotbooking from "./Player/PSlotbooking";
 import Ptrainers from "./Player/Ptrainers";
 import Psettings from "./Player/Psettings";

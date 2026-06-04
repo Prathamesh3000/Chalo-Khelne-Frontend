@@ -1,6 +1,20 @@
 //Manager/TeamKnockouts.jsx
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { TabBar, Skeleton } from "../shared/ui";
+import { TournamentShell } from "../shared/layout";
+
+// Keep label-keyed legacy state but expose canonical keys to the URL.
+const TK_URL_TO_LABEL = {
+  teams:   "Registered Teams",
+  league:  "Round Robin",
+  matches: "Matches",
+};
+const TK_LABEL_TO_URL = {
+  "Registered Teams": "teams",
+  "Round Robin":      "league",
+  "Matches":          "matches",
+};
 import { FaUsers, FaCrown, FaUser, FaSyncAlt } from "react-icons/fa";
 import { Star, StarIcon, Loader2, Trophy, RefreshCcw, Play, CheckCircle2, Clock } from "lucide-react";
 import TeamKnockoutMatches from "./TeamKnockoutMatches";
@@ -36,6 +50,32 @@ const TeamKnockouts = () => {
   const [currentSchedulingRound, setCurrentSchedulingRound] = useState(1);
   const [showSchedulingModal, setShowSchedulingModal] = useState(false);
   const [selectedTab, setSelectedTab] = useState("Registered Teams");
+  const [searchParams] = useSearchParams();
+  // Minimal tournament-info fetch — only the title + sportName for the shell
+  // header/breadcrumbs. Lightweight read, no business logic changes.
+  const [tournamentInfo, setTournamentInfo] = useState(null);
+
+  // URL → legacy tab state. ?tab=teams|league|matches.
+  useEffect(() => {
+    const t = searchParams.get("tab");
+    if (t && TK_URL_TO_LABEL[t]) setSelectedTab(TK_URL_TO_LABEL[t]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!tournamentId) return;
+    let cancelled = false;
+    axios.get(`/api/tournaments/${tournamentId}`).then((r) => {
+      if (cancelled) return;
+      const t = r.data?.tournament || r.data;
+      if (t) setTournamentInfo({
+        title: t.title || "Tournament",
+        sportName: Array.isArray(t.sports) ? (t.sports[0]?.sportName || "") : "",
+        currentStage: t.currentStage || "knockout",
+      });
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [tournamentId]);
   const [teams, setTeams] = useState([]);
   const [showSubstituteModal, setShowSubstituteModal] = useState(false);
   const [currentMatchForSub, setCurrentMatchForSub] = useState(null);
@@ -229,8 +269,14 @@ const TeamKnockouts = () => {
 
   const fetchTournamentDetails = async () => {
     try {
+      const token = localStorage.getItem("token");
       const response = await fetch(
-        `/api/tournaments/${tournamentId}`
+        `/api/tournaments/${tournamentId}`,
+        {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        }
       );
       const data = await response.json();
       if (data.success) {
@@ -266,11 +312,13 @@ const TeamKnockouts = () => {
 
       const url = `/api/players/bookings/tournament-teams/${tournamentId}`;
 
+      const token = localStorage.getItem("token");
       const response = await fetch(url, {
         method: "GET",
         headers: {
           Accept: "application/json",
           "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
       });
 
@@ -406,12 +454,14 @@ const TeamKnockouts = () => {
           setCount,
         };
 
+        const token = localStorage.getItem("token");
         const response = await fetch(
           `/api/tournaments/team-knockout/create`,
           {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
             },
             body: JSON.stringify(requestBody),
           }
@@ -448,8 +498,14 @@ const TeamKnockouts = () => {
       }
 
       // Handle subsequent rounds
+      const token = localStorage.getItem("token");
       const previousRoundResponse = await fetch(
-        `/api/tournaments/team-knockout/matches-by-round?tournamentId=${tournamentId}&round=${currentRound - 1}`
+        `/api/tournaments/team-knockout/matches-by-round?tournamentId=${tournamentId}&round=${currentRound - 1}`,
+        {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        }
       );
 
       if (!previousRoundResponse.ok) {
@@ -492,6 +548,7 @@ const TeamKnockouts = () => {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
           body: JSON.stringify({
             tournamentId,
@@ -725,12 +782,14 @@ const TeamKnockouts = () => {
 
     const handleSave = async () => {
       try {
+        const token = localStorage.getItem("token");
         const response = await fetch(
           `/api/tournaments/team-knockout/matches/${currentMatchForSub._id}/substitute`,
           {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
             },
             body: JSON.stringify({
               setNumber: 3, // Doubles set
@@ -839,12 +898,14 @@ const TeamKnockouts = () => {
       setSaving(true);
       try {
         // Save current match doubles lineup
+        const token = localStorage.getItem("token");
         const response = await fetch(
           `/api/tournaments/team-knockout/matches/${currentMatch._id}/substitute`,
           {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
             },
             body: JSON.stringify({
               setNumber: 3, // Doubles set
@@ -967,36 +1028,64 @@ const TeamKnockouts = () => {
     );
   };
 
+  // Shell props — pipeline derived from tournament stage + team count.
+  const _steps = [
+    { key: "registrations", label: "Registrations", sublabel: `${teams.length} teams` },
+    { key: "players",       label: "Players",       sublabel: "—" },
+    { key: "groups",        label: "Round Robin",   sublabel: rrGenerated ? `${rrMatches.length} matches` : "Not generated" },
+    { key: "qualifiers",    label: "Qualifiers",    sublabel: "—" },
+    { key: "knockout",      label: "Knockout",      sublabel: tournamentInfo?.currentStage === "knockout" ? "Live" : "Pending" },
+  ];
+  const _activeStep = rrGenerated ? "groups" : "registrations";
+  const _currentTabLabel = TK_LABEL_TO_URL[selectedTab] === "teams"
+    ? "Teams"
+    : TK_LABEL_TO_URL[selectedTab] === "league"
+    ? "Round Robin"
+    : "Matches";
+  const _breadcrumbs = [
+    { label: "Tournaments", to: "/mtournament-management" },
+    { label: tournamentInfo?.title || "Team Knockout", to: `/tournament-management/team-knockouts?tournamentId=${tournamentId}` },
+    { label: _currentTabLabel },
+  ];
+  const _tabBar = (
+    <TabBar
+      urlKey="tab"
+      defaultKey="teams"
+      tabs={[
+        { key: "teams",   label: "Teams",   count: teams.length || undefined },
+        { key: "league",  label: "League",  count: rrMatches.length || undefined },
+        { key: "matches", label: "Matches" },
+      ]}
+    />
+  );
+
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50">
-        <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
-        <p className="mt-4 text-gray-600 font-medium">Loading teams...</p>
-      </div>
+      <TournamentShell
+        tournament={tournamentInfo}
+        steps={_steps}
+        activeStep={_activeStep}
+        breadcrumbs={_breadcrumbs}
+        tabBar={_tabBar}
+      >
+        <Skeleton className="h-6 w-64 mb-2" />
+        <Skeleton className="h-3 w-32 mb-5" />
+        <Skeleton className="h-[420px] rounded-lg" />
+      </TournamentShell>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="p-5 max-w-[1400px] mx-auto">
-        {/* Main Tabs - Always visible */}
-        <div className="flex justify-center mb-6">
-          <div className="inline-flex gap-1 bg-white p-1.5 rounded-2xl shadow-sm border border-gray-100">
-            {["Registered Teams", "Round Robin", "Matches"].map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setSelectedTab(tab)}
-                className={`h-10 px-5 inline-flex justify-center items-center text-sm font-semibold rounded-xl whitespace-nowrap transition-all w-auto
-                  ${selectedTab === tab
-                    ? "bg-orange-500 text-white shadow-sm"
-                    : "bg-transparent text-gray-500 hover:bg-gray-100"
-                  }`}
-              >
-                {tab}
-              </button>
-            ))}
-          </div>
-        </div>
+    <TournamentShell
+      tournament={tournamentInfo}
+      steps={_steps}
+      activeStep={_activeStep}
+      breadcrumbs={_breadcrumbs}
+      activeTabKey={selectedTab}
+      tabBar={_tabBar}
+    >
+      <div className="max-w-[1400px] mx-auto">
+        {/* Tab bar is rendered by TournamentShell via the `tabBar` slot. */}
 
         {/* Content based on selected tab */}
         {selectedTab === "Registered Teams" ? (
@@ -1219,7 +1308,21 @@ const TeamKnockouts = () => {
         ) : selectedTab === "Round Robin" ? (
           // Round Robin View
           <div className="max-w-[1400px] mx-auto">
-            {!rrGenerated ? (
+            {rrLoading && rrMatches.length === 0 ? (
+              // Tab-switch skeleton — replaces the ~500ms blank flash while
+              // /round-robin/list is in flight.
+              <div className="space-y-4">
+                <div className="bg-white rounded-2xl border border-gray-100 p-5">
+                  <Skeleton className="h-5 w-40 mb-3" />
+                  <Skeleton className="h-3 w-64" />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {[0, 1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-24 rounded-2xl" />
+                  ))}
+                </div>
+              </div>
+            ) : !rrGenerated ? (
               // Generate Round Robin Form
               <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 max-w-2xl mx-auto">
                 <div className="text-center mb-6">
@@ -1656,7 +1759,7 @@ const TeamKnockouts = () => {
           </div>
         </div>
       )}
-    </div>
+    </TournamentShell>
   );
 };
 

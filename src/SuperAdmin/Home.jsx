@@ -2,44 +2,24 @@ import { toast } from "react-toastify";
 import { useEffect, useState } from "react";
 import axios from "axios";
 import {
-  Users,
-  UserCheck,
-  UserLock,
-  MessageSquare,
-  Building2,
-  Trophy,
-  Plus,
-  Activity,
-  X,
-  Loader2,
-  Copy,
+  Users, UserCheck, UserLock, MessageSquare, Building2, Trophy, Plus,
+  Activity, Loader2, ArrowRight,
 } from "lucide-react";
+
+const SIG = "#5E6AD2";
+const SIG_TINT = "rgba(94,106,210,0.12)";
 
 export default function Home() {
   const [overview, setOverview] = useState({
-    totalRequests: 0,
-    pending: 0,
-    approved: 0,
-    stats: {
-      players: 0,
-      trainers: 0,
-      clubAdmins: 0,
-      corporateAdmins: 0,
-      totalInquiries: 0,
-      pendingInquiries: 0
-    }
+    totalRequests: 0, pending: 0, approved: 0,
+    stats: { players: 0, trainers: 0, clubAdmins: 0, corporateAdmins: 0, totalInquiries: 0, pendingInquiries: 0 },
   });
+
+  const [sports, setSports] = useState([]);
   const [sportName, setSportName] = useState("");
   const [success, setSuccess] = useState("");
-  const [sports, setSports] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  // Create Club modal
-  const [showCreateClub, setShowCreateClub] = useState(false);
-  const [clubType, setClubType] = useState("club"); // "club" | "corporate"
-  const [clubForm, setClubForm] = useState({ name: "", email: "", phone: "", clubName: "", city: "", address: "", companyName: "", industryType: "", companySize: "", location: "" });
-  const [creatingClub, setCreatingClub] = useState(false);
-  const [createdCredentials, setCreatedCredentials] = useState(null);
+  const [addingSport, setAddingSport] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -47,7 +27,7 @@ export default function Home() {
       try {
         const [overviewRes, sportsRes] = await Promise.all([
           axios.get(`${import.meta.env.VITE_API_BASE_URL}/update/overview`),
-          axios.get(`${import.meta.env.VITE_API_BASE_URL}/sports`)
+          axios.get(`${import.meta.env.VITE_API_BASE_URL}/sports`),
         ]);
         setOverview(overviewRes.data);
         setSports(sportsRes.data.data || sportsRes.data);
@@ -57,14 +37,14 @@ export default function Home() {
         setLoading(false);
       }
     };
-
     fetchData();
   }, [success]);
 
   const handleAddSport = async () => {
     if (!sportName.trim()) return;
+    setAddingSport(true);
     try {
-      const res = await axios.post(
+      await axios.post(
         `${import.meta.env.VITE_API_BASE_URL}/sports`,
         { name: sportName }
       );
@@ -73,6 +53,8 @@ export default function Home() {
       setTimeout(() => setSuccess(""), 3000);
     } catch (err) {
       toast.info(err.response?.data?.message || "Failed to add sport");
+    } finally {
+      setAddingSport(false);
     }
   };
 
@@ -82,9 +64,7 @@ export default function Home() {
         isActive: !currentStatus,
       });
       setSports((prev) =>
-        prev.map((sport) =>
-          sport._id === id ? { ...sport, isActive: !currentStatus } : sport
-        )
+        prev.map((sport) => (sport._id === id ? { ...sport, isActive: !currentStatus } : sport))
       );
       setSuccess("Sport status updated");
       setTimeout(() => setSuccess(""), 3000);
@@ -93,170 +73,198 @@ export default function Home() {
     }
   };
 
-  const handleCreateClub = async () => {
-    if (!clubForm.name || !clubForm.email) { toast.warn("Name and email are required"); return; }
-    if (clubType === "club" && !clubForm.clubName) { toast.warn("Club name is required"); return; }
-    if (clubType === "corporate" && !clubForm.companyName) { toast.warn("Company name is required"); return; }
-
-    setCreatingClub(true);
-    try {
-      const endpoint = clubType === "corporate" ? "/api/corporate/onboard" : "/api/clubadminprofile/onboard";
-      const payload = clubType === "corporate"
-        ? { name: clubForm.name, email: clubForm.email, phone: clubForm.phone, companyName: clubForm.companyName, industryType: clubForm.industryType, companySize: clubForm.companySize, location: clubForm.location, designation: "Admin" }
-        : { name: clubForm.name, email: clubForm.email, phone: clubForm.phone, clubName: clubForm.clubName, city: clubForm.city, address: clubForm.address, designation: "Admin" };
-
-      const res = await axios.post(endpoint, payload);
-      setCreatedCredentials({ email: res.data.email || clubForm.email, password: res.data.password || res.data.generatedPassword || "Check email" });
-      toast.success(`${clubType === "corporate" ? "Corporate" : "Club"} account created!`);
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to create account");
-    } finally {
-      setCreatingClub(false);
-    }
-  };
-
-  const resetClubModal = () => {
-    setShowCreateClub(false);
-    setCreatedCredentials(null);
-    setClubForm({ name: "", email: "", phone: "", clubName: "", city: "", address: "", companyName: "", industryType: "", companySize: "", location: "" });
-    setClubType("club");
-  };
-
   if (loading && !overview.totalRequests) {
     return (
       <div className="flex h-96 items-center justify-center">
-        <Loader2 className="w-10 h-10 text-orange-500 animate-spin" />
+        <Loader2 className="w-7 h-7 text-neutral-400 animate-spin" />
       </div>
     );
   }
 
   const statCards = [
-    { label: "Total Users", value: overview.totalRequests, icon: Users, color: "bg-orange-50 text-orange-600" },
-    { label: "Pending Approvals", value: overview.pending, icon: UserLock, color: "bg-amber-50 text-amber-600" },
-    { label: "Approved Users", value: overview.approved, icon: UserCheck, color: "bg-emerald-50 text-emerald-600" },
-    { label: "Players", value: overview.stats?.players || 0, icon: Trophy, color: "bg-blue-50 text-blue-600" },
-    { label: "Club Admins", value: overview.stats?.clubAdmins || 0, icon: Building2, color: "bg-orange-50 text-orange-600" },
-    { label: "Corporate Admins", value: overview.stats?.corporateAdmins || 0, icon: Activity, color: "bg-emerald-50 text-emerald-600" },
-    { label: "Total Inquiries", value: overview.stats?.totalInquiries || 0, icon: MessageSquare, color: "bg-amber-50 text-amber-600" },
-    { label: "Pending Inquiries", value: overview.stats?.pendingInquiries || 0, icon: MessageSquare, color: "bg-red-50 text-red-600" },
+    { label: "Total users",        value: overview.totalRequests,                icon: Users         },
+    { label: "Pending approvals",  value: overview.pending,                      icon: UserLock      },
+    { label: "Approved users",     value: overview.approved,                     icon: UserCheck     },
+    { label: "Players",            value: overview.stats?.players          || 0, icon: Trophy        },
+    { label: "Club admins",        value: overview.stats?.clubAdmins       || 0, icon: Building2     },
+    { label: "Corporate admins",   value: overview.stats?.corporateAdmins  || 0, icon: Activity      },
+    { label: "Total inquiries",    value: overview.stats?.totalInquiries   || 0, icon: MessageSquare },
+    { label: "Pending inquiries",  value: overview.stats?.pendingInquiries || 0, icon: MessageSquare },
   ];
 
   return (
-    <div className="space-y-8 p-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
-          Admin Dashboard
-        </h3>
-        <span className="text-sm text-gray-500 font-medium bg-gray-100 px-3 py-1 rounded-full">
-          Real-time Statistics
+    <div className="p-6 max-w-[1320px] mx-auto">
+      {/* Header */}
+      <div className="flex items-end justify-between gap-3 flex-wrap mb-5">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500 mb-1.5">
+            Super admin · Overview
+          </p>
+          <h1 className="text-[28px] leading-[1.1] font-semibold tracking-tight text-neutral-950">
+            Admin dashboard
+          </h1>
+          <p className="text-[13px] text-neutral-500 mt-1.5">
+            Platform-wide statistics and management.
+          </p>
+        </div>
+        <span className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md bg-emerald-50 text-emerald-700 text-[11px] font-semibold uppercase tracking-wider">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          Live
         </span>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {statCards.map((card, idx) => (
-          <div key={idx} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow group">
-            <div className="flex justify-between items-start mb-4">
-              <div className={`p-3 rounded-xl ${card.color}`}>
-                <card.icon className="w-6 h-6" />
-              </div>
-              <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{card.label.split(' ')[0]}</span>
-            </div>
-            <div>
-              <p className="text-3xl font-bold text-gray-900 mb-1">{card.value}</p>
-              <p className="text-sm text-gray-500 font-medium">{card.label}</p>
-            </div>
-          </div>
+      {/* Stats grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+        {statCards.map((card) => (
+          <StatTile key={card.label} icon={card.icon} label={card.label} value={card.value} />
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Add Sport Section */}
-        <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 h-fit">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
-              <Plus className="w-5 h-5" />
-            </div>
-            <h4 className="text-xl font-bold text-gray-800">Add New Sport</h4>
-          </div>
-
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row gap-3">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        {/* Add Sport */}
+        <Section title="Add new sport" icon={Plus}>
+          <div className="space-y-2.5">
+            <div className="flex flex-col sm:flex-row gap-2">
               <input
                 type="text"
                 value={sportName}
                 onChange={(e) => setSportName(e.target.value)}
                 placeholder="Enter sport name (e.g. Badminton)"
-                className="flex-1 border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700 bg-gray-50"
+                className="flex-1 h-9 px-3 border border-neutral-200 rounded-lg text-[13px] bg-white text-neutral-900 placeholder:text-neutral-400 outline-none transition focus:border-[--sig] focus:ring-2 focus:ring-[--sig-tint]"
+                style={{ "--sig": SIG, "--sig-tint": SIG_TINT }}
               />
-              <button
-                onClick={handleAddSport}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl transition font-semibold shadow-lg shadow-blue-200 active:scale-95"
-              >
-                Add Sport
-              </button>
+              <SigButton onClick={handleAddSport} disabled={addingSport || !sportName.trim()}>
+                <Plus className="w-3.5 h-3.5" /> {addingSport ? "Adding…" : "Add sport"}
+              </SigButton>
             </div>
-            {success && (
-              <p className="text-green-600 text-sm font-medium animate-in fade-in slide-in-from-top-1">
-                {success}
-              </p>
-            )}
+            {success && <p className="text-[12px] font-semibold text-emerald-700">{success}</p>}
           </div>
-        </div>
+        </Section>
 
-        {/* Available Sports Section */}
-        <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
-                <Trophy className="w-5 h-5" />
-              </div>
-              <h4 className="text-xl font-bold text-gray-800">Available Sports</h4>
-            </div>
-            <span className="text-sm font-medium text-gray-400">{sports.length} Sports</span>
-          </div>
-
-          <div className="overflow-hidden rounded-xl border border-gray-100">
-            <table className="min-w-full text-sm">
-              <thead className="bg-gray-50 text-gray-500">
-                <tr>
-                  <th className="px-6 py-4 text-left font-semibold uppercase tracking-wider">Sport</th>
-                  <th className="px-6 py-4 text-center font-semibold uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-4 text-right font-semibold uppercase tracking-wider">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {sports.map((sport) => (
-                  <tr key={sport._id} className="hover:bg-gray-50/50 transition-colors">
-                    <td className="px-6 py-4 font-medium text-gray-900 capitalize italic">{sport.name}</td>
-                    <td className="px-6 py-4 text-center">
-                      <span
-                        className={`inline-flex px-3 py-1 text-xs font-bold rounded-full ${sport.isActive
-                          ? "bg-green-100 text-green-700"
-                          : "bg-red-100 text-red-700"
-                          }`}
-                      >
-                        {sport.isActive ? "Active" : "Inactive"}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <button
-                        onClick={() => toggleSportStatus(sport._id, sport.isActive)}
-                        className={`text-xs font-bold px-4 py-2 rounded-lg transition-all active:scale-95 ${sport.isActive
-                          ? "bg-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-600"
-                          : "bg-blue-50 text-blue-600 hover:bg-blue-100"
-                          }`}
-                      >
-                        {sport.isActive ? "Deactivate" : "Activate"}
-                      </button>
-                    </td>
+        {/* Available Sports */}
+        <Section
+          title="Available sports"
+          icon={Trophy}
+          rightSlot={
+            <span className="text-[11px] font-semibold text-neutral-500 font-mono tabular-nums">{sports.length} sports</span>
+          }
+        >
+          {sports.length === 0 ? (
+            <EmptyInline icon={Trophy} title="No sports yet" desc="Add your first sport using the form on the left." />
+          ) : (
+            <div className="-mx-4 -mb-4 border-t border-neutral-100">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-neutral-100">
+                    <Th>Sport</Th>
+                    <Th align="center">Status</Th>
+                    <Th align="right">Action</Th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+                </thead>
+                <tbody>
+                  {sports.map((sport) => (
+                    <tr key={sport._id} className="border-b border-neutral-50 last:border-b-0 hover:bg-neutral-50/40 transition">
+                      <Td><span className="text-[13px] font-semibold text-neutral-900 capitalize">{sport.name}</span></Td>
+                      <Td align="center"><StatusPill active={sport.isActive} /></Td>
+                      <Td align="right">
+                        <button
+                          onClick={() => toggleSportStatus(sport._id, sport.isActive)}
+                          className="h-7 px-2.5 rounded-md border border-neutral-200 hover:border-neutral-300 text-[11px] font-semibold text-neutral-700 hover:bg-neutral-50 transition inline-flex items-center gap-1 w-auto"
+                        >
+                          {sport.isActive ? "Deactivate" : "Activate"}
+                          <ArrowRight className="w-3 h-3" />
+                        </button>
+                      </Td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Section>
       </div>
+    </div>
+  );
+}
+
+// ── SIG inline primitives ────────────────────────────────────────────────────
+
+function SigButton({ children, onClick, variant = "primary", disabled, type = "button", className = "" }) {
+  const base = "h-9 px-3.5 inline-flex items-center justify-center gap-1.5 text-[13px] font-semibold rounded-lg transition active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed";
+  if (variant === "outline") {
+    return (
+      <button type={type} onClick={onClick} disabled={disabled}
+        className={`${base} border border-neutral-200 hover:border-neutral-300 text-neutral-700 hover:bg-neutral-50 ${className}`}>
+        {children}
+      </button>
+    );
+  }
+  return (
+    <button type={type} onClick={onClick} disabled={disabled}
+      className={`${base} text-white ${className}`}
+      style={{ backgroundColor: SIG }}>
+      {children}
+    </button>
+  );
+}
+
+function StatTile({ icon: Icon, label, value }) {
+  return (
+    <div className="bg-white border border-neutral-200 rounded-2xl p-4">
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <span className="w-8 h-8 inline-flex items-center justify-center rounded-lg" style={{ background: SIG_TINT, color: SIG }}>
+          <Icon className="w-4 h-4" />
+        </span>
+      </div>
+      <p className="text-[22px] font-semibold leading-none text-neutral-950 tabular-nums">{value ?? 0}</p>
+      <p className="mt-1.5 text-[12px] text-neutral-500">{label}</p>
+    </div>
+  );
+}
+
+function Section({ title, icon: Icon, rightSlot, children }) {
+  return (
+    <div className="bg-white border border-neutral-200 rounded-2xl p-4">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          {Icon && <Icon className="w-3.5 h-3.5 text-neutral-400" />}
+          <h3 className="text-[13px] font-semibold text-neutral-950">{title}</h3>
+        </div>
+        {rightSlot}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function Th({ children, align }) {
+  const a = align === "right" ? "text-right" : align === "center" ? "text-center" : "text-left";
+  return <th className={`py-3 px-4 text-[10px] font-semibold uppercase tracking-[0.08em] text-neutral-500 ${a}`}>{children}</th>;
+}
+
+function Td({ children, align }) {
+  const a = align === "right" ? "text-right" : align === "center" ? "text-center" : "text-left";
+  return <td className={`py-3 px-4 ${a}`}>{children}</td>;
+}
+
+function StatusPill({ active }) {
+  return (
+    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider ${
+      active ? "bg-emerald-50 text-emerald-700" : "bg-neutral-100 text-neutral-600"
+    }`}>
+      {active ? "Active" : "Inactive"}
+    </span>
+  );
+}
+
+function EmptyInline({ icon: Icon, title, desc }) {
+  return (
+    <div className="text-center py-10">
+      <div className="w-10 h-10 rounded-xl bg-neutral-100 inline-flex items-center justify-center mb-2.5">
+        <Icon className="w-4 h-4 text-neutral-400" />
+      </div>
+      <p className="text-[13px] font-semibold text-neutral-900">{title}</p>
+      <p className="text-[12px] text-neutral-500 mt-1 max-w-xs mx-auto">{desc}</p>
     </div>
   );
 }

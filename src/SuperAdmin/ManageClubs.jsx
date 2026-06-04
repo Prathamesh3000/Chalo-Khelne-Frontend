@@ -1,7 +1,10 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
-import { Building2, Pencil, Trash2, X, Loader2, Search, Mail, Phone, MapPin, Trophy } from "lucide-react";
+import {
+  Building2, Pencil, Trash2, X, Loader2, Search, Mail, Phone, MapPin,
+} from "lucide-react";
+import { SuperAdminShell } from "../shared/layout";
 
 export default function ManageClubs() {
   const [clubs, setClubs] = useState([]);
@@ -58,13 +61,9 @@ export default function ManageClubs() {
     }
   };
 
-  const handleSelectAll = (e) => {
-    setSelectedUsers(e.target.checked ? filtered.map((c) => c._id) : []);
-  };
-
-  const handleSelectUser = (userId) => {
+  const handleSelectAll = (e) => setSelectedUsers(e.target.checked ? filtered.map((c) => c._id) : []);
+  const handleSelectUser = (userId) =>
     setSelectedUsers((prev) => prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]);
-  };
 
   const handleEditClick = (club) => {
     setEditForm({
@@ -102,130 +101,148 @@ export default function ManageClubs() {
     if (!search) return true;
     const s = search.toLowerCase();
     return (c.name || "").toLowerCase().includes(s) ||
-           (c.email || "").toLowerCase().includes(s) ||
-           (c.profile?.clubName || c.clubName || "").toLowerCase().includes(s);
+      (c.email || "").toLowerCase().includes(s) ||
+      (c.profile?.clubName || c.clubName || "").toLowerCase().includes(s);
   });
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[40vh]">
-        <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
-      </div>
+      <SuperAdminShell searchPlaceholder="Search clubs…">
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="w-6 h-6 text-gray-500 animate-spin" />
+        </div>
+      </SuperAdminShell>
     );
   }
 
   return (
-    <div className="p-6 lg:p-8 max-w-[1400px] mx-auto">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Manage Clubs</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{filtered.length} of {clubs.length} clubs</p>
+    <SuperAdminShell searchPlaceholder="Search clubs…">
+      <header className="flex items-start justify-between gap-4 mb-6 flex-wrap">
+        <div className="min-w-0">
+          <p className="inline-flex items-center gap-1.5 text-[12px] text-gray-400">
+            <Building2 className="w-3.5 h-3.5" />
+            Clubs · Manage
+          </p>
+          <h1 className="mt-2 text-[26px] font-medium text-white leading-tight">
+            Manage clubs
+          </h1>
+          <p className="mt-1 text-[13px] text-gray-400">
+            <span className="font-mono tabular-nums">{filtered.length}</span> of <span className="font-mono tabular-nums">{clubs.length}</span> clubs
+          </p>
         </div>
         <div className="flex gap-2">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search clubs..."
-              className="pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition w-56" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500" />
+            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search clubs…"
+              className="w-56 h-9 pl-9 pr-3 rounded-md text-[13px] text-gray-200 placeholder:text-gray-500 focus:outline-none"
+              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }} />
           </div>
           {selectedUsers.length > 0 && (
             <button onClick={handleBulkDelete}
-              className="flex items-center gap-2 px-4 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 text-sm font-bold rounded-xl border border-red-200 transition w-auto">
-              <Trash2 className="w-4 h-4" /> Delete ({selectedUsers.length})
+              className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-md text-red-400 hover:text-red-300 hover:bg-red-500/10 text-[13px] font-semibold transition w-auto"
+              style={{ border: "1px solid rgba(248,113,113,0.25)" }}>
+              <Trash2 className="w-3.5 h-3.5" /> Delete (<span className="font-mono tabular-nums">{selectedUsers.length}</span>)
             </button>
           )}
         </div>
-      </div>
+      </header>
 
-      {/* Table */}
       {filtered.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
-          <div className="w-14 h-14 rounded-2xl bg-orange-50 flex items-center justify-center mx-auto mb-4">
-            <Building2 className="w-7 h-7 text-orange-300" />
+        <div className="bg-[#181A22] border border-white/[0.06] rounded-lg px-6 py-16 text-center">
+          <div className="w-10 h-10 rounded-md bg-white/[0.06] inline-flex items-center justify-center mb-3">
+            <Building2 className="w-5 h-5 text-gray-500" />
           </div>
-          <h3 className="text-base font-bold text-gray-700">{search ? "No matching clubs" : "No clubs yet"}</h3>
-          <p className="text-sm text-gray-400 mt-1">
-            {search ? "Try a different search" : "Create your first club from 'Create Club Admin'"}
+          <h3 className="text-[14px] font-medium text-white">{search ? "No matching clubs" : "No clubs yet"}</h3>
+          <p className="text-[13px] text-gray-400 mt-1 max-w-md mx-auto">
+            {search ? "Try a different search." : 'Create your first club from "Create club admin".'}
           </p>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+        <div className="bg-[#181A22] border border-white/[0.06] rounded-lg overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="bg-gray-50 border-b border-gray-100">
+                <tr className="border-b border-white/[0.06]">
                   <th className="w-12 px-4 py-3 text-center">
-                    <input type="checkbox" checked={selectedUsers.length > 0 && selectedUsers.length === filtered.length}
+                    <input type="checkbox"
+                      checked={selectedUsers.length > 0 && selectedUsers.length === filtered.length}
                       onChange={handleSelectAll}
-                      className="rounded border-gray-300 text-orange-500 focus:ring-orange-500/20 w-4 h-4 cursor-pointer" />
+                      className="rounded w-4 h-4 cursor-pointer"
+                      style={{ accentColor: "#f97316" }} />
                   </th>
-                  <th className="text-left px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-gray-400">Club</th>
-                  <th className="text-left px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-gray-400">Admin</th>
-                  <th className="text-left px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-gray-400">Contact</th>
-                  <th className="text-left px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-gray-400">Location</th>
-                  <th className="text-center px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-gray-400">Status</th>
-                  <th className="text-center px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-gray-400">Actions</th>
+                  <Th>Club</Th>
+                  <Th>Admin</Th>
+                  <Th>Contact</Th>
+                  <Th>Location</Th>
+                  <Th align="center">Status</Th>
+                  <Th align="center">Actions</Th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-50">
+              <tbody>
                 {filtered.map((club) => {
                   const isSelected = selectedUsers.includes(club._id);
                   return (
-                    <tr key={club._id} className={`transition ${isSelected ? "bg-orange-50/50" : "hover:bg-orange-50/20"}`}>
+                    <tr key={club._id}
+                      className={`border-b border-white/[0.04] last:border-b-0 transition ${
+                        isSelected ? "bg-orange-500/[0.04]" : "hover:bg-white/[0.02]"
+                      }`}>
                       <td className="px-4 py-4 text-center">
                         <input type="checkbox" checked={isSelected} onChange={() => handleSelectUser(club._id)}
-                          className="rounded border-gray-300 text-orange-500 focus:ring-orange-500/20 w-4 h-4 cursor-pointer" />
+                          className="rounded w-4 h-4 cursor-pointer"
+                          style={{ accentColor: "#f97316" }} />
                       </td>
-                      <td className="px-5 py-4">
+                      <Td>
                         <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center flex-shrink-0">
+                          <div className="w-9 h-9 rounded-md bg-orange-500/15 text-orange-400 grid place-items-center flex-shrink-0">
                             <Building2 className="w-4 h-4" />
                           </div>
-                          <div>
-                            <p className="text-sm font-bold text-gray-900">{club.profile?.clubName || club.clubName || "N/A"}</p>
-                            {club.profile?.clubID && <p className="text-[10px] text-gray-400 font-mono">{club.profile.clubID}</p>}
+                          <div className="min-w-0">
+                            <p className="text-[13px] font-medium text-white">{club.profile?.clubName || club.clubName || "N/A"}</p>
+                            {club.profile?.clubID && <p className="text-[10px] text-gray-500 font-mono">{club.profile.clubID}</p>}
                           </div>
                         </div>
-                      </td>
-                      <td className="px-5 py-4">
-                        <p className="text-sm text-gray-800">{club.name}</p>
-                      </td>
-                      <td className="px-5 py-4">
+                      </Td>
+                      <Td><span className="text-[13px] text-gray-300">{club.name}</span></Td>
+                      <Td>
                         <div className="space-y-0.5">
-                          <p className="text-xs text-gray-600 flex items-center gap-1"><Mail className="w-3 h-3" /> {club.email}</p>
-                          {club.mobile && <p className="text-xs text-gray-500 flex items-center gap-1"><Phone className="w-3 h-3" /> {club.mobile}</p>}
+                          <p className="text-[11px] text-gray-400 flex items-center gap-1"><Mail className="w-3 h-3" /> {club.email}</p>
+                          {club.mobile && (
+                            <p className="text-[11px] text-gray-500 flex items-center gap-1">
+                              <Phone className="w-3 h-3" /> <span className="font-mono tabular-nums">{club.mobile}</span>
+                            </p>
+                          )}
                         </div>
-                      </td>
-                      <td className="px-5 py-4">
+                      </Td>
+                      <Td>
                         {(club.profile?.city || club.profile?.area) ? (
-                          <p className="text-xs text-gray-600 flex items-center gap-1">
+                          <p className="text-[11px] text-gray-400 flex items-center gap-1">
                             <MapPin className="w-3 h-3" />
                             {[club.profile?.area, club.profile?.city].filter(Boolean).join(", ")}
                           </p>
-                        ) : <span className="text-xs text-gray-400">—</span>}
-                      </td>
-                      <td className="px-5 py-4 text-center">
+                        ) : <span className="text-[11px] text-gray-500">—</span>}
+                      </Td>
+                      <Td align="center">
                         <button onClick={() => handleToggleStatus(club._id)}
-                          className={`text-[10px] font-bold px-2.5 py-1 rounded-full transition w-auto ${
+                          className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider transition w-auto ${
                             club.isActive !== false
-                              ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                              : "bg-red-50 text-red-600 hover:bg-red-100"
+                              ? "bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25"
+                              : "bg-red-500/15 text-red-300 hover:bg-red-500/25"
                           }`}>
                           {club.isActive !== false ? "Active" : "Inactive"}
                         </button>
-                      </td>
-                      <td className="px-5 py-4">
+                      </Td>
+                      <Td align="center">
                         <div className="flex justify-center gap-1">
-                          <button onClick={() => handleEditClick(club)}
-                            className="p-2 text-gray-400 hover:text-orange-500 hover:bg-orange-50 rounded-lg transition w-auto" title="Edit">
-                            <Pencil className="w-4 h-4" />
+                          <button onClick={() => handleEditClick(club)} title="Edit"
+                            className="h-7 w-7 inline-flex items-center justify-center rounded-md text-gray-500 hover:text-orange-400 hover:bg-orange-500/15 transition w-auto">
+                            <Pencil className="w-3.5 h-3.5" />
                           </button>
-                          <button onClick={() => handleDelete(club._id)}
-                            className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition w-auto" title="Delete">
-                            <Trash2 className="w-4 h-4" />
+                          <button onClick={() => handleDelete(club._id)} title="Delete"
+                            className="h-7 w-7 inline-flex items-center justify-center rounded-md text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition w-auto">
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
-                      </td>
+                      </Td>
                     </tr>
                   );
                 })}
@@ -237,69 +254,74 @@ export default function ManageClubs() {
 
       {/* Edit Modal */}
       {isEditModalOpen && editForm && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="bg-gradient-to-r from-orange-500 to-orange-600 px-6 py-4 flex justify-between items-center flex-shrink-0">
-              <h2 className="text-lg font-bold text-white">Edit Club Details</h2>
-              <button onClick={() => setIsEditModalOpen(false)} className="p-2 rounded-xl bg-white/20 hover:bg-white/30 transition w-auto">
-                <X className="w-4 h-4 text-white" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setIsEditModalOpen(false)}>
+          <div className="bg-[#181A22] border border-white/[0.06] rounded-lg shadow-[0_24px_64px_rgba(0,0,0,0.5)] w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="px-5 py-4 border-b border-white/[0.06] flex justify-between items-center">
+              <h2 className="text-[14px] font-medium text-white">Edit club details</h2>
+              <button onClick={() => setIsEditModalOpen(false)}
+                className="h-7 w-7 inline-flex items-center justify-center rounded-md text-gray-500 hover:text-white hover:bg-white/5 transition w-auto">
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleEditSubmit} className="overflow-y-auto p-6 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <ModalField label="Admin Name *" name="name" value={editForm.name} onChange={handleEditChange} required />
-                <ModalField label="Club Name *" name="clubName" value={editForm.clubName} onChange={handleEditChange} required />
+            <form onSubmit={handleEditSubmit} className="overflow-y-auto px-5 py-4 space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <ModalField label="Admin name *" name="name"     value={editForm.name}     onChange={handleEditChange} required />
+                <ModalField label="Club name *"  name="clubName" value={editForm.clubName} onChange={handleEditChange} required />
               </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <ModalField label="Email (read-only)" name="email" type="email" value={editForm.email} disabled />
                 <ModalField label="Phone *" name="mobile" type="tel" value={editForm.mobile} onChange={handleEditChange} required />
               </div>
-
-              <div className="border-t border-gray-100 pt-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <ModalField label="City" name="city" value={editForm.city} onChange={handleEditChange} />
-                  <ModalField label="Area" name="area" value={editForm.area} onChange={handleEditChange} />
-                </div>
+              <div className="pt-3 border-t border-white/[0.06] grid grid-cols-1 md:grid-cols-2 gap-3">
+                <ModalField label="City" name="city" value={editForm.city} onChange={handleEditChange} />
+                <ModalField label="Area" name="area" value={editForm.area} onChange={handleEditChange} />
               </div>
-
               <ModalField label="Sports (comma separated)" name="sports" value={editForm.sports} onChange={handleEditChange} />
-
               <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1.5">Detailed Address</label>
+                <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-500 mb-1.5">Detailed address</label>
                 <textarea name="address" rows={2} value={editForm.address} onChange={handleEditChange}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition resize-none" />
+                  className="w-full px-3 py-2.5 rounded-md text-[13px] text-gray-200 placeholder:text-gray-500 focus:outline-none resize-none"
+                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }} />
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-white/[0.06]">
                 <button type="button" onClick={() => setIsEditModalOpen(false)}
-                  className="px-5 py-2.5 text-gray-600 font-semibold text-sm hover:bg-gray-100 rounded-xl transition w-auto">
+                  className="h-9 px-3.5 rounded-md text-[13px] font-semibold text-gray-200 hover:text-white hover:bg-white/[0.06] transition w-auto"
+                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
                   Cancel
                 </button>
                 <button type="submit" disabled={isSubmitting}
-                  className="px-6 py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-bold text-sm rounded-xl disabled:opacity-50 transition flex items-center gap-2 w-auto">
-                  {isSubmitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</> : "Save Changes"}
+                  className="h-9 px-3.5 inline-flex items-center gap-1.5 bg-orange-500 hover:bg-orange-600 text-white text-[13px] font-semibold rounded-md transition active:scale-[0.98] disabled:opacity-50 shadow-sm shadow-orange-500/30 w-auto">
+                  {isSubmitting ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Saving…</> : "Save changes"}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
-    </div>
+    </SuperAdminShell>
   );
+}
+
+// ── Hoisted primitives ───────────────────────────────────────────────────────
+
+function Th({ children, align }) {
+  const a = align === "right" ? "text-right" : align === "center" ? "text-center" : "text-left";
+  return <th className={`py-3 px-4 text-[10px] font-bold uppercase tracking-[0.08em] text-gray-500 ${a}`}>{children}</th>;
+}
+function Td({ children, align }) {
+  const a = align === "right" ? "text-right" : align === "center" ? "text-center" : "text-left";
+  return <td className={`py-3 px-4 ${a}`}>{children}</td>;
 }
 
 function ModalField({ label, name, type = "text", value, onChange, required, disabled }) {
   return (
     <div>
-      <label className="block text-xs font-semibold text-gray-500 mb-1.5">{label}</label>
+      <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-500 mb-1.5">{label}</label>
       <input type={type} name={name} value={value} onChange={onChange} required={required} disabled={disabled}
-        className={`w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm transition outline-none ${
-          disabled
-            ? "bg-gray-100 text-gray-500 cursor-not-allowed"
-            : "bg-gray-50 focus:bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
-        }`} />
+        className="w-full h-9 px-3 rounded-md text-[13px] text-gray-200 placeholder:text-gray-500 focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
+        style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }} />
     </div>
   );
 }

@@ -141,23 +141,58 @@ export default function useMatchScoring(matchId) {
   const isInProgress = match?.status === "IN_PROGRESS" || match?.status === "in_progress" || match?.status === "in-progress";
   const sets = match?.sets || [];
 
-  const player1SetsWon = sets.filter((s) => {
-    if (!s.setWinner) return false;
-    const w = s.setWinner;
+  // Some legacy matches don't store `setWinner` on each set (it was added
+  // mid-flight by a later scoring revision). When it's missing, derive it
+  // from the games: count games won within the set, fall back to total
+  // points on a tie. Without this fallback, completed matches show a
+  // SCORE of 0—0 in the header even though every set has a clear winner.
+  const setWinnerOf = (s) => {
+    if (s?.setWinner) return s.setWinner;
+    const games = Array.isArray(s?.games) ? s.games : [];
+    if (games.length === 0) return null;
+    let p1Games = 0, p2Games = 0, p1Pts = 0, p2Pts = 0;
+    for (const g of games) {
+      const a = g?.finalScore?.player1 ?? g?.homePoints ?? 0;
+      const b = g?.finalScore?.player2 ?? g?.awayPoints ?? 0;
+      p1Pts += a; p2Pts += b;
+      if (a > b) p1Games++;
+      else if (b > a) p2Games++;
+    }
+    if (p1Games !== p2Games) return p1Games > p2Games ? "player1" : "player2";
+    if (p1Pts === p2Pts) return null;
+    return p1Pts > p2Pts ? "player1" : "player2";
+  };
+
+  const matchesPlayer1 = (w) => {
+    if (!w) return false;
     if (typeof w === "string") return w === "player1" || w === player1Name;
-    return w.playerId?.toString() === match?.player1?.playerId?.toString() || w.playerName === player1Name;
-  }).length;
-
-  const player2SetsWon = sets.filter((s) => {
-    if (!s.setWinner) return false;
-    const w = s.setWinner;
+    return (
+      w.playerId?.toString() === match?.player1?.playerId?.toString() ||
+      w.playerName === player1Name
+    );
+  };
+  const matchesPlayer2 = (w) => {
+    if (!w) return false;
     if (typeof w === "string") return w === "player2" || w === player2Name;
-    return w.playerId?.toString() === match?.player2?.playerId?.toString() || w.playerName === player2Name;
-  }).length;
+    return (
+      w.playerId?.toString() === match?.player2?.playerId?.toString() ||
+      w.playerName === player2Name
+    );
+  };
 
-  const winnerName = match?.winner
-    ? typeof match.winner === "object" ? (match.winner.playerName || match.winner.userName || "Unknown") : match.winner
+  const player1SetsWon = sets.filter((s) => matchesPlayer1(setWinnerOf(s))).length;
+  const player2SetsWon = sets.filter((s) => matchesPlayer2(setWinnerOf(s))).length;
+
+  // Same fallback for the overall winner name — if the match doc never had
+  // `winner` written (older scorers), infer it from the sets-won count.
+  let winnerName = match?.winner
+    ? typeof match.winner === "object"
+      ? (match.winner.playerName || match.winner.userName || "Unknown")
+      : match.winner
     : null;
+  if (!winnerName && isCompleted && player1SetsWon !== player2SetsWon) {
+    winnerName = player1SetsWon > player2SetsWon ? player1Name : player2Name;
+  }
 
   return {
     // Data

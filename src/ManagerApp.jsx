@@ -3,8 +3,8 @@ import { AppLayout } from "./shared/layout";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 // Manager pages
-import MDashboard from "./Manager/MDashboard";
-import MTournamentManagement from "./Manager/MTournamentManagement";
+import MDashboard from "./pages/manager/Dashboard";
+import MTournamentManagement from "./pages/manager/Tournaments";
 import MSlot_Booking from "./Manager/MSlot_Booking";
 import MSocial from "./Manager/MSocialV2";
 import MRefree from "./Manager/MRefree";
@@ -18,6 +18,10 @@ import MCoupons from "./Manager/MCoupons";
 import InviteEmployees from "./Manager/InviteEmployees";
 import BulkBookingUpload from "./Manager/BulkBookingUpload";
 import NotificationPage from "./Manager/Notification";
+import HireRequests from "./Manager/HireRequests";
+import PaymentProofReview from "./Manager/PaymentProofReview";
+import MGroupChatList from "./Manager/MGroupChatList";
+import MGroupChatPage from "./Manager/MGroupChatPage";
 
 // Tournament — legacy (still works, kept for backward compat)
 import TeamKnockouts from "./Manager/TeamKnockouts";
@@ -43,8 +47,8 @@ import TournamentLeaderboard from "./Manager/TournamentLeaderboard";
 // Feature modules
 import { LiveMatchPage } from "./features/live";
 import { TournamentDashboardPage } from "./features/dashboard";
-import { ChatList as GroupChatListPage, ChatPage as GroupChatDetailPage } from "./features/groupChat";
-import { ChatList as GroupChatList, ChatPage as GroupChatPage } from "./features/groupChat";
+// Group chat: Manager uses MGroupChatList/MGroupChatPage wrappers (above) that
+// supply the dark ManagerShell chrome around the shared ChatList/ChatPage.
 
 const ManagerApp = () => {
   return (
@@ -60,49 +64,69 @@ const ManagerApp = () => {
       <Route path="/tournaments/:tournamentId/live/:matchId" element={<LiveMatchPage />} />
 
       {/* ═══════════════════════════════════════════════════
+          CUSTOM-SHELL PAGES (own their own sidebar+topbar)
+          /mdashboard uses ManagerShell; /tournament-management/*
+          uses TournamentShell. Both sit OUTSIDE AppLayout to avoid
+          double-chrome rendering.
+          ═══════════════════════════════════════════════════ */}
+      <Route element={<ProtectedRoute />}>
+        <Route path="/mdashboard" element={<MDashboard />} />
+        <Route path="/mtournament-management" element={<MTournamentManagement />} />
+        <Route path="/tournament-management/group-stage" element={<MGroupStageManagement />} />
+        <Route path="/tournament-management/team-knockouts" element={<TeamKnockouts />} />
+        <Route path="/tournament-management/direct-knockout" element={<MDirectKnockout />} />
+        {/* Pages that own their dark ManagerShell chrome — must stay outside AppLayout to avoid double sidebar. */}
+        <Route path="/mcoupons"      element={<MCoupons />} />
+        <Route path="/msettings"     element={<MSettings />} />
+        <Route path="/mslot-Booking" element={<MSlot_Booking />} />
+        <Route path="/msocial"       element={<MSocial />} />
+        <Route path="/mrefree"       element={<MRefree />} />
+        <Route path="/payments"          element={<MPayments />} />
+        <Route path="/notification"      element={<NotificationPage />} />
+        <Route path="/invite-employees"  element={<InviteEmployees />} />
+        <Route path="/bulk-booking"      element={<BulkBookingUpload />} />
+        <Route path="/hire-requests"        element={<HireRequests />} />
+        <Route path="/payment-proof-review" element={<PaymentProofReview />} />
+        <Route path="/staff-applications"   element={<AllStaffApplicationsPage />} />
+        <Route path="/turf-details/:id"     element={<MTurfDetails />} />
+        <Route path="/mtrainers"            element={<MTrainers />} />
+        <Route path="/group-chat"           element={<MGroupChatList />} />
+        <Route path="/group-chat/:chatId"   element={<MGroupChatPage />} />
+      </Route>
+
+      {/* ═══════════════════════════════════════════════════
           APP LAYOUT (dark sidebar + topbar)
           All standard manager pages render inside this
           ═══════════════════════════════════════════════════ */}
       <Route element={<AppLayout role="manager" />}>
         <Route element={<ProtectedRoute />}>
 
-          {/* Dashboard */}
-          <Route path="/mdashboard" element={<MDashboard />} />
+          {/* Dashboard route moved above (uses ManagerShell). */}
 
-          {/* Tournament Management */}
-          <Route path="/mtournament-management" element={<MTournamentManagement />} />
-          <Route path="/staff-applications" element={<AllStaffApplicationsPage />} />
-          <Route path="/invite-employees" element={<InviteEmployees />} />
-          <Route path="/bulk-booking" element={<BulkBookingUpload />} />
+          {/* Tournament Management list route moved above (uses ManagerShell). */}
+          {/* /staff-applications moved above — uses dark ManagerShell. */}
+          {/* /hire-requests moved above — uses dark ManagerShell. */}
+          {/* /invite-employees and /bulk-booking moved above — both use dark ManagerShell. */}
 
           {/* Facility */}
-          <Route path="/mslot-Bookingt" element={<MSlot_Booking />} />
-          <Route path="/turf-details/:id" element={<MTurfDetails />} />
+          {/* /mslot-Booking and /turf-details/:id moved above — both use dark ManagerShell. */}
 
           {/* Management */}
-          <Route path="/msocial" element={<MSocial />} />
-          <Route path="/mrefree" element={<MRefree />} />
-          <Route path="/mtrainers" element={<MTrainers />} />
+          {/* /msocial, /mrefree, /mtrainers moved above — all use dark ManagerShell. */}
           <Route path="/mnews" element={<MNews />} />
 
           {/* Finance */}
-          <Route path="/payments" element={<MPayments />} />
-          <Route path="/mcoupons" element={<MCoupons />} />
+          {/* /payments, /mcoupons, /payment-proof-review moved above — all use dark ManagerShell. */}
 
-          {/* Group Chat */}
-          <Route path="/group-chat" element={<GroupChatListPage />} />
-          <Route path="/group-chat/:chatId" element={<GroupChatDetailPage />} />
+          {/* Group Chat moved above — uses dark MGroupChatList/MGroupChatPage wrappers. */}
 
           {/* Notifications & Settings */}
-          <Route path="/notification" element={<NotificationPage />} />
-          <Route path="/msettings" element={<MSettings />} />
+          {/* /notification and /msettings moved above — both use dark ManagerShell. */}
 
-          {/* Team Knockout */}
-          <Route path="/tournament-management/team-knockouts" element={<TeamKnockouts />} />
+          {/* Team Knockout — entry route moved above (uses TournamentShell). */}
           <Route path="/tournament-management/team-knockouts/:id/matches" element={<TeamKnockoutMatches />} />
 
-          {/* Direct Knockout (Standalone) */}
-          <Route path="/tournament-management/direct-knockout" element={<MDirectKnockout />} />
+          {/* Direct Knockout entry route moved above (uses TournamentShell). */}
 
           {/* V2 Tournament Pages */}
           <Route path="/tournaments/:tournamentId" element={<TournamentOverviewPage />} />
@@ -114,8 +138,7 @@ const ManagerApp = () => {
           <Route path="/tournaments/:tournamentId/courts" element={<CourtsPage />} />
           <Route path="/tournaments/:tournamentId/staff" element={<StaffApplicationsPage />} />
 
-          {/* Legacy Group Stage (backward compat) */}
-          <Route path="/tournament-management/group-stage" element={<MGroupStageManagement />} />
+          {/* Legacy Group Stage (backward compat) — entry route moved above. */}
           <Route path="/tournament-management/group-stage/:tournamentId/:groupId/scoreboard" element={<MGroupStageScoreBoard />} />
           <Route path="/tournament-management/group-stage/:tournamentId/:groupId/points-table" element={<MPointsTableScreen />} />
           <Route path="/tournament-management/group-stage/:tournamentId/leaderboard" element={<TournamentLeaderboard />} />

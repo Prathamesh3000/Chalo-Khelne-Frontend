@@ -4,32 +4,20 @@ import { AuthContext } from "../context/AuthContext";
 import axios from "axios";
 import { getSportName, getTournamentType, getCurrentStage } from "../utils/sportTrack";
 import {
-  Users,
-  Trophy,
-  DollarSign,
-  TrendingUp,
-  ArrowLeft,
-  ChevronRight,
-  Calendar,
-  MapPin,
-  User,
-  CreditCard,
-  BarChart3,
-  Eye,
-  CheckCircle,
-  Clock,
-  XCircle,
-  Receipt,
+  Users, Trophy, IndianRupee, TrendingUp, ArrowLeft, ChevronRight,
+  MapPin, CreditCard, BarChart3, Eye, CheckCircle, Clock, Receipt, Loader2,
 } from "lucide-react";
+import { ClubAdminShell } from "../shared/layout";
 
-const statusBadge = {
-  confirmed: "bg-green-100 text-green-700",
-  pending: "bg-yellow-100 text-yellow-700",
-  cancelled: "bg-red-100 text-red-700",
-  completed: "bg-blue-100 text-blue-700",
-  active: "bg-green-100 text-green-700",
-  upcoming: "bg-blue-100 text-blue-700",
-  "in-progress": "bg-orange-100 text-orange-700",
+const statusPillClass = (status) => {
+  const s = (status || "").toLowerCase();
+  if (["confirmed", "active", "paid"].includes(s)) return "bg-emerald-500/15 text-emerald-300";
+  if (["pending"].includes(s)) return "bg-amber-500/15 text-amber-300";
+  if (["cancelled", "rejected", "failed"].includes(s)) return "bg-red-500/15 text-red-300";
+  if (["completed", "waived"].includes(s)) return "bg-blue-500/15 text-blue-300";
+  if (["upcoming"].includes(s)) return "bg-blue-500/15 text-blue-300";
+  if (["in-progress"].includes(s)) return "bg-orange-500/15 text-orange-300";
+  return "bg-white/[0.06] text-gray-400";
 };
 
 export default function ClubAdminFinance() {
@@ -37,8 +25,7 @@ export default function ClubAdminFinance() {
   const token = localStorage.getItem("token");
   const headers = { Authorization: `Bearer ${token}` };
 
-  // State
-  const [view, setView] = useState("overview"); // overview | manager | tournament
+  const [view, setView] = useState("overview");
   const [overview, setOverview] = useState(null);
   const [managerDetail, setManagerDetail] = useState(null);
   const [tournamentDetail, setTournamentDetail] = useState(null);
@@ -100,388 +87,382 @@ export default function ClubAdminFinance() {
 
   const formatCurrency = (n) => `₹${(n || 0).toLocaleString("en-IN")}`;
 
-  if (loading && !overview) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-gray-400 text-lg">Loading financial data...</div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <ClubAdminShell searchPlaceholder="Search finance…">
       {/* Header */}
-      <div className="flex items-center gap-4 mb-6">
+      <header className="flex items-start gap-3 mb-6">
         {view !== "overview" && (
-          <button onClick={goBack} className="p-2 hover:bg-gray-100 rounded-lg transition-colors w-auto bg-white border border-gray-200">
-            <ArrowLeft size={20} className="text-gray-600" />
+          <button onClick={goBack}
+            className="h-9 w-9 inline-flex items-center justify-center rounded-md text-gray-400 hover:text-white hover:bg-white/[0.04] transition w-auto flex-shrink-0"
+            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
+            <ArrowLeft className="w-4 h-4" />
           </button>
         )}
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800">
-            {view === "overview" && "Financial Overview"}
+        <div className="min-w-0">
+          <p className="inline-flex items-center gap-1.5 text-[12px] text-gray-400">
+            <TrendingUp className="w-3.5 h-3.5" />
+            Finance · {view === "overview" ? "Overview" : view === "manager" ? "Manager detail" : "Tournament detail"}
+          </p>
+          <h1 className="mt-2 text-[26px] font-medium text-white leading-tight">
+            {view === "overview" && "Financial overview"}
             {view === "manager" && `${selectedManagerName} — Details`}
-            {view === "tournament" && `Tournament — ${tournamentDetail?.tournament?.title || ""}`}
+            {view === "tournament" && `${tournamentDetail?.tournament?.title || "Tournament"}`}
           </h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            {view === "overview" && "Track all managers, tournaments, and revenue"}
-            {view === "manager" && "Tournaments, bookings, and revenue breakdown"}
-            {view === "tournament" && "Registrations and category-wise revenue"}
+          <p className="mt-1 text-[13px] text-gray-400">
+            {view === "overview" && "Track all managers, tournaments, and revenue."}
+            {view === "manager" && "Tournaments, bookings, and revenue breakdown."}
+            {view === "tournament" && "Registrations and category-wise revenue."}
           </p>
         </div>
-      </div>
+      </header>
 
-      {/* =================== OVERVIEW VIEW =================== */}
-      {view === "overview" && overview && (
+      {loading && !overview ? (
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="w-6 h-6 text-gray-500 animate-spin" />
+        </div>
+      ) : (
         <>
-          {/* Summary Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            <SummaryCard icon={<Users />} color="blue" label="Total Managers" value={overview.totalManagers} />
-            <SummaryCard icon={<Trophy />} color="purple" label="Total Tournaments" value={overview.totalTournaments} />
-            <SummaryCard icon={<DollarSign />} color="green" label="Tournament Revenue" value={formatCurrency(overview.totalTournamentRevenue)} />
-            <SummaryCard icon={<TrendingUp />} color="orange" label="Grand Total Revenue" value={formatCurrency(overview.grandTotalRevenue)} />
-          </div>
+          {/* OVERVIEW */}
+          {view === "overview" && overview && (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+                <StatTile icon={Users}        label="Total managers"      value={overview.totalManagers} />
+                <StatTile icon={Trophy}       label="Total tournaments"   value={overview.totalTournaments} />
+                <StatTile icon={IndianRupee}  label="Tournament revenue"  value={formatCurrency(overview.totalTournamentRevenue)} tone="green" />
+                <StatTile icon={TrendingUp}   label="Grand total revenue" value={formatCurrency(overview.grandTotalRevenue)} tone="green" />
+              </div>
 
-          {/* Manager Cards */}
-          <h2 className="text-lg font-semibold text-gray-800 mb-4">Managers</h2>
-          {overview.managers.length === 0 ? (
-            <div className="bg-white rounded-xl border border-gray-100 p-12 text-center">
-              <Users size={48} className="mx-auto text-gray-300 mb-4" />
-              <h3 className="text-lg font-semibold text-gray-500">No managers found</h3>
-              <p className="text-sm text-gray-400 mt-1">Create managers from your dashboard to see their financial data here</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {overview.managers.map((mgr) => (
-                <div
-                  key={mgr._id}
-                  onClick={() => openManagerDetail(mgr._id, mgr.name)}
-                  className="bg-white rounded-xl border border-gray-100 p-5 shadow-sm hover:shadow-md hover:border-blue-200 transition-all cursor-pointer group"
-                >
-                  {/* Manager Header */}
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-lg">
-                      {mgr.name?.charAt(0)?.toUpperCase() || "M"}
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-800 group-hover:text-blue-600 transition-colors">{mgr.name}</h3>
-                      <p className="text-xs text-gray-400">{mgr.email}</p>
-                    </div>
-                    <ChevronRight size={18} className="text-gray-300 group-hover:text-blue-500 transition-colors" />
+              <h2 className="text-[14px] font-medium text-white mb-3">Managers</h2>
+              {overview.managers.length === 0 ? (
+                <div className="bg-[#181A22] border border-white/[0.06] rounded-lg px-6 py-16 text-center">
+                  <div className="w-10 h-10 rounded-md bg-white/[0.06] inline-flex items-center justify-center mb-3">
+                    <Users className="w-5 h-5 text-gray-500" />
                   </div>
-
-                  {/* Stats Grid */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-purple-50 rounded-lg p-2.5 text-center">
-                      <div className="text-lg font-bold text-purple-700">{mgr.tournaments}</div>
-                      <div className="text-[10px] text-purple-500 font-medium uppercase">Tournaments</div>
-                    </div>
-                    <div className="bg-green-50 rounded-lg p-2.5 text-center">
-                      <div className="text-lg font-bold text-green-700">{formatCurrency(mgr.totalRevenue)}</div>
-                      <div className="text-[10px] text-green-500 font-medium uppercase">Revenue</div>
-                    </div>
-                    <div className="bg-blue-50 rounded-lg p-2.5 text-center">
-                      <div className="text-lg font-bold text-blue-700">{mgr.tournamentBookings}</div>
-                      <div className="text-[10px] text-blue-500 font-medium uppercase">Registrations</div>
-                    </div>
-                    <div className="bg-orange-50 rounded-lg p-2.5 text-center">
-                      <div className="text-lg font-bold text-orange-700">{mgr.turfBookings}</div>
-                      <div className="text-[10px] text-orange-500 font-medium uppercase">Turf Bookings</div>
-                    </div>
-                  </div>
-
-                  {/* Status Badge */}
-                  <div className="mt-3 flex justify-between items-center">
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${mgr.isActive ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}>
-                      {mgr.isActive ? "Active" : "Inactive"}
-                    </span>
-                    <span className="text-[10px] text-gray-400">
-                      Joined {new Date(mgr.joinedAt).toLocaleDateString("en-IN", { month: "short", year: "numeric" })}
-                    </span>
-                  </div>
+                  <h3 className="text-[14px] font-medium text-white">No managers found</h3>
+                  <p className="text-[13px] text-gray-400 mt-1 max-w-md mx-auto">Create managers from your dashboard to see their financial data here.</p>
                 </div>
-              ))}
-            </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {overview.managers.map((mgr) => (
+                    <ManagerCard key={mgr._id} mgr={mgr} onClick={() => openManagerDetail(mgr._id, mgr.name)} formatCurrency={formatCurrency} />
+                  ))}
+                </div>
+              )}
+            </>
           )}
-        </>
-      )}
 
-      {/* =================== MANAGER DETAIL VIEW =================== */}
-      {view === "manager" && managerDetail && (
-        <>
-          {/* Manager Totals */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-            <SummaryCard icon={<Trophy />} color="purple" label="Tournaments" value={managerDetail.totals.totalTournaments} />
-            <SummaryCard icon={<DollarSign />} color="green" label="Tournament Revenue" value={formatCurrency(managerDetail.totals.totalTournamentRevenue)} />
-            <SummaryCard icon={<MapPin />} color="blue" label="Turf Bookings" value={managerDetail.totals.totalTurfBookings} />
-            <SummaryCard icon={<CreditCard />} color="orange" label="Turf Revenue" value={formatCurrency(managerDetail.totals.totalTurfRevenue)} />
-            <SummaryCard icon={<TrendingUp />} color="emerald" label="Grand Total" value={formatCurrency(managerDetail.totals.grandTotal)} />
-          </div>
+          {/* MANAGER DETAIL */}
+          {view === "manager" && managerDetail && (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-5">
+                <StatTile icon={Trophy}       label="Tournaments"        value={managerDetail.totals.totalTournaments} />
+                <StatTile icon={IndianRupee}  label="Tournament revenue" value={formatCurrency(managerDetail.totals.totalTournamentRevenue)} tone="green" />
+                <StatTile icon={MapPin}       label="Turf bookings"      value={managerDetail.totals.totalTurfBookings} />
+                <StatTile icon={CreditCard}   label="Turf revenue"       value={formatCurrency(managerDetail.totals.totalTurfRevenue)} tone="green" />
+                <StatTile icon={TrendingUp}   label="Grand total"        value={formatCurrency(managerDetail.totals.grandTotal)} tone="green" />
+              </div>
 
-          {/* Tournaments Table */}
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm mb-6">
-            <div className="px-5 py-4 border-b border-gray-100">
-              <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-                <Trophy size={20} className="text-purple-600" /> Tournaments ({managerDetail.tournaments.length})
-              </h3>
-            </div>
-            {managerDetail.tournaments.length === 0 ? (
-              <div className="p-8 text-center text-gray-400">No tournaments created by this manager</div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-gray-100">
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Tournament</th>
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Sport</th>
-                      <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Status</th>
-                      <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Registrations</th>
-                      <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Revenue</th>
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Dates</th>
-                      <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {managerDetail.tournaments.map((t) => (
-                      <tr key={t._id} className="hover:bg-gray-50/50 transition-colors">
-                        <td className="px-4 py-3">
-                          <div className="font-medium text-gray-800 text-sm">{t.tournamentName || t.title}</div>
-                          <div className="text-xs text-gray-400">{getTournamentType(t)}</div>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-600">{t.sport || getSportName(t) || "—"}</td>
-                        <td className="px-4 py-3 text-center">
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusBadge[t.status || getCurrentStage(t)?.toLowerCase()] || "bg-gray-100 text-gray-600"}`}>
-                            {t.status || getCurrentStage(t) || "—"}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <div className="text-sm font-semibold text-gray-800">{t.confirmedRegistrations}</div>
-                          <div className="text-[10px] text-gray-400">{t.totalRegistrations} total</div>
-                        </td>
-                        <td className="px-4 py-3 text-right font-semibold text-green-700 text-sm">
-                          {formatCurrency(t.paidRevenue)}
-                        </td>
-                        <td className="px-4 py-3 text-xs text-gray-500">
-                          {t.startDate || "—"} — {t.endDate || "—"}
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <button
-                            onClick={() => openTournamentDetail(t._id)}
-                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors w-auto"
-                            title="View Details"
-                          >
-                            <Eye size={16} />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
+              <Section title={`Tournaments (${managerDetail.tournaments.length})`} icon={Trophy} className="mb-3">
+                {managerDetail.tournaments.length === 0 ? (
+                  <div className="text-center py-10 text-[13px] text-gray-500">No tournaments created by this manager</div>
+                ) : (
+                  <div className="overflow-x-auto -mx-5 -mb-4">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-white/[0.06]">
+                          <Th>Tournament</Th>
+                          <Th>Sport</Th>
+                          <Th align="center">Status</Th>
+                          <Th align="center">Registrations</Th>
+                          <Th align="right">Revenue</Th>
+                          <Th>Dates</Th>
+                          <Th align="center">Actions</Th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {managerDetail.tournaments.map((t) => (
+                          <tr key={t._id} className="border-b border-white/[0.04] last:border-b-0 hover:bg-white/[0.02] transition">
+                            <Td>
+                              <p className="text-[13px] font-medium text-white">{t.tournamentName || t.title}</p>
+                              <p className="text-[11px] text-gray-500">{getTournamentType(t)}</p>
+                            </Td>
+                            <Td><span className="text-[12px] text-gray-300">{t.sport || getSportName(t) || "—"}</span></Td>
+                            <Td align="center">
+                              <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${statusPillClass(t.status || getCurrentStage(t))}`}>
+                                {t.status || getCurrentStage(t) || "—"}
+                              </span>
+                            </Td>
+                            <Td align="center">
+                              <p className="text-[13px] font-semibold text-white tabular-nums">{t.confirmedRegistrations}</p>
+                              <p className="text-[10px] text-gray-500"><span className="font-mono tabular-nums">{t.totalRegistrations}</span> total</p>
+                            </Td>
+                            <Td align="right"><span className="text-[13px] font-semibold text-emerald-300 tabular-nums">{formatCurrency(t.paidRevenue)}</span></Td>
+                            <Td><span className="text-[11px] text-gray-500 font-mono tabular-nums">{t.startDate || "—"} — {t.endDate || "—"}</span></Td>
+                            <Td align="center">
+                              <button onClick={() => openTournamentDetail(t._id)}
+                                title="View details"
+                                className="h-7 w-7 inline-flex items-center justify-center rounded-md text-orange-400 hover:text-orange-300 hover:bg-orange-500/15 transition w-auto">
+                                <Eye className="w-3.5 h-3.5" />
+                              </button>
+                            </Td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </Section>
 
-          {/* Turf Bookings Summary */}
-          {managerDetail.turfSummary.length > 0 && (
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
-              <div className="px-5 py-4 border-b border-gray-100">
-                <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-                  <MapPin size={20} className="text-blue-600" /> Turf Bookings
-                </h3>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-gray-100">
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Turf</th>
-                      <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Total</th>
-                      <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Confirmed</th>
-                      <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Cancelled</th>
-                      <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Revenue</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {managerDetail.turfSummary.map((turf) => (
-                      <tr key={turf.turfId} className="hover:bg-gray-50/50">
-                        <td className="px-4 py-3 font-medium text-gray-800 text-sm">{turf.turfName}</td>
-                        <td className="px-4 py-3 text-center text-sm text-gray-600">{turf.totalBookings}</td>
-                        <td className="px-4 py-3 text-center text-sm text-green-600 font-medium">{turf.confirmedBookings}</td>
-                        <td className="px-4 py-3 text-center text-sm text-red-500">{turf.cancelledBookings}</td>
-                        <td className="px-4 py-3 text-right font-semibold text-green-700 text-sm">{formatCurrency(turf.revenue)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+              {managerDetail.turfSummary.length > 0 && (
+                <Section title="Turf bookings" icon={MapPin}>
+                  <div className="overflow-x-auto -mx-5 -mb-4">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-white/[0.06]">
+                          <Th>Turf</Th>
+                          <Th align="center">Total</Th>
+                          <Th align="center">Confirmed</Th>
+                          <Th align="center">Cancelled</Th>
+                          <Th align="right">Revenue</Th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {managerDetail.turfSummary.map((turf) => (
+                          <tr key={turf.turfId} className="border-b border-white/[0.04] last:border-b-0 hover:bg-white/[0.02] transition">
+                            <Td><span className="text-[13px] font-medium text-white">{turf.turfName}</span></Td>
+                            <Td align="center"><span className="text-[13px] text-gray-300 font-mono tabular-nums">{turf.totalBookings}</span></Td>
+                            <Td align="center"><span className="text-[13px] text-emerald-300 font-mono tabular-nums">{turf.confirmedBookings}</span></Td>
+                            <Td align="center"><span className="text-[13px] text-red-300 font-mono tabular-nums">{turf.cancelledBookings}</span></Td>
+                            <Td align="right"><span className="text-[13px] font-semibold text-emerald-300 tabular-nums">{formatCurrency(turf.revenue)}</span></Td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </Section>
+              )}
+            </>
           )}
-        </>
-      )}
 
-      {/* =================== TOURNAMENT DETAIL VIEW =================== */}
-      {view === "tournament" && tournamentDetail && (
-        <>
-          {/* Tournament Info Card */}
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 mb-6">
-            <div className="flex flex-wrap gap-6 items-start">
-              <div className="flex-1">
-                <h2 className="text-xl font-bold text-gray-800">{tournamentDetail.tournament.title}</h2>
-                <div className="flex flex-wrap gap-2 mt-2">
-                  <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">{getSportName(tournamentDetail.tournament)}</span>
-                  <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">{getTournamentType(tournamentDetail.tournament)}</span>
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusBadge[getCurrentStage(tournamentDetail.tournament)?.toLowerCase()] || "bg-gray-100 text-gray-600"}`}>
+          {/* TOURNAMENT DETAIL */}
+          {view === "tournament" && tournamentDetail && (
+            <>
+              {/* Tournament info card */}
+              <div className="bg-[#181A22] border border-white/[0.06] rounded-lg p-5 mb-3">
+                <h2 className="text-[16px] font-medium text-white">{tournamentDetail.tournament.title}</h2>
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-500/15 text-amber-300">
+                    {getSportName(tournamentDetail.tournament)}
+                  </span>
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-blue-500/15 text-blue-300">
+                    {getTournamentType(tournamentDetail.tournament)}
+                  </span>
+                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${statusPillClass(getCurrentStage(tournamentDetail.tournament))}`}>
                     {getCurrentStage(tournamentDetail.tournament)}
                   </span>
                 </div>
-                <p className="text-sm text-gray-500 mt-2">
+                <p className="text-[12px] text-gray-400 mt-2 font-mono tabular-nums">
                   {tournamentDetail.tournament.startDate} — {tournamentDetail.tournament.endDate}
                 </p>
               </div>
-            </div>
-          </div>
 
-          {/* Summary Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <SummaryCard icon={<Users />} color="blue" label="Total Registrations" value={tournamentDetail.summary.totalRegistrations} />
-            <SummaryCard icon={<CheckCircle />} color="green" label="Confirmed" value={tournamentDetail.summary.confirmedRegistrations} />
-            <SummaryCard icon={<Clock />} color="yellow" label="Pending" value={tournamentDetail.summary.pendingRegistrations} />
-            <SummaryCard icon={<DollarSign />} color="emerald" label="Total Revenue" value={formatCurrency(tournamentDetail.summary.totalRevenue)} />
-          </div>
-
-          {/* Category Breakdown */}
-          {tournamentDetail.summary.categoryBreakdown.length > 0 && (
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm mb-6">
-              <div className="px-5 py-4 border-b border-gray-100">
-                <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-                  <BarChart3 size={20} className="text-purple-600" /> Category-wise Breakdown
-                </h3>
+              {/* Summary stats */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
+                <StatTile icon={Users}        label="Total registrations" value={tournamentDetail.summary.totalRegistrations} />
+                <StatTile icon={CheckCircle}  label="Confirmed"           value={tournamentDetail.summary.confirmedRegistrations} tone="green" />
+                <StatTile icon={Clock}        label="Pending"             value={tournamentDetail.summary.pendingRegistrations} tone="amber" />
+                <StatTile icon={IndianRupee}  label="Total revenue"       value={formatCurrency(tournamentDetail.summary.totalRevenue)} tone="green" />
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-gray-100">
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Category</th>
-                      <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Fee</th>
-                      <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Total</th>
-                      <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Confirmed</th>
-                      <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Paid</th>
-                      <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Revenue</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {tournamentDetail.summary.categoryBreakdown.map((cat, idx) => (
-                      <tr key={idx} className="hover:bg-gray-50/50">
-                        <td className="px-4 py-3 font-medium text-gray-800 text-sm">{cat.name}</td>
-                        <td className="px-4 py-3 text-right text-sm text-gray-600">{formatCurrency(cat.fee)}</td>
-                        <td className="px-4 py-3 text-center text-sm text-gray-600">{cat.total}</td>
-                        <td className="px-4 py-3 text-center text-sm text-green-600 font-medium">{cat.confirmed}</td>
-                        <td className="px-4 py-3 text-center text-sm text-blue-600 font-medium">{cat.paid}</td>
-                        <td className="px-4 py-3 text-right font-semibold text-green-700 text-sm">{formatCurrency(cat.revenue)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
 
-          {/* Registration List */}
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
-            <div className="px-5 py-4 border-b border-gray-100">
-              <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-                <Receipt size={20} className="text-blue-600" /> All Registrations ({tournamentDetail.registrations.length})
-              </h3>
-            </div>
-            {tournamentDetail.registrations.length === 0 ? (
-              <div className="p-8 text-center text-gray-400">No registrations yet</div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-gray-100">
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Player</th>
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Categories</th>
-                      <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Status</th>
-                      <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Payment</th>
-                      <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Amount</th>
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Date</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {tournamentDetail.registrations.map((reg) => (
-                      <tr key={reg._id} className="hover:bg-gray-50/50">
-                        <td className="px-4 py-3">
-                          <div className="font-medium text-gray-800 text-sm">{reg.userName}</div>
-                          <div className="text-xs text-gray-400">{reg.userEmail || reg.userPhone || ""}</div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex flex-wrap gap-1">
-                            {/* STEP 17b.ii — sportSelections is the only
-                                shape after STEP 16 (every booking has it).
-                                Legacy selectedCategories fallback removed. */}
-                            {(Array.isArray(reg.sportSelections) ? reg.sportSelections : []).map((s, i) => (
-                              <span key={i} className="px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px] font-medium">
-                                {s.categoryName} ({formatCurrency(s.fee)})
+              {/* Category breakdown */}
+              {tournamentDetail.summary.categoryBreakdown.length > 0 && (
+                <Section title="Category-wise breakdown" icon={BarChart3} className="mb-3">
+                  <div className="overflow-x-auto -mx-5 -mb-4">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-white/[0.06]">
+                          <Th>Category</Th>
+                          <Th align="right">Fee</Th>
+                          <Th align="center">Total</Th>
+                          <Th align="center">Confirmed</Th>
+                          <Th align="center">Paid</Th>
+                          <Th align="right">Revenue</Th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {tournamentDetail.summary.categoryBreakdown.map((cat, idx) => (
+                          <tr key={idx} className="border-b border-white/[0.04] last:border-b-0 hover:bg-white/[0.02] transition">
+                            <Td><span className="text-[13px] font-medium text-white">{cat.name}</span></Td>
+                            <Td align="right"><span className="text-[12px] text-gray-300 font-mono tabular-nums">{formatCurrency(cat.fee)}</span></Td>
+                            <Td align="center"><span className="text-[12px] text-gray-300 font-mono tabular-nums">{cat.total}</span></Td>
+                            <Td align="center"><span className="text-[12px] text-emerald-300 font-mono tabular-nums">{cat.confirmed}</span></Td>
+                            <Td align="center"><span className="text-[12px] text-blue-300 font-mono tabular-nums">{cat.paid}</span></Td>
+                            <Td align="right"><span className="text-[13px] font-semibold text-emerald-300 tabular-nums">{formatCurrency(cat.revenue)}</span></Td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </Section>
+              )}
+
+              {/* Registration list */}
+              <Section title={`All registrations (${tournamentDetail.registrations.length})`} icon={Receipt}>
+                {tournamentDetail.registrations.length === 0 ? (
+                  <div className="text-center py-10 text-[13px] text-gray-500">No registrations yet</div>
+                ) : (
+                  <div className="overflow-x-auto -mx-5 -mb-4">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-white/[0.06]">
+                          <Th>Player</Th>
+                          <Th>Categories</Th>
+                          <Th align="center">Status</Th>
+                          <Th align="center">Payment</Th>
+                          <Th align="right">Amount</Th>
+                          <Th>Date</Th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {tournamentDetail.registrations.map((reg) => (
+                          <tr key={reg._id} className="border-b border-white/[0.04] last:border-b-0 hover:bg-white/[0.02] transition">
+                            <Td>
+                              <p className="text-[13px] font-medium text-white">{reg.userName}</p>
+                              <p className="text-[11px] text-gray-500">{reg.userEmail || reg.userPhone || ""}</p>
+                            </Td>
+                            <Td>
+                              <div className="flex flex-wrap gap-1">
+                                {(Array.isArray(reg.sportSelections) ? reg.sportSelections : []).map((s, i) => (
+                                  <span key={i} className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-500/15 text-blue-300">
+                                    {s.categoryName} (<span className="font-mono tabular-nums">{formatCurrency(s.fee)}</span>)
+                                  </span>
+                                ))}
+                              </div>
+                            </Td>
+                            <Td align="center">
+                              <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${statusPillClass(reg.status)}`}>
+                                {reg.status}
                               </span>
-                            ))}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusBadge[reg.status] || "bg-gray-100 text-gray-600"}`}>
-                            {reg.status}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                            reg.paymentStatus === "paid" ? "bg-green-100 text-green-700" :
-                            reg.paymentStatus === "waived" ? "bg-blue-100 text-blue-700" :
-                            "bg-yellow-100 text-yellow-700"
-                          }`}>
-                            {reg.paymentStatus}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-right text-sm font-medium text-gray-700">
-                          {formatCurrency(reg.paymentAmount)}
-                        </td>
-                        <td className="px-4 py-3 text-xs text-gray-500">
-                          {new Date(reg.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
+                            </Td>
+                            <Td align="center">
+                              <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${statusPillClass(reg.paymentStatus)}`}>
+                                {reg.paymentStatus}
+                              </span>
+                            </Td>
+                            <Td align="right"><span className="text-[13px] font-semibold text-white tabular-nums">{formatCurrency(reg.paymentAmount)}</span></Td>
+                            <Td><span className="text-[11px] text-gray-500 font-mono tabular-nums">{new Date(reg.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</span></Td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </Section>
+            </>
+          )}
         </>
       )}
+    </ClubAdminShell>
+  );
+}
+
+// ── Sub-components ───────────────────────────────────────────────────────────
+
+function ManagerCard({ mgr, onClick, formatCurrency }) {
+  return (
+    <button onClick={onClick}
+      className="bg-[#181A22] border border-white/[0.06] rounded-lg p-4 text-left transition hover:border-white/[0.12] hover:bg-white/[0.02] cursor-pointer group w-auto">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-10 h-10 rounded-full bg-orange-500/15 text-orange-400 grid place-items-center text-[16px] font-semibold flex-shrink-0">
+          {mgr.name?.charAt(0)?.toUpperCase() || "M"}
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="text-[14px] font-medium text-white truncate group-hover:text-orange-300 transition">{mgr.name}</h3>
+          <p className="text-[11px] text-gray-500 truncate">{mgr.email}</p>
+        </div>
+        <ChevronRight className="w-4 h-4 text-gray-600 group-hover:text-orange-400 transition" />
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <MiniStat label="Tournaments"   value={mgr.tournaments}                         tone="amber" />
+        <MiniStat label="Revenue"       value={formatCurrency(mgr.totalRevenue)}        tone="emerald" />
+        <MiniStat label="Registrations" value={mgr.tournamentBookings}                   tone="blue" />
+        <MiniStat label="Turf bookings" value={mgr.turfBookings}                         tone="orange" />
+      </div>
+
+      <div className="mt-3 flex justify-between items-center">
+        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+          mgr.isActive ? "bg-emerald-500/15 text-emerald-300" : "bg-red-500/15 text-red-300"
+        }`}>
+          {mgr.isActive ? "Active" : "Inactive"}
+        </span>
+        <span className="text-[10px] text-gray-500">
+          Joined <span className="font-mono tabular-nums">{new Date(mgr.joinedAt).toLocaleDateString("en-IN", { month: "short", year: "numeric" })}</span>
+        </span>
+      </div>
+    </button>
+  );
+}
+
+// ── Dark inline primitives ───────────────────────────────────────────────────
+
+function StatTile({ icon: Icon, label, value, tone = "orange" }) {
+  const tones = {
+    orange: { bg: "bg-orange-500/15",  text: "text-orange-400"  },
+    green:  { bg: "bg-emerald-500/15", text: "text-emerald-400" },
+    amber:  { bg: "bg-amber-500/15",   text: "text-amber-400"   },
+  };
+  const t = tones[tone] || tones.orange;
+  return (
+    <div className="bg-[#181A22] border border-white/[0.06] rounded-lg p-4">
+      <div className="flex items-start justify-between gap-2 mb-3">
+        <span className={`grid w-[34px] h-[34px] rounded-md place-items-center ${t.bg}`}>
+          <Icon className={`w-[18px] h-[18px] ${t.text}`} />
+        </span>
+      </div>
+      <p className="text-[22px] font-medium leading-none text-white tabular-nums">{value ?? 0}</p>
+      <p className="mt-1 text-[12px] text-gray-400">{label}</p>
     </div>
   );
 }
 
-// Reusable Summary Card Component
-function SummaryCard({ icon, color, label, value }) {
-  const colors = {
-    blue: "bg-blue-100 text-blue-600",
-    purple: "bg-purple-100 text-purple-600",
-    green: "bg-green-100 text-green-600",
-    orange: "bg-orange-100 text-orange-600",
-    yellow: "bg-yellow-100 text-yellow-600",
-    emerald: "bg-emerald-100 text-emerald-600",
-    red: "bg-red-100 text-red-600",
+function MiniStat({ label, value, tone }) {
+  const tones = {
+    amber:   "text-amber-300",
+    emerald: "text-emerald-300",
+    blue:    "text-blue-300",
+    orange:  "text-orange-300",
   };
-
   return (
-    <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
-      <div className="flex items-center gap-3">
-        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${colors[color] || colors.blue}`}>
-          {icon}
-        </div>
-        <div>
-          <p className="text-xs text-gray-500">{label}</p>
-          <p className="text-lg font-bold text-gray-800">{value}</p>
-        </div>
-      </div>
+    <div className="rounded-md p-2.5 text-center" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
+      <p className={`text-[15px] font-semibold tabular-nums leading-none ${tones[tone] || "text-white"}`}>{value}</p>
+      <p className="text-[9px] font-bold text-gray-500 uppercase tracking-wider mt-1">{label}</p>
     </div>
   );
+}
+
+function Section({ title, icon: Icon, className = "", children }) {
+  return (
+    <div className={`bg-[#181A22] border border-white/[0.06] rounded-lg overflow-hidden ${className}`}>
+      <div className="px-5 py-3.5 border-b border-white/[0.06] flex items-center gap-2.5">
+        {Icon && (
+          <span className="w-7 h-7 rounded-md bg-orange-500/15 grid place-items-center flex-shrink-0">
+            <Icon className="w-3.5 h-3.5 text-orange-400" />
+          </span>
+        )}
+        <h3 className="text-[13px] font-medium text-white">{title}</h3>
+      </div>
+      <div className="px-5 py-4">{children}</div>
+    </div>
+  );
+}
+
+function Th({ children, align }) {
+  const a = align === "right" ? "text-right" : align === "center" ? "text-center" : "text-left";
+  return <th className={`py-3 px-3 text-[10px] font-bold uppercase tracking-[0.08em] text-gray-500 ${a}`}>{children}</th>;
+}
+
+function Td({ children, align }) {
+  const a = align === "right" ? "text-right" : align === "center" ? "text-center" : "text-left";
+  return <td className={`py-3 px-3 ${a}`}>{children}</td>;
 }

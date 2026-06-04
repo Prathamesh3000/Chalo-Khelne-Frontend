@@ -10,7 +10,12 @@ const PTurfdetails = () => {
   useEffect(() => {
     const fetchTurfDetails = async () => {
       try {
-        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/turf/turfs/${id}`);
+        const token = localStorage.getItem("token");
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/turf/turfs/${id}`, {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
         const data = await response.json();
         setTurf(data);
       } catch (error) {

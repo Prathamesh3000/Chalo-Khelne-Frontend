@@ -1,6 +1,8 @@
 import { toast } from "react-toastify";
 import { useState, useEffect, useContext } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
+import { TabBar, Skeleton } from "../shared/ui";
+import { TournamentShell } from "../shared/layout";
 import {
   Trophy, Users, Swords, Clock, ChevronRight, Plus, X, Search,
   RotateCcw, Upload, Check, AlertCircle, Zap, Target, Crown, Trash2,
@@ -42,6 +44,13 @@ export default function MDirectKnockout() {
   const [assignModalMatch, setAssignModalMatch] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("setup"); // bracket | setup | scoring
+
+  // URL → tab state (?tab=setup|bracket|scoring). Keeps refresh + deep-links honest.
+  useEffect(() => {
+    const t = searchParams.get("tab");
+    if (t === "setup" || t === "bracket" || t === "scoring") setActiveTab(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   // Setup state
   const [registeredPlayers, setRegisteredPlayers] = useState([]);
@@ -449,39 +458,68 @@ export default function MDirectKnockout() {
   const completedCount = matches.filter((m) => m.status === "COMPLETED").length;
   const champion = matches.find((m) => m.round === "final" && m.status === "COMPLETED")?.result?.winner;
 
+  // Shell props — pipeline derived from bracket presence + completion.
+  const _shellTournament = tournament ? {
+    title: tournament.title || "Singles Knockout",
+    sportName: Array.isArray(tournament.sports) ? (tournament.sports[0]?.sportName || "") : "",
+    currentStage: tournament.currentStage || "knockout",
+  } : null;
+  const _steps = [
+    { key: "registrations", label: "Registrations", sublabel: "—" },
+    { key: "players",       label: "Players",       sublabel: "—" },
+    { key: "groups",        label: "Groups",        sublabel: "Skipped" },
+    { key: "qualifiers",    label: "Qualifiers",    sublabel: "Skipped" },
+    { key: "knockout",      label: "Knockout",      sublabel: champion ? "Complete" : hasBracket ? `${completedCount}/${matches.length}` : "Setup" },
+  ];
+  const _activeStep = "knockout";
+  const _tabLabel = activeTab === "setup" ? "Setup" : activeTab === "bracket" ? "Bracket" : "Live scoring";
+  const _breadcrumbs = [
+    { label: "Tournaments", to: "/mtournament-management" },
+    { label: tournament?.title || "Singles Knockout", to: `/tournament-management/direct-knockout?tournamentId=${tournamentId}` },
+    { label: _tabLabel },
+  ];
+  const _tabBar = (
+    <TabBar
+      urlKey="tab"
+      defaultKey="setup"
+      tabs={[
+        { key: "setup",   label: "Setup" },
+        { key: "bracket", label: "Bracket", count: matches.length || undefined },
+        { key: "scoring", label: "Live scoring" },
+      ]}
+    />
+  );
+
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Trophy className="text-orange-500" size={28} />
-            Singles Knockout
-          </h1>
-          <p className="text-gray-500 text-sm mt-1">
-            {tournament?.title || "Tournament"} • Direct Elimination Bracket
-          </p>
-        </div>
-        <div className="flex gap-2">
-          {hasBracket && (
-            <>
-              <button
-                onClick={() => setShowBulkUpload(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 w-auto"
-              >
-                <Upload size={16} />
-                Bulk Score
-              </button>
-              <button
-                onClick={handleReset}
-                className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-lg text-sm font-medium hover:bg-red-100 border border-red-200 w-auto"
-              >
-                <RotateCcw size={16} />
-                Reset
-              </button>
-            </>
-          )}
-        </div>
+    <TournamentShell
+      tournament={_shellTournament}
+      steps={_steps}
+      activeStep={_activeStep}
+      breadcrumbs={_breadcrumbs}
+      activeTabKey={activeTab}
+      tabBar={_tabBar}
+    >
+      {/* Page header actions (Bulk Score / Reset) — kept inline since they're
+          specific to the bracket state, not tournament chrome. */}
+      <div className="flex items-center justify-end gap-2 mb-4">
+        {hasBracket && (
+          <>
+            <button
+              onClick={() => setShowBulkUpload(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 w-auto"
+            >
+              <Upload size={16} />
+              Bulk Score
+            </button>
+            <button
+              onClick={handleReset}
+              className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-lg text-sm font-medium hover:bg-red-100 border border-red-200 w-auto"
+            >
+              <RotateCcw size={16} />
+              Reset
+            </button>
+          </>
+        )}
       </div>
 
       {/* Champion Banner */}
@@ -517,23 +555,7 @@ export default function MDirectKnockout() {
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="flex gap-1 bg-gray-100 rounded-lg p-1 mb-6 w-fit">
-        {["setup", "bracket", "scoring"].map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-all w-auto ${activeTab === tab
-                ? "bg-white text-gray-900 shadow-sm"
-                : "text-gray-500 hover:text-gray-700"
-              }`}
-          >
-            {tab === "setup" && "Setup Draw"}
-            {tab === "bracket" && "Bracket"}
-            {tab === "scoring" && "Live Scoring"}
-          </button>
-        ))}
-      </div>
+      {/* Tab bar is rendered by TournamentShell via the `tabBar` slot. */}
 
       {/* TAB: Bracket View */}
       {activeTab === "bracket" && (
@@ -1679,7 +1701,7 @@ export default function MDirectKnockout() {
           </div>
         );
       })()}
-    </div>
+    </TournamentShell>
   );
 }
 

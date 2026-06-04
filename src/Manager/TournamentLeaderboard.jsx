@@ -2,6 +2,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import { Trophy, ArrowLeft, User, Crown } from "lucide-react";
+import { Breadcrumbs } from "../shared/ui";
 
 const SIG = "#5E6AD2";
 
@@ -59,6 +60,14 @@ export default function TournamentLeaderboard() {
 
   return (
     <div className="p-6 max-w-[960px] mx-auto">
+      <Breadcrumbs
+        className="mb-4"
+        items={[
+          { label: "Tournaments", to: "/mtournament-management" },
+          { label: tournament.title || "Manage tournament", to: `/tournament-management/group-stage?tournamentId=${tournamentId}` },
+          { label: "Leaderboard" },
+        ]}
+      />
       <div className="flex items-center gap-3 mb-6">
         <button
           onClick={() => navigate(-1)}

@@ -3,20 +3,10 @@ import { AuthContext } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import {
-  Users,
-  Trophy,
-  DollarSign,
-  MapPin,
-  TrendingUp,
-  CreditCard,
-  Calendar,
-  ArrowRight,
-  Gavel,
-  BarChart3,
-  CheckCircle,
-  Clock,
-  XCircle,
+  Users, Trophy, IndianRupee, MapPin, TrendingUp, CreditCard,
+  ArrowRight, Gavel, BarChart3, Inbox, Loader2, ShieldCheck,
 } from "lucide-react";
+import { ClubAdminShell } from "../shared/layout";
 
 const ClubAdminDashboard = () => {
   const { auth } = useContext(AuthContext);
@@ -30,9 +20,7 @@ const ClubAdminDashboard = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (auth?._id) {
-      fetchAll();
-    }
+    if (auth?._id) fetchAll();
   }, [auth]);
 
   const fetchAll = async () => {
@@ -43,7 +31,6 @@ const ClubAdminDashboard = () => {
         axios.get("/api/club-admin/finance/overview", { headers }),
         axios.get("/api/club-admin/finance/payments?limit=5", { headers }),
       ]);
-
       if (profileRes.status === "fulfilled") setProfileData(profileRes.value.data);
       if (overviewRes.status === "fulfilled") setOverview(overviewRes.value.data.overview);
       if (paymentsRes.status === "fulfilled") setRecentPayments(paymentsRes.value.data.payments || []);
@@ -55,14 +42,14 @@ const ClubAdminDashboard = () => {
   };
 
   const formatCurrency = (n) => `₹${(n || 0).toLocaleString("en-IN")}`;
-  const formatDate = (d) =>
-    d ? new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "—";
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-      </div>
+      <ClubAdminShell searchPlaceholder="Search dashboard…">
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="w-6 h-6 text-gray-500 animate-spin" />
+        </div>
+      </ClubAdminShell>
     );
   }
 
@@ -73,245 +60,252 @@ const ClubAdminDashboard = () => {
   const tournamentRevenue = overview?.totalTournamentRevenue || 0;
   const bookingRevenue = overview?.totalBookingRevenue || 0;
 
+  const displayName = profileData?.name || auth?.name || "Club Admin";
+  const clubName = profileData?.clubName || auth?.clubName || "your club";
+
+  const quickActions = [
+    { label: "Manage turfs",       icon: MapPin,     path: "/turf-management" },
+    { label: "Staff / Managers",   icon: Users,      path: "/staff-admin" },
+    { label: "Financial overview", icon: TrendingUp, path: "/club-finance" },
+    { label: "Payment history",    icon: CreditCard, path: "/payment-history" },
+    { label: "Referee management", icon: Gavel,      path: "/club-refree" },
+  ];
+
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      {/* Welcome Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">
-          Welcome back, {profileData?.name || auth?.name || "Club Admin"}
-        </h1>
-        <p className="text-sm text-gray-500 mt-1">
-          {profileData?.clubName || auth?.clubName || "Your club"} — Dashboard Overview
-        </p>
-      </div>
-
-      {/* Profile Card */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 mb-6">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xl">
-              {(profileData?.name || auth?.name || "C").charAt(0).toUpperCase()}
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold text-gray-800">{profileData?.name || auth?.name}</h2>
-              <div className="flex flex-wrap gap-4 text-sm text-gray-500 mt-1">
-                <span>{profileData?.email || auth?.email}</span>
-                <span>{profileData?.mobile || auth?.mobile || "—"}</span>
-              </div>
-            </div>
-          </div>
-          <button
-            onClick={() => navigate("/ClubAdminProfile")}
-            className="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-100 w-auto flex items-center gap-1"
-          >
-            Edit Profile <ArrowRight size={14} />
-          </button>
+    <ClubAdminShell searchPlaceholder="Search dashboard…">
+      {/* Header */}
+      <header className="flex items-start justify-between gap-4 mb-6">
+        <div className="min-w-0">
+          <p className="inline-flex items-center gap-1.5 text-[12px] text-gray-400">
+            <ShieldCheck className="w-3.5 h-3.5" />
+            Club admin · Overview
+          </p>
+          <h1 className="mt-2 text-[26px] font-medium text-white leading-tight">
+            Welcome back, <span className="text-orange-400">{displayName}</span>
+          </h1>
+          <p className="mt-1 text-[13px] text-gray-400">
+            {clubName} · here's how things are doing today.
+          </p>
         </div>
+        <button
+          onClick={() => navigate("/ClubAdminProfile")}
+          className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-md text-[13px] font-semibold text-gray-200 hover:text-white hover:bg-white/[0.06] transition active:scale-[0.98] flex-shrink-0 w-auto"
+          style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}
+        >
+          Edit profile <ArrowRight className="w-3.5 h-3.5" />
+        </button>
+      </header>
+
+      {/* Stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+        <StatTile icon={Users}       label="Managers"       value={totalManagers} />
+        <StatTile icon={Trophy}      label="Tournaments"    value={totalTournaments} />
+        <StatTile icon={IndianRupee} label="Total revenue"  value={formatCurrency(grandRevenue)} tone="green" />
+        <StatTile icon={MapPin}      label="Turf bookings"  value={totalBookings} />
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard
-          icon={<Users size={22} />}
-          color="blue"
-          label="Managers"
-          value={totalManagers}
-          onClick={() => navigate("/staff-admin")}
-        />
-        <StatCard
-          icon={<Trophy size={22} />}
-          color="purple"
-          label="Tournaments"
-          value={totalTournaments}
-          onClick={() => navigate("/club-finance")}
-        />
-        <StatCard
-          icon={<DollarSign size={22} />}
-          color="green"
-          label="Total Revenue"
-          value={formatCurrency(grandRevenue)}
-          onClick={() => navigate("/payment-history")}
-        />
-        <StatCard
-          icon={<MapPin size={22} />}
-          color="orange"
-          label="Turf Bookings"
-          value={totalBookings}
-          onClick={() => navigate("/turf-management")}
-        />
-      </div>
-
-      {/* Revenue Breakdown + Quick Actions */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        {/* Revenue Breakdown */}
-        <div className="lg:col-span-2 bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-            <BarChart3 size={20} className="text-blue-600" /> Revenue Breakdown
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="bg-purple-50 rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Trophy size={18} className="text-purple-600" />
-                <span className="text-sm font-medium text-purple-700">Tournament Revenue</span>
-              </div>
-              <div className="text-2xl font-bold text-purple-800">{formatCurrency(tournamentRevenue)}</div>
-              <div className="text-xs text-purple-500 mt-1">From {totalTournaments} tournament(s)</div>
+      {/* Revenue + Quick actions */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-3">
+        <div className="lg:col-span-2">
+          <Section title="Revenue breakdown" icon={BarChart3}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <RevenueTile
+                icon={Trophy}
+                label="Tournament revenue"
+                value={formatCurrency(tournamentRevenue)}
+                hint={`From ${totalTournaments} tournament${totalTournaments === 1 ? "" : "s"}`}
+                tone="orange"
+              />
+              <RevenueTile
+                icon={MapPin}
+                label="Turf booking revenue"
+                value={formatCurrency(bookingRevenue)}
+                hint={`From ${totalBookings} booking${totalBookings === 1 ? "" : "s"}`}
+                tone="green"
+              />
             </div>
-            <div className="bg-blue-50 rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <MapPin size={18} className="text-blue-600" />
-                <span className="text-sm font-medium text-blue-700">Turf Booking Revenue</span>
-              </div>
-              <div className="text-2xl font-bold text-blue-800">{formatCurrency(bookingRevenue)}</div>
-              <div className="text-xs text-blue-500 mt-1">From {totalBookings} booking(s)</div>
-            </div>
-          </div>
+          </Section>
         </div>
 
-        {/* Quick Actions */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Quick Actions</h3>
-          <div className="space-y-2">
-            {[
-              { label: "Manage Turfs", icon: <MapPin size={16} />, path: "/turf-management", color: "text-blue-600 bg-blue-50 hover:bg-blue-100" },
-              { label: "Staff / Managers", icon: <Users size={16} />, path: "/staff-admin", color: "text-purple-600 bg-purple-50 hover:bg-purple-100" },
-              { label: "Financial Overview", icon: <TrendingUp size={16} />, path: "/club-finance", color: "text-green-600 bg-green-50 hover:bg-green-100" },
-              { label: "Payment History", icon: <CreditCard size={16} />, path: "/payment-history", color: "text-orange-600 bg-orange-50 hover:bg-orange-100" },
-              { label: "Referee Management", icon: <Gavel size={16} />, path: "/club-refree", color: "text-red-600 bg-red-50 hover:bg-red-100" },
-            ].map((action) => (
+        <Section title="Quick actions">
+          <div className="space-y-1.5">
+            {quickActions.map(({ label, icon: Icon, path }) => (
               <button
-                key={action.path}
-                onClick={() => navigate(action.path)}
-                className={`w-full px-4 py-2.5 rounded-lg text-sm font-medium flex items-center justify-between ${action.color} transition-colors`}
+                key={path}
+                onClick={() => navigate(path)}
+                className="w-full flex items-center justify-between px-3 py-2 rounded-md hover:bg-white/[0.04] text-[13px] font-medium text-gray-200 transition group w-auto"
+                style={{ border: "1px solid rgba(255,255,255,0.06)" }}
               >
-                <span className="flex items-center gap-2">{action.icon} {action.label}</span>
-                <ArrowRight size={14} />
+                <span className="flex items-center gap-2">
+                  <Icon className="w-3.5 h-3.5 text-gray-500 group-hover:text-orange-400 transition" />
+                  {label}
+                </span>
+                <ArrowRight className="w-3.5 h-3.5 text-gray-600 group-hover:text-orange-400 transition" />
               </button>
             ))}
           </div>
-        </div>
+        </Section>
       </div>
 
-      {/* Top Managers + Recent Payments */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Top Managers */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-              <Users size={20} className="text-blue-600" /> Managers
-            </h3>
-            <button
-              onClick={() => navigate("/club-finance")}
-              className="text-xs text-blue-600 hover:text-blue-700 font-medium w-auto bg-transparent"
-            >
-              View All
-            </button>
-          </div>
+      {/* Managers + Recent payments */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <Section
+          title="Top managers"
+          icon={Users}
+          actionLabel="View all"
+          onAction={() => navigate("/club-finance")}
+        >
           {overview?.managers?.length > 0 ? (
-            <div className="space-y-3">
+            <ul className="divide-y divide-white/[0.04] -my-2">
               {overview.managers.slice(0, 5).map((mgr) => (
-                <div
+                <li
                   key={mgr._id}
                   onClick={() => navigate("/club-finance")}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer transition-colors"
+                  className="flex items-center justify-between py-2.5 cursor-pointer group"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-sm">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="w-8 h-8 rounded-full bg-orange-500/15 text-orange-400 grid place-items-center text-[12px] font-semibold flex-shrink-0">
                       {mgr.name?.charAt(0)?.toUpperCase() || "M"}
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium text-gray-800">{mgr.name}</div>
-                      <div className="text-xs text-gray-400">{mgr.tournaments} tournaments</div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm font-semibold text-green-700">{formatCurrency(mgr.totalRevenue)}</div>
-                    <div className="text-[10px] text-gray-400">revenue</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-6 text-gray-400 text-sm">
-              <Users size={32} className="mx-auto mb-2 text-gray-300" />
-              No managers yet
-            </div>
-          )}
-        </div>
-
-        {/* Recent Payments */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-              <CreditCard size={20} className="text-green-600" /> Recent Payments
-            </h3>
-            <button
-              onClick={() => navigate("/payment-history")}
-              className="text-xs text-blue-600 hover:text-blue-700 font-medium w-auto bg-transparent"
-            >
-              View All
-            </button>
-          </div>
-          {recentPayments.length > 0 ? (
-            <div className="space-y-3">
-              {recentPayments.map((p) => (
-                <div key={p._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                      p.type === "tournament" ? "bg-purple-100 text-purple-600" : "bg-blue-100 text-blue-600"
-                    }`}>
-                      {p.type === "tournament" ? <Trophy size={14} /> : <MapPin size={14} />}
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium text-gray-800">{p.playerName}</div>
-                      <div className="text-xs text-gray-400">{p.reference}</div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm font-semibold text-gray-800">{formatCurrency(p.amount)}</div>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
-                      p.paymentStatus === "paid" ? "bg-green-100 text-green-700" :
-                      p.paymentStatus === "pending" ? "bg-yellow-100 text-yellow-700" :
-                      "bg-gray-100 text-gray-600"
-                    }`}>
-                      {p.paymentStatus}
                     </span>
+                    <div className="min-w-0">
+                      <p className="text-[13px] font-medium text-white truncate group-hover:text-orange-300 transition">{mgr.name}</p>
+                      <p className="text-[11px] text-gray-500">
+                        <span className="font-mono tabular-nums">{mgr.tournaments}</span> tournament{mgr.tournaments === 1 ? "" : "s"}
+                      </p>
+                    </div>
                   </div>
-                </div>
+                  <div className="text-right flex-shrink-0">
+                    <p className="text-[13px] font-semibold text-emerald-300 tabular-nums">{formatCurrency(mgr.totalRevenue)}</p>
+                    <p className="text-[10px] text-gray-500 uppercase tracking-wider">revenue</p>
+                  </div>
+                </li>
               ))}
-            </div>
+            </ul>
           ) : (
-            <div className="text-center py-6 text-gray-400 text-sm">
-              <CreditCard size={32} className="mx-auto mb-2 text-gray-300" />
-              No payments yet
-            </div>
+            <EmptyInline icon={Users} title="No managers yet" desc="Assign managers to your tournaments to see them ranked here." />
           )}
-        </div>
+        </Section>
+
+        <Section
+          title="Recent payments"
+          icon={CreditCard}
+          actionLabel="View all"
+          onAction={() => navigate("/payment-history")}
+        >
+          {recentPayments.length > 0 ? (
+            <ul className="divide-y divide-white/[0.04] -my-2">
+              {recentPayments.map((p) => (
+                <li key={p._id} className="flex items-center justify-between py-2.5">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className={`w-8 h-8 rounded-md grid place-items-center flex-shrink-0 ${
+                      p.type === "tournament" ? "bg-amber-500/15 text-amber-300" : "bg-blue-500/15 text-blue-300"
+                    }`}>
+                      {p.type === "tournament" ? <Trophy className="w-3.5 h-3.5" /> : <MapPin className="w-3.5 h-3.5" />}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-[13px] font-medium text-white truncate">{p.playerName}</p>
+                      <p className="text-[11px] text-gray-500 truncate">{p.reference}</p>
+                    </div>
+                  </div>
+                  <div className="text-right flex flex-col items-end gap-0.5 flex-shrink-0 ml-3">
+                    <p className="text-[13px] font-semibold text-white tabular-nums">{formatCurrency(p.amount)}</p>
+                    <PaymentStatusPill status={p.paymentStatus} />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <EmptyInline icon={Inbox} title="No payments yet" desc="Payment activity will show up here once players check out." />
+          )}
+        </Section>
       </div>
-    </div>
+    </ClubAdminShell>
   );
 };
 
-function StatCard({ icon, color, label, value, onClick }) {
-  const colors = {
-    blue: "bg-blue-100 text-blue-600",
-    purple: "bg-purple-100 text-purple-600",
-    green: "bg-green-100 text-green-600",
-    orange: "bg-orange-100 text-orange-600",
+// ── Dark inline primitives ───────────────────────────────────────────────────
+
+function StatTile({ icon: Icon, label, value, tone = "orange" }) {
+  const tones = {
+    orange: { bg: "bg-orange-500/15",  text: "text-orange-400"  },
+    green:  { bg: "bg-emerald-500/15", text: "text-emerald-400" },
   };
+  const t = tones[tone] || tones.orange;
   return (
-    <div
-      onClick={onClick}
-      className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm hover:shadow-md hover:border-blue-200 transition-all cursor-pointer"
-    >
-      <div className="flex items-center gap-3">
-        <div className={`w-11 h-11 rounded-lg flex items-center justify-center ${colors[color]}`}>{icon}</div>
-        <div>
-          <p className="text-xs text-gray-500">{label}</p>
-          <p className="text-xl font-bold text-gray-800">{value}</p>
-        </div>
+    <div className="bg-[#181A22] border border-white/[0.06] rounded-lg p-4">
+      <div className="flex items-start justify-between gap-2 mb-3">
+        <span className={`grid w-[34px] h-[34px] rounded-md place-items-center ${t.bg}`}>
+          <Icon className={`w-[18px] h-[18px] ${t.text}`} />
+        </span>
       </div>
+      <p className="text-[24px] font-medium leading-none text-white tabular-nums">{value ?? 0}</p>
+      <p className="mt-1 text-[12px] text-gray-400">{label}</p>
     </div>
+  );
+}
+
+function Section({ title, icon: Icon, actionLabel, onAction, children }) {
+  return (
+    <div className="bg-[#181A22] border border-white/[0.06] rounded-lg p-4">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          {Icon && <Icon className="w-3.5 h-3.5 text-gray-500" />}
+          <h3 className="text-[13px] font-medium text-white">{title}</h3>
+        </div>
+        {actionLabel && onAction && (
+          <button onClick={onAction}
+            className="text-[12px] font-semibold inline-flex items-center gap-1 transition text-orange-400 hover:text-orange-300 w-auto"
+          >
+            {actionLabel} <ArrowRight className="w-3 h-3" />
+          </button>
+        )}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function RevenueTile({ icon: Icon, label, value, hint, tone }) {
+  const tones = {
+    orange: { iconBg: "bg-orange-500/15",  iconText: "text-orange-400",  valueText: "text-white" },
+    green:  { iconBg: "bg-emerald-500/15", iconText: "text-emerald-300", valueText: "text-white" },
+  };
+  const t = tones[tone] || tones.orange;
+  return (
+    <div className="rounded-md p-3.5" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
+      <div className="flex items-center gap-2 mb-2">
+        <span className={`w-7 h-7 rounded-md ${t.iconBg} grid place-items-center`}>
+          <Icon className={`w-3.5 h-3.5 ${t.iconText}`} />
+        </span>
+        <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">{label}</span>
+      </div>
+      <p className={`text-[22px] font-medium ${t.valueText} tabular-nums leading-none`}>{value}</p>
+      <p className="text-[11px] mt-1.5 text-gray-500">{hint}</p>
+    </div>
+  );
+}
+
+function EmptyInline({ icon: Icon, title, desc }) {
+  return (
+    <div className="text-center py-8">
+      <div className="w-10 h-10 rounded-md bg-white/[0.06] inline-flex items-center justify-center mb-2.5">
+        <Icon className="w-4 h-4 text-gray-500" />
+      </div>
+      <p className="text-[13px] font-medium text-white">{title}</p>
+      <p className="text-[12px] text-gray-400 mt-1 max-w-xs mx-auto">{desc}</p>
+    </div>
+  );
+}
+
+function PaymentStatusPill({ status }) {
+  const s = (status || "").toLowerCase();
+  let cls = "bg-white/[0.06] text-gray-400";
+  if (s === "paid")    cls = "bg-emerald-500/15 text-emerald-300";
+  if (s === "pending") cls = "bg-amber-500/15 text-amber-300";
+  return (
+    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${cls}`}>
+      {status || "—"}
+    </span>
   );
 }
 

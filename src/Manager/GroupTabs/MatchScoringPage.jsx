@@ -3,6 +3,7 @@ import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { ArrowLeft, Trophy, RefreshCcw, Check, AlertCircle } from "lucide-react";
 import useMatchScoring from "../Tournament/useMatchScoring";
 import { DynamicScorer, getSportConfig } from "../../features/scoring";
+import { Breadcrumbs } from "../../shared/ui";
 
 /**
  * Detects whether the match format uses nested games (Tennis) or flat sets (TT, Badminton).
@@ -28,7 +29,11 @@ export default function MatchScoringPage() {
   const { matchId, tournamentId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const backTo = location.state?.backTo || `/tournament-management/group-stage?tournamentId=${tournamentId}`;
+  // Default back target carries `?tab=groups` so the user lands on the Groups
+  // tab they came from, not the default Players tab. An explicit
+  // `location.state.backTo` (passed by callers that want a different
+  // destination) still wins.
+  const backTo = location.state?.backTo || `/tournament-management/group-stage?tournamentId=${tournamentId}&tab=groups`;
 
   const {
     match, matchFormat, loading, error, submitting,
@@ -97,6 +102,14 @@ export default function MatchScoringPage() {
       </div>
 
       <div className="max-w-4xl mx-auto p-6 space-y-6">
+        <Breadcrumbs
+          items={[
+            { label: "Tournaments", to: "/mtournament-management" },
+            { label: "Manage tournament", to: `/tournament-management/group-stage?tournamentId=${tournamentId}` },
+            { label: `Match${match.matchNumber ? ` · M${match.matchNumber}` : ""}` },
+          ]}
+        />
+
         {/* Players + Score Summary */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="bg-gradient-to-r from-orange-50 to-orange-50 p-6">

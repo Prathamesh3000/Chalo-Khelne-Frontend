@@ -1,6 +1,6 @@
 import React from "react";
 
-const SIG = "#5E6AD2";
+const SIG = "#F97316";
 
 export default function SportNumberBadge({ index, className = "" }) {
   return (

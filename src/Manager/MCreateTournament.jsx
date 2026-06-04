@@ -47,6 +47,7 @@ import {
 import {
   SPORT_SCORING_TYPES,
   isNestedSetSport,
+  isTeamOnlySport,
   slugifyForSport,
   UNRANKED_DEFAULTS,
   getUnrankedDefaults,
@@ -57,8 +58,8 @@ import {
 // (Imported from "./wizard/sportClassification" above the file's other
 // wizard imports — kept inline here only as a comment marker.)
 
-const CK_SIG = "#5E6AD2";
-const CK_SIG_TINT = "rgba(94,106,210,0.18)";
+const CK_SIG = "#F97316";
+const CK_SIG_TINT = "rgba(249,115,22,0.25)";
 
 // ─── Step definitions — 3 fixed steps, no dynamic insertion ───
 // "sportConfig" is removed; locked rule book + custom match format now live
@@ -231,9 +232,18 @@ function mapSportApiToFormSport(s, isFirst, legacyRootLevel = "") {
     //   sport entry's own level → legacy root tournamentLevel → "" (force pick)
     tournamentLevel: s.tournamentLevel || legacyRootLevel || "",
     type: s.type || "knockout + group stage",
+    // Edit-load preserves the template snapshot fields so the picker re-hydrates
+    // to the saved choice and the bounds caption still renders.
     categories: (Array.isArray(s.categories) && s.categories.length > 0)
-      ? s.categories.map((c) => ({ name: c.name, fee: Number(c.fee || 0) }))
-      : [{ name: "Open Category", fee: 0 }],
+      ? s.categories.map((c) => ({
+          templateId: c.templateId || null,
+          name: c.name || "",
+          fee: Number(c.fee || 0),
+          minAge: c.minAge ?? null,
+          maxAge: c.maxAge ?? null,
+          gender: c.gender || "any",
+        }))
+      : [{ templateId: null, name: "", fee: 0, minAge: null, maxAge: null, gender: "any" }],
     groupStageFormat: s.groupStageFormat || null,
     knockoutFormat: s.knockoutFormat || null,
     davisCupFormatId: s.davisCupFormatId || null,
@@ -302,7 +312,9 @@ function newSportEntry({ expanded = false } = {}) {
     // Per-sport tournament level — empty default forces explicit choice.
     tournamentLevel: "",
     type: "knockout + group stage",
-    categories: [{ name: "Open Category", fee: 0 }], // Sub-step 5 — match spec
+    // First row is empty so the picker prompts the manager to select a
+    // SuperAdmin template — there is no free-form category entry.
+    categories: [{ templateId: null, name: "", fee: 0, minAge: null, maxAge: null, gender: "any" }],
     groupStageFormat: "Singles",
     knockoutFormat: "Singles",
     davisCupFormatId: null,
@@ -611,12 +623,29 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
         if (!s.type) {
           errors[`${prefix}.type`] = "Please pick a tournament type";
         }
+        // Max players (draw size) is optional, but if provided must be a positive number.
+        if (s.drawSize !== null && s.drawSize !== undefined && s.drawSize !== "") {
+          const n = Number(s.drawSize);
+          if (!Number.isFinite(n) || n <= 0) {
+            errors[`${prefix}.drawSize`] = "Max players must be a positive number";
+          }
+        }
         if (!Array.isArray(s.categories) || s.categories.length === 0) {
           errors[`${prefix}.categories`] = "At least one category is required";
         } else {
           s.categories.forEach((c, j) => {
-            if (!c?.name?.trim()) {
-              errors[`${prefix}.categories[${j}].name`] = "Category name is required";
+            // Managers must pick a template — both the templateId and the
+            // snapshot label are required. Older categories created before
+            // templates existed only have `name`, so we accept either signal
+            // to stay backward-compatible with mid-flight tournaments.
+            if (!c?.templateId && !c?.name?.trim()) {
+              errors[`${prefix}.categories[${j}].name`] = "Please select a category";
+            }
+            const minSet = c?.minAge !== null && c?.minAge !== undefined && c?.minAge !== "";
+            const maxSet = c?.maxAge !== null && c?.maxAge !== undefined && c?.maxAge !== "";
+            if (minSet && maxSet && Number(c.maxAge) < Number(c.minAge)) {
+              errors[`${prefix}.categories[${j}].ageRange`] =
+                "Max age must be greater than or equal to min age";
             }
           });
         }
@@ -642,6 +671,22 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
       if (!formData.eventLocation.trim()) errors.eventLocation = "Event location is required";
       if (!formData.startDate) errors.startDate = "Start date is required";
       if (!formData.endDate) errors.endDate = "End date is required";
+      // End date must not be before the start date.
+      if (
+        formData.startDate &&
+        formData.endDate &&
+        dayjs(formData.endDate).isBefore(dayjs(formData.startDate), "day")
+      ) {
+        errors.endDate = "End date must be on or after the start date";
+      }
+      // Registration deadline (if set) must not be after the start date.
+      if (
+        formData.registrationDeadline &&
+        formData.startDate &&
+        dayjs(formData.registrationDeadline).isAfter(dayjs(formData.startDate), "day")
+      ) {
+        errors.registrationDeadline = "Registration deadline must be on or before the start date";
+      }
     }
 
     setFieldErrors(errors);
@@ -786,10 +831,23 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
           scoringType,
           tournamentLevel: s.tournamentLevel || "",
           type: s.type,
-          categories: (s.categories || []).map((c) => ({
-            name: c.name,
-            fee: Number(c.fee || 0),
-          })),
+          categories: (s.categories || []).map((c) => {
+            const ageOrNull = (v) => {
+              if (v === null || v === undefined || v === "") return null;
+              const n = Number(v);
+              return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : null;
+            };
+            return {
+              templateId: c.templateId || null,
+              name: c.name,
+              fee: Number(c.fee || 0),
+              minAge: ageOrNull(c.minAge),
+              maxAge: ageOrNull(c.maxAge),
+              gender: ["male", "female", "any"].includes(c.gender)
+                ? c.gender
+                : "any",
+            };
+          }),
           groupStageFormat: String(s.type || "").includes("group stage") ? s.groupStageFormat : null,
           knockoutFormat: String(s.type || "").includes("knockout") ? s.knockoutFormat : null,
           davisCupFormatId: s.davisCupFormatId || null,
@@ -843,124 +901,10 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
   const formatLabel = (key) =>
     key.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase()).trim();
 
-  // ── Dynamic Field Renderer ──
-  const renderDynamicField = (field) => {
-    const val = ruleBookValues[field.path];
-    const hasError = ruleBookErrors[field.path];
-
-    if (field.type === "boolean") {
-      return (
-        <div key={field.path} className="flex items-center justify-between bg-neutral-50 px-3 h-10 rounded-lg border border-neutral-200">
-          <label className="text-[12px] font-medium text-neutral-700">{field.label}</label>
-          <button
-            type="button"
-            onClick={() => handleRuleBookFieldChange(field.path, !val)}
-            className="relative w-10 h-5 rounded-full transition-colors"
-            style={{ backgroundColor: val ? CK_SIG : "#D4D4D4" }}
-          >
-            <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${val ? "translate-x-5" : ""}`} />
-          </button>
-        </div>
-      );
-    }
-
-    if (field.type === "select") {
-      return (
-        <div key={field.path}>
-          <label className="block text-[10px] font-semibold uppercase tracking-[0.08em] text-neutral-500 mb-1.5">{field.label}</label>
-          <div className="relative">
-            <select
-              value={val || ""}
-              onChange={(e) => handleRuleBookFieldChange(field.path, e.target.value)}
-              className={`w-full h-9 px-3 pr-9 rounded-lg border text-[13px] outline-none transition appearance-none cursor-pointer focus:ring-2 ${hasError ? "border-rose-300 bg-rose-50/40" : "border-neutral-200 bg-white hover:border-neutral-300"}`}
-              style={{ "--tw-ring-color": hasError ? "rgba(244,63,94,0.18)" : "rgba(94,106,210,0.18)" }}
-              onFocus={(e) => { if (!hasError) e.currentTarget.style.borderColor = CK_SIG; }}
-              onBlur={(e) => { e.currentTarget.style.borderColor = ""; }}
-            >
-              <option value="">Select</option>
-              {field.options?.map((opt) => (
-                <option key={opt} value={opt}>{opt.replace(/[-_]/g, " ").replace(/^./, (s) => s.toUpperCase())}</option>
-              ))}
-            </select>
-            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-neutral-400 pointer-events-none" />
-          </div>
-          {hasError && <p className="text-[11px] text-rose-600 mt-1 font-medium">{ruleBookErrors[field.path]}</p>}
-        </div>
-      );
-    }
-
-    if (field.type === "multiselect") {
-      const selected = Array.isArray(val) ? val : [];
-      return (
-        <div key={field.path} className="col-span-full">
-          <label className="block text-[10px] font-semibold uppercase tracking-[0.08em] text-neutral-500 mb-2">{field.label}</label>
-          <div className="flex flex-wrap gap-1.5">
-            {field.options?.map((opt) => {
-              const isActive = selected.includes(opt);
-              return (
-                <button
-                  key={opt}
-                  type="button"
-                  onClick={() => handleMultiSelectToggle(field.path, opt)}
-                  className={`px-2.5 h-7 inline-flex items-center rounded-md text-[11px] font-medium border transition ${
-                    isActive
-                      ? "border-transparent ring-2 text-neutral-950"
-                      : "bg-white border-neutral-200 text-neutral-600 hover:border-neutral-300"
-                  }`}
-                  style={isActive ? { backgroundColor: "rgba(94,106,210,0.08)", "--tw-ring-color": CK_SIG } : undefined}
-                >
-                  {opt.replace(/[-_]/g, " ").replace(/^./, (s) => s.toUpperCase())}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      );
-    }
-
-    if (field.type === "text") {
-      return (
-        <div key={field.path} className="col-span-full">
-          <label className="block text-[10px] font-semibold uppercase tracking-[0.08em] text-neutral-500 mb-1.5">{field.label}</label>
-          <input
-            type="text"
-            value={val || ""}
-            onChange={(e) => handleRuleBookFieldChange(field.path, e.target.value)}
-            className="w-full h-9 px-3 bg-white border border-neutral-200 hover:border-neutral-300 rounded-lg text-[13px] outline-none transition focus:ring-2"
-            style={{ "--tw-ring-color": "rgba(94,106,210,0.18)" }}
-            onFocus={(e) => { e.currentTarget.style.borderColor = CK_SIG; }}
-            onBlur={(e) => { e.currentTarget.style.borderColor = ""; }}
-            placeholder={`Enter ${field.label.toLowerCase()}`}
-          />
-        </div>
-      );
-    }
-
-    return (
-      <div key={field.path}>
-        <label className="block text-[10px] font-semibold uppercase tracking-[0.08em] text-neutral-500 mb-1.5">
-          {field.label}
-          {field.defaultValue != null && (
-            <span className="text-[10px] text-neutral-400 font-normal ml-1 normal-case tracking-normal">(default: {field.defaultValue})</span>
-          )}
-        </label>
-        <input
-          type="number"
-          min={field.min}
-          max={field.max}
-          step={field.step || 1}
-          value={val ?? ""}
-          onChange={(e) => handleRuleBookFieldChange(field.path, e.target.value)}
-          className={`w-full h-9 px-3 rounded-lg border text-[13px] font-mono tabular-nums outline-none transition focus:ring-2 ${hasError ? "border-rose-300 bg-rose-50/40" : "border-neutral-200 bg-white hover:border-neutral-300"}`}
-          style={{ "--tw-ring-color": hasError ? "rgba(244,63,94,0.18)" : "rgba(94,106,210,0.18)" }}
-          onFocus={(e) => { if (!hasError) e.currentTarget.style.borderColor = CK_SIG; }}
-          onBlur={(e) => { e.currentTarget.style.borderColor = ""; }}
-          placeholder={field.min != null && field.max != null ? `${field.min}–${field.max}` : ""}
-        />
-        {hasError && <p className="text-[11px] text-rose-600 mt-1 font-medium">{ruleBookErrors[field.path]}</p>}
-      </div>
-    );
-  };
+  // NOTE: a dead `renderDynamicField` helper used to live here. It was never
+  // called (it referenced undefined `ruleBookValues`/`ruleBookErrors` — the live
+  // rule-book UI is rendered by SportCard via `_ruleBookValues`) and produced
+  // no-undef errors, so it was removed.
 
   if (!showPopup) return null;
 
@@ -1053,7 +997,7 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
               onChange={handleInputChange}
               rows={4}
               placeholder="Describe your tournament…"
-              className="w-full px-3 py-2.5 rounded-lg border border-neutral-200 bg-white text-[13px] text-neutral-900 placeholder-neutral-400 focus:outline-none focus:ring-2 transition resize-y"
+              className="w-full px-3 py-2.5 rounded-lg border border-white/[0.08] bg-white/[0.04] text-[13px] text-gray-100 placeholder:text-gray-500 focus:outline-none focus:ring-2 transition resize-y"
               style={{ "--tw-ring-color": CK_SIG_TINT }}
               onFocus={(e) => { e.currentTarget.style.borderColor = CK_SIG; }}
               onBlur={(e) => { e.currentTarget.style.borderColor = ""; }}
@@ -1066,18 +1010,18 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
       <div className="lg:col-span-4">
         <WCard className="space-y-4">
           <SectionHeader
-            icon={<ImageIcon className="w-4 h-4 text-neutral-500" />}
+            icon={<ImageIcon className="w-4 h-4 text-gray-400" />}
             title="Tournament logo"
           />
 
           {image ? (
-            <div className="relative w-full aspect-square rounded-xl overflow-hidden border border-neutral-200 bg-neutral-50">
+            <div className="relative w-full aspect-square rounded-xl overflow-hidden border border-white/[0.08] bg-white/[0.03]">
               <img src={image} alt="Tournament logo" className="w-full h-full object-cover" />
               <button
                 type="button"
                 onClick={removeImage}
                 aria-label="Remove logo"
-                className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/95 hover:bg-white text-neutral-600 hover:text-rose-600 inline-flex items-center justify-center shadow-[0_1px_3px_rgba(0,0,0,0.08)] transition"
+                className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/40 hover:bg-black/60 text-gray-300 hover:text-red-400 inline-flex items-center justify-center shadow-[0_1px_3px_rgba(0,0,0,0.20)] transition"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -1089,8 +1033,8 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
               onDrop={handleDrop}
               className="block w-full aspect-square rounded-xl border border-dashed transition cursor-pointer"
               style={{
-                borderColor: isDragging ? CK_SIG : "#D4D4D4",
-                backgroundColor: isDragging ? "rgba(94,106,210,0.06)" : "#FAFAFA",
+                borderColor: isDragging ? CK_SIG : "rgba(255,255,255,0.12)",
+                backgroundColor: isDragging ? "rgba(249,115,22,0.08)" : "rgba(255,255,255,0.03)",
               }}
             >
               <input
@@ -1100,11 +1044,11 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
                 className="sr-only"
               />
               <div className="w-full h-full flex flex-col items-center justify-center text-center p-4 pointer-events-none">
-                <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center mb-3 text-neutral-500 border border-neutral-200">
+                <div className="w-10 h-10 bg-white/[0.04] rounded-xl flex items-center justify-center mb-3 text-gray-400 border border-white/[0.08]">
                   <ImageIcon className="w-4 h-4" />
                 </div>
-                <p className="text-[13px] font-semibold text-neutral-900">Click to upload or drag &amp; drop</p>
-                <p className="text-[11px] text-neutral-500 mt-0.5">PNG, JPG up to 5MB</p>
+                <p className="text-[13px] font-semibold text-gray-100">Click to upload or drag &amp; drop</p>
+                <p className="text-[11px] text-gray-400 mt-0.5">PNG, JPG up to 5MB</p>
               </div>
             </label>
           )}
@@ -1146,6 +1090,7 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
             onToggleExpand={() => toggleSportExpanded(idx)}
             errors={sliceSportErrors(idx)}
             fixedLevels={FIXED_LEVELS}
+            rulesLocked={isRulesLocked}
           />
         ))}
 
@@ -1212,10 +1157,10 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
             <div>
               <FieldLabel>Daily schedule</FieldLabel>
               <div
-                className="flex items-center gap-2 px-3 h-9 rounded-lg border border-neutral-200 bg-white focus-within:ring-2 transition"
+                className="flex items-center gap-2 px-3 h-9 rounded-lg border border-white/[0.08] bg-white/[0.04] focus-within:ring-2 transition"
                 style={{ "--tw-ring-color": CK_SIG_TINT }}
               >
-                <Clock className="w-3.5 h-3.5 text-neutral-400 flex-shrink-0" />
+                <Clock className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
                 <input
                   type="time"
                   aria-label="Daily start time"
@@ -1226,9 +1171,9 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
                       selectedTime: { ...p.selectedTime, startTime: e.target.value },
                     }))
                   }
-                  className="flex-1 bg-transparent border-none focus:outline-none focus:ring-0 text-[13px] font-mono tabular-nums text-neutral-900 p-0"
+                  className="flex-1 bg-transparent border-none focus:outline-none focus:ring-0 text-[13px] font-mono tabular-nums text-gray-100 p-0"
                 />
-                <span className="text-neutral-300">—</span>
+                <span className="text-gray-600">—</span>
                 <input
                   type="time"
                   aria-label="Daily end time"
@@ -1239,7 +1184,7 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
                       selectedTime: { ...p.selectedTime, endTime: e.target.value },
                     }))
                   }
-                  className="flex-1 bg-transparent border-none focus:outline-none focus:ring-0 text-[13px] font-mono tabular-nums text-neutral-900 p-0"
+                  className="flex-1 bg-transparent border-none focus:outline-none focus:ring-0 text-[13px] font-mono tabular-nums text-gray-100 p-0"
                 />
               </div>
             </div>
@@ -1305,7 +1250,7 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
             onChange={handleInputChange}
             rows={4}
             placeholder="Enter specific rules or terms…"
-            className="w-full px-3 py-2.5 rounded-lg border border-neutral-200 bg-white text-[13px] text-neutral-900 placeholder-neutral-400 focus:outline-none focus:ring-2 transition resize-y"
+            className="w-full px-3 py-2.5 rounded-lg border border-white/[0.08] bg-white/[0.04] text-[13px] text-gray-100 placeholder:text-gray-500 focus:outline-none focus:ring-2 transition resize-y"
             style={{ "--tw-ring-color": CK_SIG_TINT }}
             onFocus={(e) => { e.currentTarget.style.borderColor = CK_SIG; }}
             onBlur={(e) => { e.currentTarget.style.borderColor = ""; }}
@@ -1322,30 +1267,12 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
   // sports[0] (representative when sports advance independently). Safe to
   // default to "registration" when sports[] is missing or empty.
   const initialStage = initialData?.sports?.[0]?.currentStage || "registration";
-  const isRulesLocked = isEditMode && initialData && initialStage !== "registration";
+  // Rules editor is locked whenever we are editing an existing tournament.
+  // Format selection, categories, dates and other fields remain editable —
+  // only the rules block inside SportCard's Section D is disabled.
+  const isRulesLocked = isEditMode && !!initialData;
 
   const renderActiveStep = () => {
-    // Sub-step 6 — only the "format" step is rule-locked. "sportConfig" was
-    // removed from STATIC_STEPS in Sub-step 3 and is no longer reachable.
-    const lockedSteps = ["format"];
-    if (isRulesLocked && lockedSteps.includes(activeStep?.id)) {
-      return (
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl px-6 py-10 text-center">
-          <div className="w-10 h-10 rounded-xl bg-amber-100 inline-flex items-center justify-center mb-3">
-            <Lock className="w-4 h-4 text-amber-700" />
-          </div>
-          <h3 className="text-[15px] font-semibold text-amber-900 mb-1">Rules locked</h3>
-          <p className="text-[13px] text-amber-800 max-w-md mx-auto">
-            This tournament has already started ({initialStage.replace(/_/g, " ")}).
-            Match rules and format cannot be changed after matches are generated.
-          </p>
-          <p className="text-[11px] text-amber-700/80 mt-3">
-            You can still edit title, description, dates, and categories.
-          </p>
-        </div>
-      );
-    }
-
     switch (activeStep?.id) {
       case "basic": return renderStepBasic();
       case "format": return renderStepFormat();
@@ -1355,29 +1282,29 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
   };
 
   return (
-    <div className="fixed inset-0 bg-neutral-950/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white w-full max-w-6xl h-[90vh] rounded-2xl border border-neutral-200 shadow-[0_24px_64px_rgba(0,0,0,0.16)] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-[#181A22] w-full max-w-6xl h-[90vh] rounded-2xl border border-white/[0.08] shadow-[0_24px_64px_rgba(0,0,0,0.6)] flex flex-col overflow-hidden">
 
-        <div className="px-6 py-4 border-b border-neutral-100 flex items-center justify-between bg-white">
+        <div className="px-6 py-4 border-b border-white/[0.06] flex items-center justify-between bg-[#181A22]">
           <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500 mb-1">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-400 mb-1">
               {isEditMode ? "Edit tournament" : "New tournament"}
             </p>
-            <h2 className="text-[20px] leading-tight font-semibold tracking-tight text-neutral-950 truncate">
+            <h2 className="text-[20px] leading-tight font-semibold tracking-tight text-white truncate">
               Step <span className="font-mono tabular-nums">{currentStep + 1}</span> of <span className="font-mono tabular-nums">{steps.length}</span>
-              <span className="mx-2 text-neutral-300">·</span>
-              <span className="text-neutral-700">{activeStep?.label}</span>
+              <span className="mx-2 text-gray-600">·</span>
+              <span className="text-gray-300">{activeStep?.label}</span>
             </h2>
           </div>
           <button
             onClick={() => setShowPopup(false)}
-            className="h-8 w-8 inline-flex items-center justify-center rounded-md hover:bg-neutral-100 text-neutral-500 hover:text-neutral-900 flex-shrink-0"
+            className="h-8 w-8 inline-flex items-center justify-center rounded-md hover:bg-white/[0.06] text-gray-400 hover:text-gray-100 flex-shrink-0"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="px-6 py-3 bg-neutral-50/60 border-b border-neutral-100">
+        <div className="px-6 py-3 bg-white/[0.04] border-b border-white/[0.06]">
           <div className="flex items-center gap-1.5">
             {steps.map((step, idx) => {
               const isActive = idx === currentStep;
@@ -1391,8 +1318,8 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
                       isActive
                         ? "text-white"
                         : isDone
-                        ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 cursor-pointer"
-                        : "bg-white text-neutral-400 border border-neutral-200"
+                        ? "bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 cursor-pointer"
+                        : "bg-white/[0.04] text-gray-500 border border-white/[0.08]"
                     }`}
                     style={isActive ? { backgroundColor: CK_SIG } : undefined}
                   >
@@ -1404,7 +1331,7 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
                     <div
                       className="flex-1 h-px"
                       style={{
-                        backgroundColor: idx < currentStep ? "#A7F3D0" : "#E5E5E5",
+                        backgroundColor: idx < currentStep ? "#10B981" : "rgba(255,255,255,0.10)",
                       }}
                     />
                   )}
@@ -1414,16 +1341,16 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto bg-neutral-50/40">
+        <div className="flex-1 overflow-y-auto bg-[#13141B]">
           {success ? (
             <div className="flex flex-col items-center justify-center h-full min-h-[400px]">
-              <div className="w-14 h-14 bg-emerald-50 border border-emerald-200 rounded-2xl inline-flex items-center justify-center mb-4">
-                <Check className="w-7 h-7 text-emerald-700" strokeWidth={2.5} />
+              <div className="w-14 h-14 bg-emerald-500/15 border border-emerald-500/30 rounded-2xl inline-flex items-center justify-center mb-4">
+                <Check className="w-7 h-7 text-emerald-400" strokeWidth={2.5} />
               </div>
-              <h3 className="text-[20px] font-semibold tracking-tight text-neutral-950 mb-1">
+              <h3 className="text-[20px] font-semibold tracking-tight text-white mb-1">
                 {isEditMode ? "Tournament updated" : "Tournament created"}
               </h3>
-              <p className="text-[13px] text-neutral-500">{success}</p>
+              <p className="text-[13px] text-gray-400">{success}</p>
             </div>
           ) : (
             <div className="p-6">
@@ -1433,11 +1360,11 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
         </div>
 
         {!success && (
-          <div className="px-6 py-3 border-t border-neutral-100 flex items-center justify-between bg-white">
+          <div className="px-6 py-3 border-t border-white/[0.06] flex items-center justify-between bg-[#181A22]">
             <button
               type="button"
               onClick={currentStep === 0 ? () => setShowPopup(false) : goPrev}
-              className="h-9 px-3 inline-flex items-center gap-1.5 text-[12px] font-medium text-neutral-700 hover:bg-neutral-100 rounded-lg transition"
+              className="h-9 px-3 inline-flex items-center gap-1.5 text-[12px] font-medium text-gray-300 hover:bg-white/[0.06] rounded-lg transition"
             >
               {currentStep === 0 ? (
                 "Cancel"
@@ -1460,7 +1387,7 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
                           ? CK_SIG
                           : idx < currentStep
                           ? "#10B981"
-                          : "#D4D4D4",
+                          : "rgba(255,255,255,0.12)",
                     }}
                   />
                 ))}
@@ -1471,25 +1398,31 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
                   type="button"
                   onClick={createTournament}
                   disabled={isSubmitting}
-                  className="h-9 px-4 inline-flex items-center gap-1.5 text-[13px] font-semibold text-white rounded-lg transition active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
-                  style={{ backgroundColor: CK_SIG }}
+                  className="group h-10 px-5 inline-flex items-center gap-2 text-[13px] font-semibold text-white whitespace-nowrap rounded-lg bg-orange-500 hover:bg-orange-600 active:bg-orange-700 shadow-[0_4px_12px_rgba(249,115,22,0.25)] hover:shadow-[0_6px_16px_rgba(249,115,22,0.35)] transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-orange-500 disabled:hover:shadow-[0_4px_12px_rgba(249,115,22,0.25)] focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[#181A22]"
                 >
-                  {isSubmitting
-                    ? isEditMode
-                      ? "Updating…"
-                      : "Creating…"
-                    : isEditMode
-                    ? "Update tournament"
-                    : "Create tournament"}
+                  {isSubmitting ? (
+                    <>
+                      <span
+                        className="inline-block w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin"
+                        aria-hidden="true"
+                      />
+                      {isEditMode ? "Updating…" : "Creating…"}
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" strokeWidth={2.5} />
+                      {isEditMode ? "Update tournament" : "Create tournament"}
+                    </>
+                  )}
                 </button>
               ) : (
                 <button
                   type="button"
                   onClick={goNext}
-                  className="h-9 px-4 inline-flex items-center gap-1.5 text-[13px] font-semibold text-white rounded-lg transition active:scale-[0.98]"
-                  style={{ backgroundColor: CK_SIG }}
+                  className="group h-10 px-5 inline-flex items-center gap-2 text-[13px] font-semibold text-white whitespace-nowrap rounded-lg bg-orange-500 hover:bg-orange-600 active:bg-orange-700 shadow-[0_4px_12px_rgba(249,115,22,0.25)] hover:shadow-[0_6px_16px_rgba(249,115,22,0.35)] transition-all active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[#181A22]"
                 >
-                  Next <ChevronRight className="w-3.5 h-3.5" />
+                  Next
+                  <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" strokeWidth={2.5} />
                 </button>
               )}
             </div>
@@ -1504,7 +1437,7 @@ function CustomRuleInput({ label, field, type = "number", min, max, step, value,
   const val = value[field] ?? "";
   return (
     <div>
-      <label className="block text-[10px] font-semibold uppercase tracking-[0.08em] text-neutral-500 mb-1.5">{label}</label>
+      <label className="block text-[10px] font-semibold uppercase tracking-[0.08em] text-gray-400 mb-1.5">{label}</label>
       <input
         type={type}
         min={min}
@@ -1512,7 +1445,7 @@ function CustomRuleInput({ label, field, type = "number", min, max, step, value,
         step={step}
         value={val}
         onChange={(e) => onChange((prev) => ({ ...prev, [field]: type === "number" ? Number(e.target.value) : e.target.value }))}
-        className="w-full h-9 px-3 border border-neutral-200 hover:border-neutral-300 rounded-lg text-[13px] font-mono tabular-nums bg-white focus:outline-none focus:ring-2 transition"
+        className="w-full h-9 px-3 border border-white/[0.08] hover:border-white/[0.16] rounded-lg text-[13px] font-mono tabular-nums bg-white/[0.04] focus:outline-none focus:ring-2 transition"
         style={{ "--tw-ring-color": CK_SIG_TINT }}
         onFocus={(e) => { e.currentTarget.style.borderColor = CK_SIG; }}
         onBlur={(e) => { e.currentTarget.style.borderColor = ""; }}
@@ -1524,8 +1457,8 @@ function CustomRuleInput({ label, field, type = "number", min, max, step, value,
 function CustomRuleToggle({ label, field, value, onChange }) {
   const checked = !!value[field];
   return (
-    <div className="flex items-center justify-between bg-white rounded-lg px-3 h-10 border border-neutral-200">
-      <span className="text-[12px] font-medium text-neutral-700">{label}</span>
+    <div className="flex items-center justify-between bg-white/[0.04] rounded-lg px-3 h-10 border border-white/[0.08]">
+      <span className="text-[12px] font-medium text-gray-300">{label}</span>
       <Switch
         checked={checked}
         onChange={() => onChange((prev) => ({ ...prev, [field]: !prev[field] }))}

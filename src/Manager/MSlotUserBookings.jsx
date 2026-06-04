@@ -209,9 +209,12 @@ const UserBookings = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        const token = localStorage.getItem("token");
+        const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
         // Fetch turf details
         const turfResponse = await fetch(
-          `/api/turfs/${id}`
+          `/api/turfs/${id}`,
+          { headers: { ...authHeaders } }
         );
         if (turfResponse.ok) {
           const turfData = await turfResponse.json();
@@ -224,7 +227,8 @@ const UserBookings = () => {
         if (filters.status) queryParams.append("status", filters.status);
 
         const bookingsResponse = await fetch(
-          `/api/players/turf-bookings/turf/${id}?${queryParams}`
+          `/api/players/turf-bookings/turf/${id}?${queryParams}`,
+          { headers: { ...authHeaders } }
         );
 
         if (!bookingsResponse.ok) {
@@ -287,6 +291,7 @@ const UserBookings = () => {
         localStorage.getItem("managerId") ||
         sessionStorage.getItem("managerId");
 
+      const token = localStorage.getItem("token");
       const response = await fetch(
         `/api/manager/turf-bookings/${bookingId}/payment-status`,
         {
@@ -294,6 +299,7 @@ const UserBookings = () => {
           headers: {
             "Content-Type": "application/json",
             "manager-id": managerId || "", // Send empty string instead of null
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
           body: JSON.stringify({
             paymentStatus: newStatus,

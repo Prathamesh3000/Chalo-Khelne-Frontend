@@ -1,8 +1,8 @@
 import React from "react";
 import { ChevronDown } from "lucide-react";
 
-const SIG = "#5E6AD2";
-const SIG_TINT = "rgba(94,106,210,0.15)";
+const SIG = "#F97316";
+const SIG_TINT = "rgba(249,115,22,0.20)";
 
 export default function Select({
   id,
@@ -16,8 +16,8 @@ export default function Select({
   ...rest
 }) {
   const errorClass = error
-    ? "border-rose-300 bg-rose-50/40"
-    : "border-neutral-200 bg-white hover:border-neutral-300";
+    ? "border-red-400/50 bg-red-500/10"
+    : "border-white/[0.08] hover:border-white/[0.16]";
 
   return (
     <div>
@@ -28,9 +28,10 @@ export default function Select({
           onChange={onChange}
           disabled={disabled}
           aria-invalid={!!error || undefined}
-          className={`w-full appearance-none h-9 px-3 pr-9 rounded-lg border ${errorClass} text-[13px] text-neutral-900 focus:outline-none focus:ring-2 transition disabled:bg-neutral-50 disabled:text-neutral-400 disabled:cursor-not-allowed ${className}`}
+          className={`w-full appearance-none h-9 px-3 pr-9 rounded-lg border ${errorClass} text-[13px] text-gray-100 focus:outline-none focus:ring-2 transition disabled:opacity-40 disabled:cursor-not-allowed ${className}`}
           style={{
-            "--tw-ring-color": error ? "rgba(244,63,94,0.18)" : SIG_TINT,
+            background: error ? undefined : "rgba(255,255,255,0.04)",
+            "--tw-ring-color": error ? "rgba(239,68,68,0.25)" : SIG_TINT,
           }}
           onFocus={(e) => {
             if (!error) e.currentTarget.style.borderColor = SIG;
@@ -43,7 +44,7 @@ export default function Select({
           {...rest}
         >
           {placeholder && (
-            <option value="" disabled>
+            <option value="" disabled className="bg-[#181A22]">
               {placeholder}
             </option>
           )}
@@ -51,16 +52,16 @@ export default function Select({
             const v = typeof opt === "object" ? opt.value : opt;
             const l = typeof opt === "object" ? opt.label : opt;
             return (
-              <option key={String(v)} value={v}>
+              <option key={String(v)} value={v} className="bg-[#181A22]">
                 {l}
               </option>
             );
           })}
         </select>
-        <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-neutral-400 pointer-events-none" />
+        <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500 pointer-events-none" />
       </div>
       {error && (
-        <p className="text-[11px] text-rose-600 mt-1 font-medium">{error}</p>
+        <p className="text-[11px] text-red-400 mt-1 font-medium">{error}</p>
       )}
     </div>
   );

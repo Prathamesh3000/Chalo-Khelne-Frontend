@@ -124,11 +124,15 @@ const TeamKnockoutsScoreboard = () => {
 
         setMessage(`Submitting game ${gameData.gameNumber}...`);
 
+        const token = localStorage.getItem("token");
         const response = await fetch(
           `/api/tournaments/team-knockout/matches/${matchId}/complete-game`,
           {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
             body: JSON.stringify({
               setNumber: currentSetNumber,
               gameNumber: gameData.gameNumber,
@@ -210,8 +214,14 @@ const TeamKnockoutsScoreboard = () => {
       setLoading(true);
 
       // Get current live state from backend
+      const token = localStorage.getItem("token");
       const response = await fetch(
-        `/api/tournaments/team-knockout/matches/${matchId}/live-state`
+        `/api/tournaments/team-knockout/matches/${matchId}/live-state`,
+        {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        }
       );
 
       if (!response.ok) {
@@ -544,11 +554,15 @@ const TeamKnockoutsScoreboard = () => {
   // NEW: Use proper backend API for live score updates
   const updateLiveScore = async (homePoints, awayPoints) => {
     try {
+      const token = localStorage.getItem("token");
       const response = await fetch(
         `/api/tournaments/team-knockout/matches/${matchId}/live-score`,
         {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
           body: JSON.stringify({
             homePoints,
             awayPoints,
@@ -731,11 +745,15 @@ const TeamKnockoutsScoreboard = () => {
 
     try {
       // Use the proper backend API for game completion
+      const token = localStorage.getItem("token");
       const response = await fetch(
         `/api/tournaments/team-knockout/matches/${matchId}/complete-game`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
           body: JSON.stringify({
             setNumber: currentSetNumber,
             gameNumber: currentGameInMatch,
@@ -848,11 +866,15 @@ const TeamKnockoutsScoreboard = () => {
       // Get team ID based on team type
       const teamId = team === "team1" ? "home_team_id" : "away_team_id"; // You'll need actual team IDs
 
+      const token = localStorage.getItem("token");
       const response = await fetch(
         `/api/tournaments/team-knockout/teams/${teamId}/substitute`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
           body: JSON.stringify({
             outgoingPlayer: currentPlayer,
             incomingPlayer: substitute,
@@ -962,11 +984,15 @@ const TeamKnockoutsScoreboard = () => {
 
       // Update match state and backend
       try {
+        const token = localStorage.getItem("token");
         const response = await fetch(
           `/api/tournaments/team-knockout/matches/${matchId}/live-score`,
           {
             method: "PUT",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
             body: JSON.stringify({
               matches: updatedMatches,
               teamASetWins,
@@ -1028,8 +1054,14 @@ const TeamKnockoutsScoreboard = () => {
         try {
           setLoading(true);
           // Fetch team data and substitution history
+          const token = localStorage.getItem("token");
           const response = await fetch(
-            `/api/tournaments/team-knockout/matches/${matchId}/live-state`
+            `/api/tournaments/team-knockout/matches/${matchId}/live-state`,
+            {
+              headers: {
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+              },
+            }
           );
 
           if (response.ok) {

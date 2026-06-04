@@ -7,6 +7,7 @@ import { useNavigate, useParams, useLocation } from "react-router-dom";
 import axios from "axios";
 import BulkScoreUploadModal from "./BulkScoreUploadModal";
 import { getResultLabels } from "../shared/utils/matchResultUtils";
+import { Breadcrumbs } from "../shared/ui";
 
 const MPointsTableScreen = () => {
   const navigate = useNavigate();
@@ -542,6 +543,16 @@ Please complete all group stage matches first.`);
 
   return (
     <div className="p-4 space-y-6">
+      {/* Tournament-anchored breadcrumbs — keeps "I'm inside Tournament X" while
+          drilled into a points table. */}
+      <Breadcrumbs
+        items={[
+          { label: "Tournaments", to: "/mtournament-management" },
+          { label: "Manage tournament", to: `/tournament-management/group-stage?tournamentId=${tournamentId}` },
+          { label: isRound2 ? "Points table · Round 2" : "Points table" },
+        ]}
+      />
+
       {/* Header Section */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">

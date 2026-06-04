@@ -9,7 +9,7 @@ const PAGE_META = {
   "/mdashboard": { title: "Dashboard", crumbs: [] },
   "/mtournament-management": { title: "Tournaments", crumbs: [] },
   "/invite-employees": { title: "Invite employees", crumbs: [{ label: "Tournaments", path: "/mtournament-management" }] },
-  "/mslot-Bookingt": { title: "Slot booking", crumbs: [] },
+  "/mslot-Booking": { title: "Slot booking", crumbs: [] },
   "/msocial": { title: "Social feed", crumbs: [] },
   "/mrefree": { title: "Referee panel", crumbs: [] },
   "/mtrainers": { title: "Trainers", crumbs: [] },

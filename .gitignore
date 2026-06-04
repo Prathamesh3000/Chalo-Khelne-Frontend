@@ -9,7 +9,8 @@ lerna-debug.log*
 
 .env
 
-package-lock.json
+# package-lock.json is intentionally NOT ignored — it MUST be committed for
+# reproducible production installs (npm ci).
 
 node_modules
 

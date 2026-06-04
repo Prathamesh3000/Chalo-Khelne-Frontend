@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { assetUrl } from "../shared/lib/assetUrl";
 
 const TurfDetails = () => {
   const navigate = useNavigate();
@@ -16,8 +17,14 @@ const TurfDetails = () => {
   useEffect(() => {
     const fetchTurfDetails = async () => {
       try {
+        const token = localStorage.getItem("token");
         const response = await fetch(
-          `/api/turfs/${id}`
+          `/api/turfs/${id}`,
+          {
+            headers: {
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+          }
         );
 
         if (!response.ok) {
@@ -170,7 +177,7 @@ const TurfDetails = () => {
                 {turf.images.map((image, index) => (
                   <img
                     key={index}
-                    src={`/uploads/${image}`}
+                    src={assetUrl(image)}
                     alt={`${turf.name} - Image ${index + 1}`}
                     className="w-full h-48 object-cover rounded-lg"
                     onError={(e) => {

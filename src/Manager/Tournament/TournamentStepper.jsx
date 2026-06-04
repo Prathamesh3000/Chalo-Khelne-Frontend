@@ -3,11 +3,18 @@ import { Users, Grid3X3, Swords, ClipboardList, Check } from "lucide-react";
 
 const SIG = "#5E6AD2";
 
+// The V2 PlayersPage was a read-only mirror of what the legacy group-stage
+// page already shows — same player list, no create-groups action, just one
+// extra click. We route the "Players" step straight to the legacy page so
+// the full management UI (player checkboxes, seeding, Create Groups) loads
+// on first click.
+const LEGACY_PLAYERS_PATH = "/tournament-management/group-stage";
+
 const STEPS = [
   { key: "overview", label: "Overview", icon: ClipboardList, path: "" },
-  { key: "players", label: "Players", icon: Users, path: "/players" },
-  { key: "groups", label: "Groups", icon: Grid3X3, path: "/groups" },
-  { key: "knockout", label: "Knockout", icon: Swords, path: "/knockout" },
+  { key: "players",  label: "Players",  icon: Users,         path: LEGACY_PLAYERS_PATH, useQuery: true },
+  { key: "groups",   label: "Groups",   icon: Grid3X3,       path: "/groups" },
+  { key: "knockout", label: "Knockout", icon: Swords,        path: "/knockout" },
 ];
 
 const STAGE_ORDER = [
@@ -27,9 +34,17 @@ export default function TournamentStepper({ currentStage }) {
   const activePath = location.pathname.replace(basePath, "") || "";
   const stageIndex = STAGE_ORDER.indexOf(currentStage || "registration");
 
+  const hrefFor = (step) =>
+    step.useQuery
+      ? `${step.path}?tournamentId=${tournamentId}`
+      : `${basePath}${step.path}`;
+
   const getStatus = (step, idx) => {
-    const isActive =
-      activePath === step.path || activePath.startsWith(step.path + "/");
+    // The Players step lives outside basePath (it's the legacy URL), so
+    // detect it via the location pathname instead of activePath.
+    const isActive = step.useQuery
+      ? location.pathname.startsWith(step.path)
+      : activePath === step.path || activePath.startsWith(step.path + "/");
     if (isActive) return "active";
     if (idx <= stageIndex) return "completed";
     return "pending";
@@ -46,7 +61,7 @@ export default function TournamentStepper({ currentStage }) {
           return (
             <div key={step.key} className="flex items-center flex-1">
               <button
-                onClick={() => navigate(`${basePath}${step.path}`)}
+                onClick={() => navigate(hrefFor(step))}
                 className={`flex items-center gap-2 px-3 h-9 rounded-lg text-[12px] font-medium transition ${
                   status === "active"
                     ? "text-white"

@@ -1,6 +1,9 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* NOTE: Tailwind is loaded via the play-CDN <script> in index.html, NOT via
+   PostCSS in this app. The previous `@tailwind base/components/utilities`
+   directives here were no-ops (PostCSS pipeline isn't running on this file)
+   and on top of that this file was never even imported in main.jsx — so
+   every custom rule below silently failed to load until 2026-05-19. Now
+   imported via main.jsx; only custom rules belong here. */
 
 :root {
   font-family: "Inter", system-ui, Avenir, Helvetica, Arial, sans-serif;
@@ -98,5 +101,50 @@ input[type="number"] {
 ::-webkit-scrollbar-track { background: #F5F7FA; }
 ::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: #9CA3AF; }
-.scrollbar-hide::-webkit-scrollbar { display: none; }
-.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+.scrollbar-hide::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }
+.scrollbar-hide { -ms-overflow-style: none !important; scrollbar-width: none !important; }
+
+/* ───────────────────────────────────────────────────────────────
+   Landing-page motion. Kept as plain CSS so it works regardless of
+   Tailwind v3/v4 token-resolution quirks. Each keyframe is named to
+   match the animate-* utility class below it.
+   ─────────────────────────────────────────────────────────────── */
+
+@keyframes hero-rise {
+  0%   { opacity: 0; transform: translateY(110%); }
+  60%  { opacity: 1; }
+  100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes marquee {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+@keyframes pulse-ring {
+  0%   { transform: scale(1);   opacity: 0.6; }
+  80%  { transform: scale(2.2); opacity: 0;   }
+  100% { transform: scale(2.2); opacity: 0;   }
+}
+@keyframes score-tick-in {
+  0%   { opacity: 0; transform: translateY(80%); }
+  100% { opacity: 1; transform: translateY(0);   }
+}
+@keyframes shine {
+  0%   { transform: translateX(-150%) skewX(-20deg); }
+  100% { transform: translateX(250%)  skewX(-20deg); }
+}
+
+.animate-hero-rise     { animation: hero-rise 700ms cubic-bezier(0.16, 1, 0.3, 1) backwards; }
+.animate-marquee       { animation: marquee 30s linear infinite; }
+.animate-pulse-ring    { animation: pulse-ring 1.6s cubic-bezier(0.16, 1, 0.3, 1) infinite; }
+.animate-score-tick-in { animation: score-tick-in 400ms cubic-bezier(0.16, 1, 0.3, 1); }
+.animate-shine         { animation: shine 1100ms ease-out; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-hero-rise,
+  .animate-marquee,
+  .animate-pulse-ring,
+  .animate-score-tick-in,
+  .animate-shine {
+    animation: none !important;
+  }
+}

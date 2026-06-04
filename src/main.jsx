@@ -3,18 +3,19 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import axios from "axios";
 import { QueryClientProvider } from "@tanstack/react-query";
-import queryClient from "./config/queryClient";
-import { AuthProvider } from "./context/AuthContext";
+import { queryClient } from "./shared/lib";
+import { AuthProvider } from "./features/auth";
 import NotificationProvider from "./context/NotificationContext";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import "./index.css";
 import App from "./App";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { initSocket } from "./features/realtime";
-import { setupAxiosInterceptors } from "./services/authInterceptor";
+import { setupApiInterceptors } from "./shared/api";
 
 // Setup global axios interceptors — auto token, 401 handling, error toasts
-setupAxiosInterceptors();
+setupApiInterceptors();
 
 // Initialize WebSocket if user is authenticated (lazy — don't block startup)
 try {

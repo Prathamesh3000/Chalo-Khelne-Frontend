@@ -24,8 +24,14 @@ const MTrainerApplications = () => {
         return;
       }
 
+      const token = localStorage.getItem("token");
       const response = await fetch(
-        `/api/manager/trainer-applications?managerId=${managerId}&status=${filter}`
+        `/api/manager/trainer-applications?managerId=${managerId}&status=${filter}`,
+        {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        }
       );
 
       if (!response.ok) {
@@ -47,6 +53,7 @@ const MTrainerApplications = () => {
     rejectionReason = ""
   ) => {
     try {
+      const token = localStorage.getItem("token");
       const response = await fetch(
         `/api/manager/trainer-applications/${applicationId}/${action}`,
         {
@@ -54,6 +61,7 @@ const MTrainerApplications = () => {
           headers: {
             "Content-Type": "application/json",
             "manager-id": auth?._id,
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
           body: JSON.stringify({ rejectionReason }),
         }

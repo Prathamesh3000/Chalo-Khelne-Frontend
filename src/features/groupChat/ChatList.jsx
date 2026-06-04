@@ -1,10 +1,15 @@
 import { useState, useContext } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, MessageCircle, Users, Crown, X, Clock } from "lucide-react";
+import { Plus, MessageCircle, Users, Crown, X } from "lucide-react";
 import { AuthContext } from "../../context/AuthContext";
 import { useChats, useCreateChat } from "./useGroupChat";
 
-export default function ChatList() {
+/**
+ * Props:
+ * - dark: boolean (default false) — render in Manager dark theme
+ * - showHeader: boolean (defaults to !dark — page wrapper provides its own header in dark)
+ */
+export default function ChatList({ dark = false, showHeader }) {
   const { auth } = useContext(AuthContext);
   const userId = auth?._id;
   const navigate = useNavigate();
@@ -14,6 +19,8 @@ export default function ChatList() {
   const [showCreate, setShowCreate] = useState(false);
   const [name, setName] = useState("");
   const [desc, setDesc] = useState("");
+
+  const renderHeader = showHeader ?? !dark;
 
   const handleCreate = async () => {
     if (!name.trim()) return;
@@ -35,83 +42,193 @@ export default function ChatList() {
     return `${Math.floor(h / 24)}d`;
   };
 
+  const t = dark
+    ? {
+        wrapper:   "",
+        titleText: "text-white",
+        metaText:  "text-gray-400",
+        cta:       "bg-orange-500 hover:bg-orange-600 text-white shadow-sm shadow-orange-500/30",
+        skeleton:  "bg-[#181A22] border border-white/[0.06]",
+        emptyBox:  "bg-[#181A22]",
+        emptyBorder: { border: "1px solid rgba(255,255,255,0.06)" },
+        emptyIconBg: "bg-white/[0.06]",
+        emptyIcon:   "text-gray-500",
+        emptyTitle:  "text-white",
+        emptyDesc:   "text-gray-400",
+        rowCard:   "bg-[#181A22] hover:border-white/[0.12] transition",
+        rowBorder: "border border-white/[0.06]",
+        rowAvatar: "bg-orange-500/15 text-orange-400",
+        rowName:   "text-white",
+        rowMeta:   "text-gray-500",
+        crown:     "text-orange-400",
+      }
+    : {
+        wrapper:   "p-6 lg:p-8 max-w-3xl mx-auto",
+        titleText: "text-gray-900",
+        metaText:  "text-gray-500",
+        cta:       "bg-orange-500 hover:bg-orange-600 text-white shadow-sm",
+        skeleton:  "bg-white border border-gray-100",
+        emptyBox:  "bg-white border border-gray-100",
+        emptyBorder: undefined,
+        emptyIconBg: "bg-gray-100",
+        emptyIcon:   "text-gray-300",
+        emptyTitle:  "text-gray-700",
+        emptyDesc:   "text-gray-400",
+        rowCard:   "bg-white hover:shadow-md hover:border-gray-200 transition-all",
+        rowBorder: "border border-gray-100",
+        rowAvatar: "bg-gradient-to-br from-orange-500 to-[#2DA5FF] text-white",
+        rowName:   "text-gray-800",
+        rowMeta:   "text-gray-400",
+        crown:     "text-orange-500",
+      };
+
   return (
-    <div className="p-6 lg:p-8 max-w-3xl mx-auto">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-black text-gray-900">Group Chats</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{chats.length} chat{chats.length !== 1 ? "s" : ""}</p>
+    <div className={t.wrapper}>
+      {renderHeader && (
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className={`text-2xl font-black ${t.titleText}`}>Group Chats</h1>
+            <p className={`text-sm mt-0.5 ${t.metaText}`}>{chats.length} chat{chats.length === 1 ? "" : "s"}</p>
+          </div>
+          <button onClick={() => setShowCreate(true)}
+            className={`inline-flex items-center gap-1.5 h-9 px-3.5 rounded-md text-[13px] font-semibold transition active:scale-[0.98] w-auto ${t.cta}`}>
+            <Plus className="w-3.5 h-3.5" /> New chat
+          </button>
         </div>
-        <button onClick={() => setShowCreate(true)}
-          className="flex items-center gap-1.5 px-4 py-2.5 bg-orange-500 hover:bg-[#E55D00] text-white text-sm font-semibold rounded-xl transition shadow-sm w-auto active:scale-[0.97]">
-          <Plus className="w-4 h-4" /> New Chat
-        </button>
-      </div>
+      )}
+
+      {/* When dark and header hidden, still show a top-right New chat button */}
+      {!renderHeader && (
+        <div className="flex justify-end mb-4">
+          <button onClick={() => setShowCreate(true)}
+            className={`inline-flex items-center gap-1.5 h-9 px-3.5 rounded-md text-[13px] font-semibold transition active:scale-[0.98] w-auto ${t.cta}`}>
+            <Plus className="w-3.5 h-3.5" /> New chat
+          </button>
+        </div>
+      )}
 
       {isLoading ? (
-        <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="bg-white rounded-2xl border border-gray-100 p-5 animate-pulse h-20" />)}</div>
+        <div className="space-y-2">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className={`rounded-md p-4 animate-pulse h-16 ${t.skeleton}`} />
+          ))}
+        </div>
       ) : chats.length === 0 ? (
-        <div className="text-center py-20 bg-white rounded-2xl border border-gray-100">
-          <MessageCircle className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-          <h3 className="text-lg font-bold text-gray-700">No group chats yet</h3>
-          <p className="text-sm text-gray-400 mt-1">Create one to start chatting!</p>
+        <div className={`text-center py-16 rounded-2xl ${t.emptyBox}`} style={t.emptyBorder}>
+          <div className={`w-10 h-10 rounded-md inline-flex items-center justify-center mb-3 ${t.emptyIconBg}`}>
+            <MessageCircle className={`w-5 h-5 ${t.emptyIcon}`} />
+          </div>
+          <h3 className={`text-[14px] font-medium ${t.emptyTitle}`}>No group chats yet</h3>
+          <p className={`text-[13px] mt-1 max-w-xs mx-auto ${t.emptyDesc}`}>Create one to start chatting with your community.</p>
+          <button onClick={() => setShowCreate(true)}
+            className={`mt-4 inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[12px] font-semibold transition active:scale-[0.98] w-auto ${t.cta}`}>
+            <Plus className="w-3.5 h-3.5" /> New chat
+          </button>
         </div>
       ) : (
         <div className="space-y-2">
           {chats.map((chat) => (
             <button key={chat._id} onClick={() => navigate(`/group-chat/${chat._id}`)}
-              className="w-full bg-white rounded-2xl border border-gray-100 p-4 text-left hover:shadow-md hover:border-gray-200 transition-all flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-500 to-[#2DA5FF] flex items-center justify-center text-white text-lg font-bold flex-shrink-0">
+              className={`w-full rounded-lg p-4 text-left flex items-center gap-3 ${t.rowCard} ${t.rowBorder}`}>
+              <div className={`w-11 h-11 rounded-md grid place-items-center text-[15px] font-semibold flex-shrink-0 ${t.rowAvatar}`}>
                 {chat.name?.charAt(0)?.toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <h3 className="font-bold text-gray-800 text-sm truncate">{chat.name}</h3>
-                  {chat.isOwner && <Crown className="w-3.5 h-3.5 text-orange-500 flex-shrink-0" />}
+                  <h3 className={`text-[13px] font-medium truncate ${t.rowName}`}>{chat.name}</h3>
+                  {chat.isOwner && <Crown className={`w-3.5 h-3.5 flex-shrink-0 ${t.crown}`} />}
                 </div>
-                <p className="text-xs text-gray-400 truncate">
+                <p className={`text-[11px] truncate mt-0.5 ${t.rowMeta}`}>
                   {chat.lastMessageText ? `${chat.lastMessageBy}: ${chat.lastMessageText}` : "No messages yet"}
                 </p>
               </div>
-              <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                {chat.lastMessageAt && <span className="text-[10px] text-gray-400">{timeAgo(chat.lastMessageAt)}</span>}
-                <span className="text-[10px] text-gray-400 flex items-center gap-0.5"><Users className="w-3 h-3" />{chat.members?.length}</span>
+              <div className={`flex flex-col items-end gap-1 flex-shrink-0 text-[10px] ${t.rowMeta}`}>
+                {chat.lastMessageAt && <span className="font-mono tabular-nums">{timeAgo(chat.lastMessageAt)}</span>}
+                <span className="flex items-center gap-0.5">
+                  <Users className="w-3 h-3" />
+                  <span className="font-mono tabular-nums">{chat.members?.length}</span>
+                </span>
               </div>
             </button>
           ))}
         </div>
       )}
 
-      {/* Create Modal */}
+      {/* Create modal */}
       {showCreate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-              <h3 className="text-lg font-bold text-gray-800">Create Group Chat</h3>
-              <button onClick={() => setShowCreate(false)} className="p-1.5 hover:bg-gray-100 rounded-lg w-auto"><X className="w-5 h-5 text-gray-500" /></button>
-            </div>
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wider">Chat Name *</label>
-                <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Table Tennis Squad"
-                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition" autoFocus />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wider">Description</label>
-                <input type="text" value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="What's this chat about?"
-                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition" />
-              </div>
-              <div className="flex justify-end gap-3 pt-2">
-                <button onClick={() => setShowCreate(false)} className="px-5 py-2.5 text-gray-600 text-sm font-medium hover:bg-gray-100 rounded-xl transition w-auto">Cancel</button>
-                <button onClick={handleCreate} disabled={!name.trim() || createMutation.isPending}
-                  className="px-5 py-2.5 bg-orange-500 hover:bg-orange-700 text-white text-sm font-bold rounded-xl transition disabled:opacity-50 w-auto active:scale-[0.97]">
-                  {createMutation.isPending ? "Creating..." : "Create"}
-                </button>
-              </div>
-            </div>
+        <CreateChatModal
+          dark={dark}
+          name={name} setName={setName}
+          desc={desc} setDesc={setDesc}
+          pending={createMutation.isPending}
+          onClose={() => setShowCreate(false)}
+          onCreate={handleCreate}
+        />
+      )}
+    </div>
+  );
+}
+
+function CreateChatModal({ dark, name, setName, desc, setDesc, pending, onClose, onCreate }) {
+  const t = dark
+    ? {
+        backdrop: "bg-black/60 backdrop-blur-sm",
+        card:     "bg-[#181A22] border border-white/[0.06] shadow-[0_24px_64px_rgba(0,0,0,0.5)]",
+        header:   "border-b border-white/[0.06]",
+        title:    "text-white",
+        close:    "text-gray-500 hover:text-white hover:bg-white/5",
+        label:    "text-[11px] font-semibold text-gray-500 uppercase tracking-[0.06em]",
+        input:    "h-9 px-3 rounded-md text-[13px] text-gray-200 placeholder:text-gray-500 focus:outline-none",
+        inputStyle: { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" },
+        cancel:   "text-gray-300 hover:text-white hover:bg-white/[0.06]",
+        cancelStyle: { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" },
+      }
+    : {
+        backdrop: "bg-black/40 backdrop-blur-sm",
+        card:     "bg-white shadow-2xl",
+        header:   "border-b border-gray-100",
+        title:    "text-gray-800",
+        close:    "text-gray-500 hover:bg-gray-100",
+        label:    "text-xs font-semibold text-gray-500 uppercase tracking-wider",
+        input:    "px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition",
+        inputStyle: undefined,
+        cancel:   "text-gray-600 hover:bg-gray-100",
+        cancelStyle: undefined,
+      };
+
+  return (
+    <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${t.backdrop}`} onClick={onClose}>
+      <div className={`rounded-2xl w-full max-w-md overflow-hidden ${t.card}`} onClick={(e) => e.stopPropagation()}>
+        <div className={`flex items-center justify-between px-5 py-4 ${t.header}`}>
+          <h3 className={`text-[14px] font-medium ${t.title}`}>Create group chat</h3>
+          <button onClick={onClose} className={`h-7 w-7 inline-flex items-center justify-center rounded-md transition w-auto ${t.close}`}>
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="px-5 py-4 space-y-3">
+          <div>
+            <label className={`block mb-1.5 ${t.label}`}>Chat name *</label>
+            <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Table Tennis Squad"
+              className={`w-full ${t.input}`} style={t.inputStyle} autoFocus />
+          </div>
+          <div>
+            <label className={`block mb-1.5 ${t.label}`}>Description</label>
+            <input type="text" value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="What's this chat about?"
+              className={`w-full ${t.input}`} style={t.inputStyle} />
           </div>
         </div>
-      )}
+        <div className={`px-5 py-3 flex justify-end gap-2 ${t.header.replace("border-b", "border-t")} ${dark ? "bg-white/[0.02]" : ""}`}>
+          <button onClick={onClose}
+            className={`h-9 px-3.5 rounded-md text-[13px] font-semibold transition w-auto ${t.cancel}`}
+            style={t.cancelStyle}>
+            Cancel
+          </button>
+          <button onClick={onCreate} disabled={!name.trim() || pending}
+            className="h-9 px-3.5 inline-flex items-center gap-1.5 bg-orange-500 hover:bg-orange-600 text-white text-[13px] font-semibold rounded-md transition active:scale-[0.98] disabled:opacity-50 shadow-sm shadow-orange-500/30 w-auto">
+            {pending ? "Creating…" : "Create"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

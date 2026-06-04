@@ -15,7 +15,7 @@ export default function ExpandableSection({
 }) {
   const chevron = (
     <ChevronDown
-      className={`w-3.5 h-3.5 text-neutral-400 transition-transform duration-150 ease-out ${
+      className={`w-3.5 h-3.5 text-gray-500 transition-transform duration-150 ease-out ${
         open ? "rotate-180" : ""
       }`}
     />
@@ -42,7 +42,7 @@ export default function ExpandableSection({
           type="button"
           onClick={onToggle}
           aria-expanded={open}
-          className="text-[12px] font-medium text-neutral-500 hover:text-neutral-900 inline-flex items-center gap-1 transition"
+          className="text-[12px] font-medium text-gray-400 hover:text-white inline-flex items-center gap-1 transition"
         >
           {label}
           {chevron}
@@ -58,15 +58,15 @@ export default function ExpandableSection({
         type="button"
         onClick={onToggle}
         aria-expanded={open}
-        className="w-full flex items-center justify-between gap-2 bg-white hover:bg-neutral-50 px-3 h-9 rounded-lg border border-neutral-200 transition"
+        className="w-full flex items-center justify-between gap-2 bg-[#181A22] hover:bg-white/[0.04] px-3 h-9 rounded-lg border border-white/[0.06] transition"
       >
         <span className="flex items-center gap-2 min-w-0">
-          {icon && <span className="text-neutral-500 flex-shrink-0">{icon}</span>}
-          <span className="text-[12px] font-medium text-neutral-900 text-left truncate">
+          {icon && <span className="text-gray-400 flex-shrink-0">{icon}</span>}
+          <span className="text-[12px] font-medium text-white text-left truncate">
             {label}
           </span>
           {description && (
-            <span className="text-[11px] text-neutral-500 truncate">
+            <span className="text-[11px] text-gray-400 truncate">
               {description}
             </span>
           )}

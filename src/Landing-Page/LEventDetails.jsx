@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronRight, MapPin, Calendar, Award, IndianRupee, ArrowLeft, Clock } from "lucide-react";
+import cardImg from "../assets/card-img.png";
 
 const EventDetails = () => {
   const navigate = useNavigate();
@@ -50,7 +51,7 @@ const EventDetails = () => {
       <div className="max-w-[1200px] mx-auto px-6 md:px-12 py-8 space-y-5">
         {/* Hero Image */}
         <div className="rounded-2xl overflow-hidden h-[320px] md:h-[420px] bg-gray-200">
-          <img src="/src/assets/card-img.png" alt="Event" className="w-full h-full object-cover" />
+          <img src={cardImg} alt="Event" className="w-full h-full object-cover" />
         </div>
 
         {/* Info Cards */}

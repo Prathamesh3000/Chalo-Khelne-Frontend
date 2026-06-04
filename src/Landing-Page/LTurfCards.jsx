@@ -1,5 +1,6 @@
 import React from "react";
 import { Star, MapPin, Navigation } from "lucide-react";
+import { assetUrl } from "../shared/lib/assetUrl";
 import { motion } from "framer-motion";
 
 const TurfCards = ({ turf, onTurfClick }) => {
@@ -12,7 +13,7 @@ const TurfCards = ({ turf, onTurfClick }) => {
 
   const sports = Array.isArray(turf?.sports) ? turf.sports : [];
   const minPrice = sports.length > 0 ? Math.min(...sports.map((s) => s.pricePerHour || 0)) : 0;
-  const image = turf?.images?.[0] ? `/uploads/${turf.images[0]}` : null;
+  const image = turf?.images?.[0] ? assetUrl(turf.images[0]) : null;
 
   return (
     <motion.div

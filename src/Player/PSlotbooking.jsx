@@ -12,7 +12,12 @@ const PSlotbooking = () => {
   useEffect(() => {
     const fetchTurfs = async () => {
       try {
-        const response = await fetch(`/api/turf/turfs/`);
+        const token = localStorage.getItem("token");
+        const response = await fetch(`/api/turf/turfs/`, {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
         const data = await response.json();
         setTurfs(data);
       } catch (error) {
@@ -23,7 +28,12 @@ const PSlotbooking = () => {
     const fetchUserBookings = async () => {
       try {
         if (!userId) return;
-        const response = await fetch(`/api/turf/turfs/bookings/user/${userId}`);
+        const token = localStorage.getItem("token");
+        const response = await fetch(`/api/turf/turfs/bookings/user/${userId}`, {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
         const data = await response.json();
         setBookings(data);
       } catch (error) {

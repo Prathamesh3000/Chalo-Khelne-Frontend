@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
+import { assetUrl } from "../shared/lib/assetUrl";
 import {
   Share2, X, LogIn, MapPin, Calendar, Award, ArrowRight, IndianRupee, Users, Loader2, Trophy,
 } from "lucide-react";
@@ -40,7 +41,7 @@ const TournamentDetailModal = ({ tournament, onClose, onSignInPrompt }) => {
         {/* Hero Image */}
         <div className="relative h-56 md:h-64 overflow-hidden">
           <img
-            src={tournament.tournamentLogo ? `/uploads/tournaments/${tournament.tournamentLogo.split("\\").pop()}` : defaultImg}
+            src={tournament.tournamentLogo ? assetUrl('tournaments/' + tournament.tournamentLogo.split("\\").pop()) : defaultImg}
             alt={tournament.title}
             className="w-full h-full object-cover"
             onError={(e) => { e.target.src = defaultImg; }}
@@ -196,7 +197,12 @@ const Event = () => {
 
       (async () => {
         try {
-          const res = await fetch(`/api/tournaments/${deepLinkedTournamentId}`);
+          const token = localStorage.getItem("token");
+          const res = await fetch(`/api/tournaments/${deepLinkedTournamentId}`, {
+            headers: {
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+          });
           if (res.ok) {
             const data = await res.json();
             if (data.tournament) setSelectedTournament(data.tournament);
@@ -300,7 +306,12 @@ const TournamentCards = ({ onTournamentClick }) => {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch("/api/tournaments");
+        const token = localStorage.getItem("token");
+        const res = await fetch("/api/tournaments", {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
         if (!res.ok) throw new Error("Failed to load");
         const data = await res.json();
         setTournaments(data.tournaments || data);
@@ -346,7 +357,7 @@ const TournamentCards = ({ onTournamentClick }) => {
           {/* Image */}
           <div className="relative h-48 overflow-hidden">
             <img
-              src={tournament.tournamentLogo ? `/uploads/tournaments/${tournament.tournamentLogo.split("\\").pop()}` : defaultImg}
+              src={tournament.tournamentLogo ? assetUrl('tournaments/' + tournament.tournamentLogo.split("\\").pop()) : defaultImg}
               alt={tournament.title}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               onError={(e) => { e.target.src = defaultImg; }}

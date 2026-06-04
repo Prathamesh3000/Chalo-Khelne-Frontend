@@ -1,12 +1,14 @@
-import React, { useState, useEffect, useContext, useRef } from "react";
+import { useState, useEffect, useContext, useRef } from "react";
 import { AuthContext } from "../context/AuthContext";
+import { assetUrl } from "../shared/lib/assetUrl";
 import { Link } from "react-router-dom";
 import axios from "axios";
 import { toast } from "react-toastify";
 import {
   MapPin, Clock, Camera, Plus, X, Search, Trash2, Edit2, Star, Check,
-  Dumbbell, DollarSign, Loader2, Eye,
+  Dumbbell, IndianRupee, Loader2, Eye, ImageOff,
 } from "lucide-react";
+import { ClubAdminShell } from "../shared/layout";
 
 const DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
 const SPORTS_PRESETS = ["Football", "Cricket", "Basketball", "Tennis", "Badminton", "Volleyball", "Hockey", "Table Tennis", "Swimming", "Pickleball", "Chess", "Carrom"];
@@ -19,7 +21,6 @@ const FACILITY_PRESETS = [
 const TurfManagement = () => {
   const { auth } = useContext(AuthContext);
 
-  // Tab
   const [activeTab, setActiveTab] = useState("add");
 
   // Add form state
@@ -49,7 +50,6 @@ const TurfManagement = () => {
 
   const fileInputRefs = [useRef(null), useRef(null), useRef(null)];
 
-  // Fetch turfs
   useEffect(() => {
     if (activeTab === "manage" && auth?._id) {
       (async () => {
@@ -63,7 +63,6 @@ const TurfManagement = () => {
     }
   }, [activeTab, auth]);
 
-  // ═══ IMAGE HANDLERS ═══
   const handleImageChange = (e, index) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -82,7 +81,6 @@ const TurfManagement = () => {
     if (fileInputRefs[index].current) fileInputRefs[index].current.value = "";
   };
 
-  // ═══ SPORT HANDLERS ═══
   const addSport = (sportName) => {
     const n = (sportName || sportInput).trim();
     if (!n) return;
@@ -95,7 +93,6 @@ const TurfManagement = () => {
   const toggleFacility = (f) => setFacilities((prev) => prev.includes(f) ? prev.filter((x) => x !== f) : [...prev, f]);
   const toggleDay = (d) => setSelectedDays((prev) => prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]);
 
-  // ═══ SUBMIT ═══
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!name.trim()) { toast.error("Turf name is required"); return; }
@@ -122,7 +119,6 @@ const TurfManagement = () => {
       await axios.post("/api/turfs", fd, { headers: { "Content-Type": "multipart/form-data" } });
       toast.success("Turf added successfully!");
 
-      // Reset
       setName(""); setDescription(""); setLocationAddress(""); setArea(""); setCity(""); setPincode("");
       setLongitude(""); setLatitude(""); setSportsList([]); setFacilities([]);
       setSelectedDays([...DAYS]); setOpenTime("06:00"); setCloseTime("22:00");
@@ -134,7 +130,6 @@ const TurfManagement = () => {
     }
   };
 
-  // ═══ DELETE TURF ═══
   const handleDeleteTurf = async (id) => {
     if (!confirm("Delete this turf permanently?")) return;
     try {
@@ -149,63 +144,70 @@ const TurfManagement = () => {
     t.address?.fullAddress?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // ═══════════════════════════════════
-  // RENDER
-  // ═══════════════════════════════════
   return (
-    <div className="p-6 lg:p-8 max-w-5xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-black text-gray-900">Turf Management</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Add and manage your sports facilities</p>
-        </div>
-      </div>
+    <ClubAdminShell searchPlaceholder="Search turfs…">
+      {/* Header */}
+      <header className="mb-6">
+        <p className="inline-flex items-center gap-1.5 text-[12px] text-gray-400">
+          <MapPin className="w-3.5 h-3.5" />
+          Turfs · Management
+        </p>
+        <h1 className="mt-2 text-[26px] font-medium text-white leading-tight">
+          Turf management
+        </h1>
+        <p className="mt-1 text-[13px] text-gray-400">
+          Add and manage your sports facilities.
+        </p>
+      </header>
 
       {/* Tabs */}
-      <div className="flex gap-2 mb-6">
+      <div className="inline-flex items-center gap-1 bg-white/[0.04] p-1 rounded-md border border-white/[0.06] mb-5">
         {[
-          { key: "add", label: "Add Turf", icon: Plus },
-          { key: "manage", label: `My Turfs ${turfs.length > 0 ? `(${turfs.length})` : ""}`, icon: MapPin },
-        ].map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition w-auto ${
-              activeTab === tab.key ? "bg-orange-500 text-white shadow-sm" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
-            }`}
-          >
-            <tab.icon className="w-4 h-4" /> {tab.label}
-          </button>
-        ))}
+          { key: "add", label: "Add turf", icon: Plus },
+          { key: "manage", label: `My turfs ${turfs.length > 0 ? `(${turfs.length})` : ""}`, icon: MapPin },
+        ].map((tab) => {
+          const active = activeTab === tab.key;
+          return (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`inline-flex items-center gap-1.5 h-7 px-3 rounded-[5px] text-[12px] font-medium transition w-auto ${
+                active ? "bg-[#181A22] text-white shadow-[0_1px_2px_rgba(0,0,0,0.3)]" : "text-gray-400 hover:text-white"
+              }`}
+            >
+              <tab.icon className="w-3.5 h-3.5" /> {tab.label}
+            </button>
+          );
+        })}
       </div>
 
-      {/* ═══ ADD TAB ═══ */}
+      {/* ADD TAB */}
       {activeTab === "add" && (
-        <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Section 1: Basic Info */}
-          <Section icon={Dumbbell} title="Basic Information">
-            <Input label="Turf Name *" value={name} onChange={setName} placeholder="e.g. Shivaji Sports Arena" />
-            <Textarea label="Description" value={description} onChange={setDescription} placeholder="Describe your facility — surface type, size, environment..." rows={3} />
+        <form onSubmit={handleSubmit} className="space-y-3 max-w-5xl">
+          <Section icon={Dumbbell} title="Basic information">
+            <DarkInput label="Turf name *" value={name} onChange={setName} placeholder="e.g. Shivaji Sports Arena" />
+            <DarkTextarea label="Description" value={description} onChange={setDescription} placeholder="Describe your facility — surface type, size, environment…" rows={3} />
           </Section>
 
-          {/* Section 2: Photos */}
-          <Section icon={Camera} title="Turf Photos">
-            <div className="grid grid-cols-3 gap-4">
+          <Section icon={Camera} title="Turf photos">
+            <div className="grid grid-cols-3 gap-3">
               {[0, 1, 2].map((idx) => (
-                <div key={idx} className={`relative rounded-2xl border-2 border-dashed overflow-hidden transition-all ${images[idx] ? "border-orange-500 bg-blue-50/30" : "border-gray-200 hover:border-orange-500 hover:bg-blue-50/20"}`}>
+                <div key={idx}
+                  className={`relative rounded-md overflow-hidden transition ${images[idx] ? "" : "hover:bg-white/[0.04]"}`}
+                  style={{ border: images[idx] ? "1px solid rgba(249,115,22,0.4)" : "1px dashed rgba(255,255,255,0.12)" }}>
                   {images[idx] ? (
                     <>
-                      <img src={images[idx]} alt="" className="w-full h-36 object-cover" />
+                      <img src={images[idx]} alt="" className="w-full h-32 object-cover" />
                       <button type="button" onClick={() => handleRemoveImage(idx)}
-                        className="absolute top-2 right-2 w-7 h-7 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-sm transition w-auto">
-                        <X className="w-3.5 h-3.5 text-gray-600" />
+                        className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/60 hover:bg-black/80 backdrop-blur-sm rounded-md flex items-center justify-center transition w-auto">
+                        <X className="w-3 h-3 text-white" />
                       </button>
                     </>
                   ) : (
-                    <label className="flex flex-col items-center justify-center h-36 cursor-pointer">
-                      <Camera className="w-6 h-6 text-gray-400 mb-1.5" />
-                      <span className="text-xs text-gray-500 font-medium">Photo {idx + 1}</span>
-                      <span className="text-[10px] text-gray-400 mt-0.5">Click to upload</span>
+                    <label className="flex flex-col items-center justify-center h-32 cursor-pointer">
+                      <Camera className="w-5 h-5 text-gray-500 mb-1.5" />
+                      <span className="text-[11px] text-gray-400 font-medium">Photo {idx + 1}</span>
+                      <span className="text-[10px] text-gray-600 mt-0.5">Click to upload</span>
                       <input type="file" ref={fileInputRefs[idx]} onChange={(e) => handleImageChange(e, idx)} className="hidden" accept="image/*" />
                     </label>
                   )}
@@ -214,61 +216,60 @@ const TurfManagement = () => {
             </div>
           </Section>
 
-          {/* Section 3: Location */}
           <Section icon={MapPin} title="Location">
-            <Input label="Full Address *" value={locationAddress} onChange={setLocationAddress} placeholder="Street address, landmark" icon={MapPin} />
-            <div className="grid grid-cols-3 gap-4">
-              <Input label="Area" value={area} onChange={setArea} placeholder="e.g. Kharadi" />
-              <Input label="City" value={city} onChange={setCity} placeholder="Pune" />
-              <Input label="Pincode" value={pincode} onChange={setPincode} placeholder="411014" />
+            <DarkInput label="Full address *" value={locationAddress} onChange={setLocationAddress} placeholder="Street address, landmark" />
+            <div className="grid grid-cols-3 gap-3">
+              <DarkInput label="Area" value={area} onChange={setArea} placeholder="e.g. Kharadi" />
+              <DarkInput label="City" value={city} onChange={setCity} placeholder="Pune" />
+              <DarkInput label="Pincode" value={pincode} onChange={setPincode} placeholder="411014" />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <Input label="Latitude" value={latitude} onChange={setLatitude} placeholder="18.5255" type="number" />
-              <Input label="Longitude" value={longitude} onChange={setLongitude} placeholder="73.8409" type="number" />
+            <div className="grid grid-cols-2 gap-3">
+              <DarkInput label="Latitude" value={latitude} onChange={setLatitude} placeholder="18.5255" type="number" />
+              <DarkInput label="Longitude" value={longitude} onChange={setLongitude} placeholder="73.8409" type="number" />
             </div>
           </Section>
 
-          {/* Section 4: Sports & Pricing */}
-          <Section icon={DollarSign} title="Sports & Pricing">
-            <div className="flex items-end gap-3">
+          <Section icon={IndianRupee} title="Sports & pricing">
+            <div className="flex items-end gap-2">
               <div className="flex-1">
-                <label className="block text-xs font-semibold text-gray-500 mb-1.5">Sport Name</label>
-                <input type="text" value={sportInput} onChange={(e) => setSportInput(e.target.value)} placeholder="or pick below"
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition" />
+                <DarkInput label="Sport name" value={sportInput} onChange={setSportInput} placeholder="or pick from below" />
               </div>
               <div className="w-28">
-                <label className="block text-xs font-semibold text-gray-500 mb-1.5">₹/hr</label>
-                <input type="number" value={priceInput} onChange={(e) => setPriceInput(e.target.value)} placeholder="500"
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition" />
+                <DarkInput label="₹/hr" value={priceInput} onChange={setPriceInput} placeholder="500" type="number" />
               </div>
-              <button type="button" onClick={() => addSport()} className="px-4 py-2.5 bg-orange-500 hover:bg-orange-700 text-white rounded-xl text-sm font-semibold transition w-auto">
+              <button type="button" onClick={() => addSport()}
+                className="h-9 px-3.5 bg-orange-500 hover:bg-orange-600 text-white rounded-md text-[13px] font-semibold transition active:scale-[0.98] shadow-sm shadow-orange-500/30 w-auto">
                 <Plus className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Sport presets */}
             <div className="flex flex-wrap gap-1.5 mt-3">
               {SPORTS_PRESETS.filter((s) => !sportsList.some((sl) => sl.name === s)).map((s) => (
-                <button key={s} type="button" onClick={() => { setSportInput(s); }}
-                  className="px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600 hover:bg-orange-500/10 hover:text-orange-500 transition w-auto">
+                <button key={s} type="button" onClick={() => setSportInput(s)}
+                  className="px-2.5 py-1 rounded text-[11px] font-medium text-gray-400 hover:text-orange-400 hover:bg-orange-500/10 transition w-auto"
+                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
                   {s}
                 </button>
               ))}
             </div>
 
-            {/* Added sports */}
             {sportsList.length > 0 && (
-              <div className="space-y-2 mt-3">
+              <div className="space-y-1.5 mt-3">
                 {sportsList.map((sport, idx) => (
-                  <div key={idx} className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-xl px-4 py-2.5">
+                  <div key={idx} className="flex items-center justify-between rounded-md px-3 py-2"
+                    style={{ background: "rgba(249,115,22,0.08)", border: "1px solid rgba(249,115,22,0.20)" }}>
                     <div className="flex items-center gap-2">
-                      <Star className="w-4 h-4 text-orange-500" />
-                      <span className="text-sm font-semibold text-gray-800">{sport.name}</span>
-                      {sport.pricePerHour > 0 && <span className="text-xs text-orange-500 bg-orange-500/10 px-2 py-0.5 rounded-full font-bold">₹{sport.pricePerHour}/hr</span>}
-                      {sport.pricePerHour === 0 && <span className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full font-bold">FREE</span>}
+                      <Star className="w-3.5 h-3.5 text-orange-400" />
+                      <span className="text-[13px] font-medium text-white">{sport.name}</span>
+                      {sport.pricePerHour > 0 ? (
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-orange-300 bg-orange-500/15 px-1.5 py-0.5 rounded">₹{sport.pricePerHour}/hr</span>
+                      ) : (
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-300 bg-emerald-500/15 px-1.5 py-0.5 rounded">Free</span>
+                      )}
                     </div>
-                    <button type="button" onClick={() => removeSport(idx)} className="text-red-400 hover:text-red-600 transition w-auto">
-                      <X className="w-4 h-4" />
+                    <button type="button" onClick={() => removeSport(idx)}
+                      className="h-6 w-6 inline-flex items-center justify-center rounded text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition w-auto">
+                      <X className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 ))}
@@ -276,187 +277,226 @@ const TurfManagement = () => {
             )}
           </Section>
 
-          {/* Section 5: Operating Hours */}
-          <Section icon={Clock} title="Operating Hours">
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <Input label="Opening Time" value={openTime} onChange={setOpenTime} type="time" icon={Clock} />
-              <Input label="Closing Time" value={closeTime} onChange={setCloseTime} type="time" icon={Clock} />
+          <Section icon={Clock} title="Operating hours">
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <DarkInput label="Opening time" value={openTime} onChange={setOpenTime} type="time" />
+              <DarkInput label="Closing time" value={closeTime} onChange={setCloseTime} type="time" />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-gray-500 mb-2">Open Days</label>
-              <div className="flex flex-wrap gap-2">
-                {DAYS.map((day) => (
-                  <button key={day} type="button" onClick={() => toggleDay(day)}
-                    className={`px-4 py-2 rounded-xl text-xs font-bold capitalize transition w-auto ${
-                      selectedDays.includes(day) ? "bg-orange-500 text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-                    }`}>
-                    {day.slice(0, 3)}
-                  </button>
-                ))}
+              <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-500 mb-2">Open days</label>
+              <div className="flex flex-wrap gap-1.5">
+                {DAYS.map((day) => {
+                  const selected = selectedDays.includes(day);
+                  return (
+                    <button key={day} type="button" onClick={() => toggleDay(day)}
+                      className={`px-3 py-1.5 rounded-md text-[11px] font-bold capitalize transition w-auto ${
+                        selected
+                          ? "bg-orange-500 text-white"
+                          : "text-gray-400 hover:text-white hover:bg-white/[0.06]"
+                      }`}
+                      style={!selected ? { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" } : undefined}>
+                      {day.slice(0, 3)}
+                    </button>
+                  );
+                })}
                 <button type="button" onClick={() => setSelectedDays(selectedDays.length === DAYS.length ? [] : [...DAYS])}
-                  className="px-4 py-2 rounded-xl text-xs font-bold text-orange-500 bg-orange-500/10 hover:bg-orange-500/20 transition w-auto">
-                  {selectedDays.length === DAYS.length ? "Clear All" : "Select All"}
+                  className="px-3 py-1.5 rounded-md text-[11px] font-bold text-orange-400 hover:text-orange-300 hover:bg-orange-500/15 transition w-auto"
+                  style={{ background: "rgba(249,115,22,0.10)", border: "1px solid rgba(249,115,22,0.25)" }}>
+                  {selectedDays.length === DAYS.length ? "Clear all" : "Select all"}
                 </button>
               </div>
             </div>
           </Section>
 
-          {/* Section 6: Facilities */}
-          <Section icon={Star} title="Facilities & Amenities">
-            <div className="flex flex-wrap gap-2">
-              {FACILITY_PRESETS.map((f) => (
-                <button key={f} type="button" onClick={() => toggleFacility(f)}
-                  className={`px-3 py-2 rounded-xl text-xs font-medium transition w-auto flex items-center gap-1.5 ${
-                    facilities.includes(f) ? "bg-green-100 text-green-700 border border-green-200" : "bg-gray-50 text-gray-600 border border-gray-200 hover:border-gray-300"
-                  }`}>
-                  {facilities.includes(f) && <Check className="w-3 h-3" />}
-                  {f}
-                </button>
-              ))}
+          <Section icon={Star} title="Facilities & amenities">
+            <div className="flex flex-wrap gap-1.5">
+              {FACILITY_PRESETS.map((f) => {
+                const selected = facilities.includes(f);
+                return (
+                  <button key={f} type="button" onClick={() => toggleFacility(f)}
+                    className={`px-2.5 py-1.5 rounded-md text-[11px] font-medium transition w-auto inline-flex items-center gap-1.5 ${
+                      selected ? "bg-emerald-500/15 text-emerald-300" : "text-gray-400 hover:text-white hover:bg-white/[0.06]"
+                    }`}
+                    style={!selected
+                      ? { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }
+                      : { border: "1px solid rgba(16,185,129,0.25)" }}>
+                    {selected && <Check className="w-3 h-3" />}
+                    {f}
+                  </button>
+                );
+              })}
             </div>
           </Section>
 
-          {/* Submit */}
-          <div className="flex items-center gap-4 pt-4 border-t border-gray-100">
+          <div className="flex items-center gap-2 pt-3" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
             <button type="button" onClick={() => setActiveTab("manage")}
-              className="px-6 py-3 rounded-xl border border-gray-200 text-gray-600 font-semibold text-sm hover:bg-gray-50 transition w-auto">
+              className="h-9 px-3.5 rounded-md text-[13px] font-semibold text-gray-200 hover:text-white hover:bg-white/[0.06] transition w-auto"
+              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
               Cancel
             </button>
             <button type="submit" disabled={isSubmitting}
-              className="flex-1 md:flex-none md:px-12 py-3 rounded-xl bg-orange-500 hover:bg-orange-700 text-white font-bold text-sm shadow-sm transition flex items-center justify-center gap-2 disabled:opacity-50 active:scale-[0.98]">
-              {isSubmitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Adding...</> : <><Check className="w-4 h-4" /> Add Turf</>}
+              className="h-9 px-6 rounded-md bg-orange-500 hover:bg-orange-600 text-white text-[13px] font-semibold shadow-sm shadow-orange-500/30 transition flex items-center gap-1.5 disabled:opacity-50 active:scale-[0.98] w-auto">
+              {isSubmitting ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Adding…</> : <><Check className="w-3.5 h-3.5" /> Add turf</>}
             </button>
           </div>
         </form>
       )}
 
-      {/* ═══ MANAGE TAB ═══ */}
+      {/* MANAGE TAB */}
       {activeTab === "manage" && (
         <div>
-          {/* Search */}
           <div className="relative mb-4 max-w-sm">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search turfs..."
-              className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500" />
+            <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search turfs…"
+              className="w-full h-9 pl-9 pr-3 rounded-md text-[13px] text-gray-200 placeholder:text-gray-500 focus:outline-none"
+              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }} />
           </div>
 
           {isLoading ? (
-            <div className="text-center py-16"><Loader2 className="w-8 h-8 text-orange-500 animate-spin mx-auto" /></div>
+            <div className="text-center py-16">
+              <Loader2 className="w-6 h-6 text-gray-500 animate-spin mx-auto" />
+            </div>
           ) : filteredTurfs.length === 0 ? (
-            <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
-              <MapPin className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-              <h3 className="text-lg font-bold text-gray-700">No turfs yet</h3>
-              <p className="text-sm text-gray-400 mt-1">Add your first turf to get started</p>
-              <button onClick={() => setActiveTab("add")} className="mt-4 px-5 py-2 bg-orange-500 text-white text-sm font-semibold rounded-xl w-auto">
-                <Plus className="w-4 h-4 inline mr-1" /> Add Turf
+            <div className="bg-[#181A22] border border-white/[0.06] rounded-lg px-6 py-16 text-center">
+              <div className="w-10 h-10 rounded-md bg-white/[0.06] inline-flex items-center justify-center mb-3">
+                <MapPin className="w-5 h-5 text-gray-500" />
+              </div>
+              <h3 className="text-[14px] font-medium text-white">No turfs yet</h3>
+              <p className="text-[13px] text-gray-400 mt-1 max-w-md mx-auto">Add your first turf to get started.</p>
+              <button onClick={() => setActiveTab("add")}
+                className="mt-4 inline-flex items-center gap-1.5 h-8 px-3 bg-orange-500 hover:bg-orange-600 text-white text-[12px] font-semibold rounded-md transition active:scale-[0.98] w-auto">
+                <Plus className="w-3.5 h-3.5" /> Add turf
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {filteredTurfs.map((turf) => (
-                <div key={turf._id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
-                  {/* Image */}
-                  {turf.images?.[0] ? (
-                    <img src={`/${turf.images[0]}`} alt={turf.name} className="w-full h-40 object-cover" />
-                  ) : (
-                    <div className="w-full h-40 bg-gradient-to-br from-orange-500 to-[#2DA5FF] flex items-center justify-center">
-                      <MapPin className="w-10 h-10 text-white/40" />
-                    </div>
-                  )}
-
-                  <div className="p-4">
-                    <div className="flex items-start justify-between mb-2">
-                      <div>
-                        <h3 className="font-bold text-gray-800">{turf.name}</h3>
-                        <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
-                          <MapPin className="w-3 h-3" />
-                          {turf.address?.fullAddress || turf.address?.city || "No address"}
-                        </p>
-                      </div>
-                      <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${turf.isActive ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
-                        {turf.isActive ? "Active" : "Inactive"}
-                      </span>
-                    </div>
-
-                    {/* Sports */}
-                    <div className="flex flex-wrap gap-1.5 mb-3">
-                      {turf.sports?.map((s, i) => (
-                        <span key={i} className="text-[10px] font-semibold text-orange-500 bg-orange-500/10 px-2 py-0.5 rounded-full">
-                          {s.name} {s.pricePerHour > 0 && `₹${s.pricePerHour}`}
-                        </span>
-                      ))}
-                    </div>
-
-                    {/* Rating */}
-                    {turf.ratings?.average > 0 && (
-                      <div className="flex items-center gap-1 mb-3">
-                        <Star className="w-3.5 h-3.5 text-yellow-500 fill-yellow-500" />
-                        <span className="text-xs font-bold text-gray-700">{turf.ratings.average.toFixed(1)}</span>
-                        <span className="text-xs text-gray-400">({turf.ratings.count})</span>
-                      </div>
-                    )}
-
-                    {/* Actions */}
-                    <div className="flex gap-2 pt-3 border-t border-gray-100">
-                      <Link to={`/turf/${turf._id}`} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded-xl transition">
-                        <Eye className="w-3.5 h-3.5" /> View
-                      </Link>
-                      <Link to={`/turf/edit/${turf._id}`} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-orange-500 text-xs font-semibold rounded-xl transition">
-                        <Edit2 className="w-3.5 h-3.5" /> Edit
-                      </Link>
-                      <button onClick={() => handleDeleteTurf(turf._id)}
-                        className="px-3 py-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition w-auto">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                <TurfCard key={turf._id} turf={turf} onDelete={() => handleDeleteTurf(turf._id)} />
               ))}
             </div>
           )}
         </div>
       )}
-    </div>
+    </ClubAdminShell>
   );
 };
 
-// ═══ REUSABLE SUB-COMPONENTS ═══
+function TurfCard({ turf, onDelete }) {
+  return (
+    <article className="bg-[#181A22] border border-white/[0.06] rounded-lg overflow-hidden transition hover:border-white/[0.12]">
+      {/* Image */}
+      <div className="h-36 bg-white/[0.04] overflow-hidden relative">
+        {turf.images?.[0] ? (
+          <img src={assetUrl(turf.images[0])} alt={turf.name}
+            className="w-full h-full object-cover"
+            onError={(e) => { e.currentTarget.style.display = "none"; }} />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <ImageOff className="w-8 h-8 text-gray-600" />
+          </div>
+        )}
+        <span className={`absolute top-2 right-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+          turf.isActive ? "bg-emerald-500/15 text-emerald-300" : "bg-red-500/15 text-red-300"
+        }`}
+          style={{ backdropFilter: "blur(8px)" }}>
+          {turf.isActive ? "Active" : "Inactive"}
+        </span>
+      </div>
+
+      <div className="p-4">
+        <h3 className="text-[14px] font-medium text-white truncate">{turf.name}</h3>
+        <p className="text-[11px] text-gray-500 flex items-center gap-1 mt-0.5">
+          <MapPin className="w-3 h-3" />
+          {turf.address?.fullAddress || turf.address?.city || "No address"}
+        </p>
+
+        {/* Sports */}
+        {turf.sports?.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-3">
+            {turf.sports.map((s, i) => (
+              <span key={i} className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-orange-500/15 text-orange-400">
+                {s.name}{s.pricePerHour > 0 && <span className="ml-1 font-mono tabular-nums">₹{s.pricePerHour}</span>}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Rating */}
+        {turf.ratings?.average > 0 && (
+          <div className="flex items-center gap-1 mt-3">
+            <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
+            <span className="text-[11px] font-semibold text-gray-200 font-mono tabular-nums">{turf.ratings.average.toFixed(1)}</span>
+            <span className="text-[11px] text-gray-500">(<span className="font-mono tabular-nums">{turf.ratings.count}</span>)</span>
+          </div>
+        )}
+
+        {/* Actions */}
+        <div className="flex gap-1.5 mt-3 pt-3 border-t border-white/[0.06]">
+          <Link to={`/turf/${turf._id}`}
+            className="flex-1 inline-flex items-center justify-center gap-1.5 h-8 rounded-md text-[12px] font-semibold text-gray-200 hover:text-white hover:bg-white/[0.06] transition w-auto"
+            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
+            <Eye className="w-3 h-3" /> View
+          </Link>
+          <Link to={`/turf/edit/${turf._id}`}
+            className="flex-1 inline-flex items-center justify-center gap-1.5 h-8 rounded-md text-[12px] font-semibold text-orange-400 hover:text-orange-300 hover:bg-orange-500/15 transition w-auto"
+            style={{ background: "rgba(249,115,22,0.10)", border: "1px solid rgba(249,115,22,0.25)" }}>
+            <Edit2 className="w-3 h-3" /> Edit
+          </Link>
+          <button onClick={onDelete}
+            className="h-8 w-8 inline-flex items-center justify-center rounded-md text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition w-auto"
+            style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+// ── Dark inline primitives ───────────────────────────────────────────────────
 
 function Section({ icon: Icon, title, children }) {
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-      <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center">
-          <Icon className="w-4 h-4 text-orange-500" />
-        </div>
-        <h3 className="font-bold text-gray-800 text-sm">{title}</h3>
+    <div className="bg-[#181A22] border border-white/[0.06] rounded-lg overflow-hidden">
+      <div className="px-5 py-3.5 border-b border-white/[0.06] flex items-center gap-2.5">
+        <span className="w-7 h-7 rounded-md bg-orange-500/15 grid place-items-center flex-shrink-0">
+          <Icon className="w-3.5 h-3.5 text-orange-400" />
+        </span>
+        <h3 className="text-[13px] font-medium text-white">{title}</h3>
       </div>
-      <div className="p-6 space-y-4">{children}</div>
+      <div className="px-5 py-4 space-y-3">{children}</div>
     </div>
   );
 }
 
-function Input({ label, value, onChange, icon: Icon, type = "text", ...props }) {
+function DarkInput({ label, value, onChange, type = "text", ...props }) {
   return (
     <div>
-      <label className="block text-xs font-semibold text-gray-500 mb-1.5">{label}</label>
-      <div className="relative">
-        {Icon && <Icon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />}
-        <input type={type} value={value} onChange={(e) => onChange(e.target.value)}
-          className={`w-full ${Icon ? "pl-10" : "pl-4"} pr-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-800 placeholder-gray-400 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition`}
-          {...props} />
-      </div>
+      <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-500 mb-1.5">{label}</label>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full h-9 px-3 rounded-md text-[13px] text-gray-200 placeholder:text-gray-500 focus:outline-none"
+        style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}
+        {...props}
+      />
     </div>
   );
 }
 
-function Textarea({ label, value, onChange, rows = 3, ...props }) {
+function DarkTextarea({ label, value, onChange, rows = 3, ...props }) {
   return (
     <div>
-      <label className="block text-xs font-semibold text-gray-500 mb-1.5">{label}</label>
-      <textarea value={value} onChange={(e) => onChange(e.target.value)} rows={rows}
-        className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-800 placeholder-gray-400 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition resize-none"
-        {...props} />
+      <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-500 mb-1.5">{label}</label>
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        rows={rows}
+        className="w-full px-3 py-2.5 rounded-md text-[13px] text-gray-200 placeholder:text-gray-500 focus:outline-none resize-none"
+        style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}
+        {...props}
+      />
     </div>
   );
 }

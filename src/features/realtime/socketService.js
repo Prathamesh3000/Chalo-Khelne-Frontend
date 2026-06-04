@@ -1,6 +1,10 @@
 import { io } from "socket.io-client";
 
-const SERVER_URL = import.meta.env.VITE_API_URL || "http://localhost:3003";
+// Derive socket origin from the API base (dev "/api" → localhost; prod
+// "https://host/api" → "https://host"). VITE_API_URL never existed → this used
+// to always hit localhost, breaking live-scoring sockets in production.
+const SERVER_URL =
+  (import.meta.env.VITE_API_BASE_URL || "").replace(/\/api\/?$/i, "") || "http://localhost:3003";
 
 let socket = null;
 let reconnectAttempts = 0;

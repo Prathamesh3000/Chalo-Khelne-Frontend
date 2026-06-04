@@ -7,7 +7,12 @@ const NotificationContext = createContext(null);
 
 export const useNotifications = () => useContext(NotificationContext);
 
-const SERVER_URL = import.meta.env.VITE_API_URL || "http://localhost:3003";
+// Derive the socket origin from the API base (dev "/api" → localhost backend;
+// prod "https://host/api" → "https://host"). The old VITE_API_URL var never
+// existed, so this previously always fell back to localhost — breaking the
+// socket (and the booking:new alerts below) in production.
+const SERVER_URL =
+  (import.meta.env.VITE_API_BASE_URL || "").replace(/\/api\/?$/i, "") || "http://localhost:3003";
 
 export const NotificationProvider = ({ children }) => {
   const [notifications, setNotifications] = useState([]);

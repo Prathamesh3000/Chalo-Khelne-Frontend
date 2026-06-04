@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
-import { Search, CheckCircle, Eye, ArrowLeft, Pencil, Check, X, Shield, Mail, Phone, User, Loader2 } from "lucide-react";
+import {
+  Search, CheckCircle, Eye, ArrowLeft, Pencil, Check, X, Shield, Mail, Phone, User, Loader2,
+} from "lucide-react";
+import { SuperAdminShell } from "../shared/layout";
 
 const ROLES = ["All", "Player", "Trainer", "ClubAdmin", "corporate_admin"];
 const EDITABLE_ROLES = ["Player", "Trainer", "ClubAdmin", "corporate_admin", "Manager"];
@@ -60,177 +63,213 @@ export default function Approved() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[40vh]">
-        <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
-      </div>
+      <SuperAdminShell searchPlaceholder="Search users…">
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="w-6 h-6 text-gray-500 animate-spin" />
+        </div>
+      </SuperAdminShell>
     );
   }
 
-  // Detail View
+  // ── Detail View ────────────────────────────────────────────────────────────
   if (selectedUser) {
     return (
-      <div className="p-6 lg:p-8 max-w-3xl mx-auto">
+      <SuperAdminShell searchPlaceholder="Search users…">
         <button onClick={() => { setSelectedUser(null); setEditingRole(false); }}
-          className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 mb-6 w-auto">
-          <ArrowLeft className="w-4 h-4" /> Back to users
+          className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[12px] font-semibold text-gray-300 hover:text-white hover:bg-white/[0.06] transition mb-6 w-auto"
+          style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
+          <ArrowLeft className="w-3.5 h-3.5" /> Back to users
         </button>
 
-        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-          {/* Profile Header */}
-          <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-6 flex items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center text-white text-2xl font-bold">
+        <div className="bg-[#181A22] border border-white/[0.06] rounded-lg overflow-hidden max-w-3xl">
+          {/* Profile banner */}
+          <div className="p-5 flex items-center gap-4" style={{ background: "linear-gradient(135deg, rgba(249,115,22,0.20) 0%, rgba(249,115,22,0.06) 100%)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+            <div className="w-16 h-16 rounded-md bg-orange-500/25 text-orange-200 grid place-items-center text-[24px] font-medium flex-shrink-0">
               {(selectedUser.name || "?").charAt(0).toUpperCase()}
             </div>
-            <div>
-              <h2 className="text-xl font-bold text-white">{selectedUser.name}</h2>
-              <p className="text-white/70 text-sm">{selectedUser.email}</p>
+            <div className="min-w-0">
+              <h2 className="text-[18px] font-medium text-white truncate">{selectedUser.name}</h2>
+              <p className="text-[12px] text-orange-200/80 truncate">{selectedUser.email}</p>
             </div>
           </div>
 
-          <div className="p-6 space-y-5">
+          <div className="px-5 py-4 space-y-3">
             {/* Role */}
-            <div className="flex items-center justify-between py-3 border-b border-gray-100">
-              <div className="flex items-center gap-2">
-                <Shield className="w-4 h-4 text-gray-400" />
-                <span className="text-sm font-semibold text-gray-500">Role</span>
-              </div>
+            <DetailRow icon={Shield} label="Role">
               {editingRole ? (
                 <div className="flex items-center gap-2">
                   <select value={newRole} onChange={(e) => setNewRole(e.target.value)}
-                    className="border border-gray-200 rounded-xl px-3 py-1.5 text-sm bg-gray-50 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none">
-                    {EDITABLE_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+                    className="h-8 px-3 rounded-md text-[12px] text-gray-200 focus:outline-none cursor-pointer"
+                    style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                    {EDITABLE_ROLES.map((r) => <option key={r} value={r} className="bg-[#181A22]">{r}</option>)}
                   </select>
-                  <button onClick={handleRoleUpdate} className="p-1.5 bg-emerald-100 text-emerald-600 rounded-lg hover:bg-emerald-200 w-auto"><Check className="w-4 h-4" /></button>
-                  <button onClick={() => setEditingRole(false)} className="p-1.5 bg-gray-100 text-gray-500 rounded-lg hover:bg-gray-200 w-auto"><X className="w-4 h-4" /></button>
+                  <button onClick={handleRoleUpdate}
+                    className="h-7 w-7 inline-flex items-center justify-center rounded-md bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 transition w-auto">
+                    <Check className="w-3.5 h-3.5" />
+                  </button>
+                  <button onClick={() => setEditingRole(false)}
+                    className="h-7 w-7 inline-flex items-center justify-center rounded-md text-gray-500 hover:text-white hover:bg-white/5 transition w-auto">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               ) : (
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-gray-900 capitalize">{selectedUser.role}</span>
+                  <span className="text-[13px] font-medium text-white capitalize">{selectedUser.role}</span>
                   <button onClick={() => { setEditingRole(true); setNewRole(selectedUser.role); }}
-                    className="p-1.5 text-gray-400 hover:text-orange-500 hover:bg-orange-50 rounded-lg transition w-auto">
-                    <Pencil className="w-3.5 h-3.5" />
+                    className="h-7 w-7 inline-flex items-center justify-center rounded-md text-gray-500 hover:text-orange-400 hover:bg-orange-500/15 transition w-auto">
+                    <Pencil className="w-3 h-3" />
                   </button>
                 </div>
               )}
-            </div>
+            </DetailRow>
 
-            {/* Email */}
-            <div className="flex items-center justify-between py-3 border-b border-gray-100">
-              <div className="flex items-center gap-2">
-                <Mail className="w-4 h-4 text-gray-400" />
-                <span className="text-sm font-semibold text-gray-500">Email</span>
-              </div>
-              <span className="text-sm text-gray-900">{selectedUser.email}</span>
-            </div>
+            <DetailRow icon={Mail}  label="Email">
+              <span className="text-[13px] text-gray-200">{selectedUser.email}</span>
+            </DetailRow>
+            <DetailRow icon={Phone} label="Mobile">
+              <span className="text-[13px] text-gray-200 font-mono tabular-nums">{selectedUser.mobile || "N/A"}</span>
+            </DetailRow>
 
-            {/* Phone */}
-            <div className="flex items-center justify-between py-3 border-b border-gray-100">
+            <DetailRow icon={User} label="Status">
               <div className="flex items-center gap-2">
-                <Phone className="w-4 h-4 text-gray-400" />
-                <span className="text-sm font-semibold text-gray-500">Mobile</span>
-              </div>
-              <span className="text-sm text-gray-900">{selectedUser.mobile || "N/A"}</span>
-            </div>
-
-            {/* Status */}
-            <div className="flex items-center justify-between py-3">
-              <div className="flex items-center gap-2">
-                <User className="w-4 h-4 text-gray-400" />
-                <span className="text-sm font-semibold text-gray-500">Status</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${selectedUser.isApproved ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600"}`}>
+                <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                  selectedUser.isApproved ? "bg-emerald-500/15 text-emerald-300" : "bg-red-500/15 text-red-300"
+                }`}>
                   {selectedUser.isApproved ? "Active" : "Inactive"}
                 </span>
                 <button onClick={handleStatusToggle}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold transition w-auto ${
+                  className={`inline-flex items-center h-8 px-3 rounded-md text-[12px] font-semibold transition w-auto ${
                     selectedUser.isApproved
-                      ? "bg-red-50 text-red-600 border border-red-200 hover:bg-red-100"
-                      : "bg-emerald-500 text-white hover:bg-emerald-600"
-                  }`}>
+                      ? "text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                      : "bg-emerald-500 hover:bg-emerald-600 text-white"
+                  }`}
+                  style={selectedUser.isApproved ? { border: "1px solid rgba(248,113,113,0.25)" } : undefined}>
                   {selectedUser.isApproved ? "Deactivate" : "Activate"}
                 </button>
               </div>
-            </div>
+            </DetailRow>
           </div>
         </div>
-      </div>
+      </SuperAdminShell>
     );
   }
 
-  // List View
+  // ── List View ──────────────────────────────────────────────────────────────
   return (
-    <div className="p-6 lg:p-8 max-w-[1400px] mx-auto">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Approved Users</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{filtered.length} of {users.length} users</p>
+    <SuperAdminShell searchPlaceholder="Search users…">
+      <header className="flex items-start justify-between gap-4 mb-6 flex-wrap">
+        <div className="min-w-0">
+          <p className="inline-flex items-center gap-1.5 text-[12px] text-gray-400">
+            <CheckCircle className="w-3.5 h-3.5" />
+            Club approvals · Approved users
+          </p>
+          <h1 className="mt-2 text-[26px] font-medium text-white leading-tight">
+            Approved users
+          </h1>
+          <p className="mt-1 text-[13px] text-gray-400">
+            <span className="font-mono tabular-nums">{filtered.length}</span> of <span className="font-mono tabular-nums">{users.length}</span> users
+          </p>
         </div>
         <div className="flex gap-2">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search..."
-              className="pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition w-48" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500" />
+            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search…"
+              className="w-48 h-9 pl-9 pr-3 rounded-md text-[13px] text-gray-200 placeholder:text-gray-500 focus:outline-none"
+              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }} />
           </div>
           <select value={selectedRole} onChange={(e) => setSelectedRole(e.target.value)}
-            className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none appearance-none cursor-pointer">
-            {ROLES.map((r) => <option key={r} value={r}>{r === "All" ? "All Roles" : r}</option>)}
+            className="h-9 px-3 rounded-md text-[13px] text-gray-200 focus:outline-none cursor-pointer"
+            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
+            {ROLES.map((r) => <option key={r} value={r} className="bg-[#181A22]">{r === "All" ? "All roles" : r}</option>)}
           </select>
         </div>
-      </div>
+      </header>
 
       {filtered.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
-          <CheckCircle className="w-8 h-8 text-gray-300 mx-auto mb-3" />
-          <h3 className="text-base font-bold text-gray-700">No users found</h3>
-          <p className="text-sm text-gray-400 mt-1">{search ? "Try a different search" : "No approved users yet"}</p>
+        <div className="bg-[#181A22] border border-white/[0.06] rounded-lg px-6 py-16 text-center">
+          <div className="w-10 h-10 rounded-md bg-white/[0.06] inline-flex items-center justify-center mb-3">
+            <CheckCircle className="w-5 h-5 text-gray-500" />
+          </div>
+          <h3 className="text-[14px] font-medium text-white">No users found</h3>
+          <p className="text-[13px] text-gray-400 mt-1 max-w-md mx-auto">
+            {search ? "Try a different search." : "No approved users yet."}
+          </p>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-          <table className="w-full">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-100">
-                <th className="text-left px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-gray-400">User</th>
-                <th className="text-left px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-gray-400">Role</th>
-                <th className="text-left px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-gray-400">Status</th>
-                <th className="text-center px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-gray-400">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {filtered.map((user) => (
-                <tr key={user._id} className="hover:bg-orange-50/30 transition cursor-pointer" onClick={() => { setSelectedUser(user); setEditingRole(false); }}>
-                  <td className="px-5 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center text-sm font-bold flex-shrink-0">
-                        {(user.name || "?").charAt(0).toUpperCase()}
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-gray-900">{user.name}</p>
-                        <p className="text-xs text-gray-400">{user.email}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-5 py-4">
-                    <span className="text-xs font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full capitalize">{user.role}</span>
-                  </td>
-                  <td className="px-5 py-4">
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${user.isApproved ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600"}`}>
-                      {user.isApproved ? "Active" : "Inactive"}
-                    </span>
-                  </td>
-                  <td className="px-5 py-4 text-center">
-                    <button className="p-2 text-gray-400 hover:text-orange-500 hover:bg-orange-50 rounded-xl transition w-auto"
-                      onClick={(e) => { e.stopPropagation(); setSelectedUser(user); setEditingRole(false); }}>
-                      <Eye className="w-4 h-4" />
-                    </button>
-                  </td>
+        <div className="bg-[#181A22] border border-white/[0.06] rounded-lg overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-white/[0.06]">
+                  <Th>User</Th>
+                  <Th>Role</Th>
+                  <Th>Status</Th>
+                  <Th align="center">Action</Th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filtered.map((user) => (
+                  <tr key={user._id} className="border-b border-white/[0.04] last:border-b-0 hover:bg-white/[0.02] transition cursor-pointer"
+                    onClick={() => { setSelectedUser(user); setEditingRole(false); }}>
+                    <Td>
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-md bg-orange-500/15 text-orange-400 grid place-items-center text-[13px] font-semibold flex-shrink-0">
+                          {(user.name || "?").charAt(0).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[13px] font-medium text-white truncate">{user.name}</p>
+                          <p className="text-[11px] text-gray-500 truncate">{user.email}</p>
+                        </div>
+                      </div>
+                    </Td>
+                    <Td>
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-orange-500/15 text-orange-400">
+                        {user.role}
+                      </span>
+                    </Td>
+                    <Td>
+                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                        user.isApproved ? "bg-emerald-500/15 text-emerald-300" : "bg-red-500/15 text-red-300"
+                      }`}>
+                        {user.isApproved ? "Active" : "Inactive"}
+                      </span>
+                    </Td>
+                    <Td align="center">
+                      <button onClick={(e) => { e.stopPropagation(); setSelectedUser(user); setEditingRole(false); }}
+                        className="h-7 w-7 inline-flex items-center justify-center rounded-md text-orange-400 hover:text-orange-300 hover:bg-orange-500/15 transition w-auto">
+                        <Eye className="w-3.5 h-3.5" />
+                      </button>
+                    </Td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
+    </SuperAdminShell>
+  );
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function DetailRow({ icon: Icon, label, children }) {
+  return (
+    <div className="flex items-center justify-between gap-3 py-3 border-b border-white/[0.04] last:border-b-0">
+      <div className="flex items-center gap-2">
+        <Icon className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
+        <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500">{label}</span>
+      </div>
+      {children}
     </div>
   );
+}
+
+function Th({ children, align }) {
+  const a = align === "right" ? "text-right" : align === "center" ? "text-center" : "text-left";
+  return <th className={`py-3 px-4 text-[10px] font-bold uppercase tracking-[0.08em] text-gray-500 ${a}`}>{children}</th>;
+}
+function Td({ children, align }) {
+  const a = align === "right" ? "text-right" : align === "center" ? "text-center" : "text-left";
+  return <td className={`py-3 px-4 ${a}`}>{children}</td>;
 }

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowUp, Instagram, Facebook, Twitter, Youtube, Send, Globe, Shield, Zap, Smartphone, ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
+import googlePlay from "../assets/google.png";
 
 const Footer = () => {
   const [showScrollTop, setShowScrollTop] = useState(false);
@@ -145,7 +146,7 @@ const Footer = () => {
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-4 px-8 py-4 bg-white text-gray-900 rounded-2xl font-bold tracking-wide text-xs hover:scale-105 active:scale-95 transition-all shadow-lg"
                 >
-                  Get it on Google Play <img src="./src/assets/google.png" alt="Google Play" className="h-4" />
+                  Get it on Google Play <img src={googlePlay} alt="Google Play" className="h-4" />
                 </a>
               </div>
             </div>

@@ -22,10 +22,23 @@ const SIZES = {
   lg: "px-6 py-3 text-sm gap-2",
 };
 
-const Button = forwardRef(({ variant = "primary", size = "md", className = "", children, ...props }, ref) => {
+const Button = forwardRef(({
+  variant = "primary",
+  size = "md",
+  className = "",
+  children,
+  loading = false,
+  disabled,
+  ...props
+}, ref) => {
+  // `loading` is destructured (not spread to the DOM) so callers like
+  // <Button loading={...}/> don't trigger React's
+  // "Received `false` for a non-boolean attribute `loading`" warning.
+  // While loading, the button is also disabled so it can't be re-clicked.
   return (
     <button
       ref={ref}
+      disabled={disabled || loading}
       className={`
         inline-flex items-center justify-center font-semibold rounded-xl
         transition-all duration-150 active:scale-[0.98]

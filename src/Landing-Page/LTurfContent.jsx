@@ -17,9 +17,10 @@ import TurfCards from "./LTurfCards.jsx";
 
 // Turf Detail Modal Component
 const TurfDetailModal = ({ turf, onClose, onSignInPrompt }) => {
-  if (!turf) return null;
-
+  // Hooks must run unconditionally — keep this above the early return below.
   const [activeTab, setActiveTab] = useState("info");
+
+  if (!turf) return null;
 
   const getAddress = () => {
     if (!turf.address) return "Address unavailable";
@@ -584,7 +585,12 @@ const TurfContent = () => {
   const fetchTurfs = async (page = 1) => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/turfs?page=${page}&limit=10`);
+      const token = localStorage.getItem("token");
+      const response = await fetch(`/api/turfs?page=${page}&limit=10`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
       if (!response.ok) {
         throw new Error("Failed to fetch turfs");
       }

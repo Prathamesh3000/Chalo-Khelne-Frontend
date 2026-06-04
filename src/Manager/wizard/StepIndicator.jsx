@@ -1,7 +1,7 @@
 import React, { Fragment } from "react";
 import { Check } from "lucide-react";
 
-const SIG = "#5E6AD2";
+const SIG = "#F97316";
 
 export default function StepIndicator({ steps, currentStep, onStepClick }) {
   return (
@@ -19,13 +19,13 @@ export default function StepIndicator({ steps, currentStep, onStepClick }) {
             ? "bg-emerald-500 text-white"
             : isCurrent
             ? ""
-            : "border border-neutral-300 bg-white text-neutral-400";
+            : "border border-white/[0.10] bg-[#181A22] text-gray-500";
 
           const labelClass = isCompleted
-            ? "text-emerald-700"
+            ? "text-emerald-400"
             : isCurrent
-            ? "text-neutral-900"
-            : "text-neutral-400";
+            ? "text-white"
+            : "text-gray-500";
 
           return (
             <Fragment key={step.id}>
@@ -55,7 +55,7 @@ export default function StepIndicator({ steps, currentStep, onStepClick }) {
                 <div className="flex-1 mx-3 relative h-0">
                   <div
                     className={`absolute inset-x-0 top-1/2 h-px -translate-y-1/2 ${
-                      idx < currentStep ? "bg-emerald-400" : "bg-neutral-200"
+                      idx < currentStep ? "bg-emerald-500" : "bg-white/[0.10]"
                     }`}
                   />
                 </div>
@@ -65,7 +65,7 @@ export default function StepIndicator({ steps, currentStep, onStepClick }) {
         })}
       </div>
 
-      <div className="mt-3 text-[11px] text-neutral-500 font-mono tabular-nums">
+      <div className="mt-3 text-[11px] text-gray-400 font-mono tabular-nums">
         Step {currentStep + 1} of {steps.length}
       </div>
     </div>

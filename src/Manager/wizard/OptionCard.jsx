@@ -1,6 +1,6 @@
 import React from "react";
 
-const SIG = "#5E6AD2";
+const SIG = "#F97316";
 
 export default function OptionCard({
   icon,
@@ -11,16 +11,16 @@ export default function OptionCard({
   disabled,
   className = "",
 }) {
-  const base = "relative text-left rounded-xl border p-3.5 transition";
+  const base = "relative text-left rounded-lg border p-3.5 transition";
   const stateClass = disabled
-    ? "border-neutral-100 bg-neutral-50 text-neutral-300 cursor-not-allowed"
+    ? "border-white/[0.04] bg-white/[0.02] text-gray-600 cursor-not-allowed"
     : selected
     ? "border-transparent ring-2"
-    : "border-neutral-200 bg-white hover:border-neutral-300 hover:bg-neutral-50/60";
+    : "border-white/[0.06] bg-[#181A22] hover:border-white/[0.12] hover:bg-white/[0.03]";
 
   const selectedStyle = selected && !disabled
     ? {
-        backgroundColor: "rgba(94,106,210,0.06)",
+        backgroundColor: "rgba(249,115,22,0.10)",
         "--tw-ring-color": SIG,
       }
     : undefined;
@@ -41,7 +41,7 @@ export default function OptionCard({
         <div className="min-w-0">
           <div
             className={`text-[13px] font-semibold ${
-              disabled ? "text-neutral-300" : "text-neutral-950"
+              disabled ? "text-gray-600" : "text-white"
             }`}
           >
             {title}
@@ -49,7 +49,7 @@ export default function OptionCard({
           {description && (
             <div
               className={`text-[12px] mt-0.5 ${
-                disabled ? "text-neutral-300" : "text-neutral-500"
+                disabled ? "text-gray-600" : "text-gray-400"
               }`}
             >
               {description}

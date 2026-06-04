@@ -517,7 +517,7 @@ export default function LHomeV2() {
       .catch(() => { });
 
     axios
-      .get("/api/turfs")
+      .get("/api/turfs?limit=200")
       .then((r) => {
         const list = r.data?.turfs || r.data || [];
         setVenues(Array.isArray(list) ? list : []);

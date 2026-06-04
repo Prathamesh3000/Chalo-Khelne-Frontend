@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FiFlag, FiTable, FiEdit2, FiCheck, FiInfo, FiUpload } from "react-icons/fi";
 import { useGroupTabs } from "./GroupTabsContext";
+import { assetUrl } from "../../shared/lib/assetUrl";
 import groupTabsApi from "./groupTabsApi";
 import { getTournamentType, getCurrentStage, getQualifyPerGroup } from "../../utils/sportTrack";
 import CourtPicker from "../components/CourtPicker";
@@ -379,7 +380,7 @@ function PlayerRow({ player, isWinner, matchType }) {
     <div className="flex items-center gap-2 mb-1">
       {player.playerId?.profileImage ? (
         <img
-          src={`/uploads/profiles/${player.playerId.profileImage}`}
+          src={assetUrl(player.playerId.profileImage)}
           alt={player.userName}
           className="w-8 h-8 rounded-full object-cover"
         />

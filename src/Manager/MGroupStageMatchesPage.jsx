@@ -124,8 +124,14 @@ const MGroupStageMatchesPage = () => {
         try {
             setLoading(true);
 
+            const token = localStorage.getItem("token");
             const response = await fetch(
-                `/api/tournaments/scores/${matchId}`
+                `/api/tournaments/scores/${matchId}`,
+                {
+                    headers: {
+                        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                    },
+                }
             );
 
             if (!response.ok) {
@@ -198,11 +204,15 @@ const MGroupStageMatchesPage = () => {
 
     const updateLiveScore = async ({ playerA, playerB, setOne, setTwo, setThree, winner }) => {
         try {
+            const token = localStorage.getItem("token");
             const response = await fetch(
                 `/api/tournaments/scores/${matchId}`,
                 {
                     method: "PUT",
-                    headers: { "Content-Type": "application/json" },
+                    headers: {
+                        "Content-Type": "application/json",
+                        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                    },
                     body: JSON.stringify({
                         playerA,    // playerA _id
                         playerB,    // playerB _id
@@ -259,11 +269,15 @@ const MGroupStageMatchesPage = () => {
         if (bSetWins === 2) winnerId = playerBId;
 
         try {
+            const token = localStorage.getItem("token");
             const response = await fetch(
                 `/api/tournaments/scores/${matchId}`,
                 {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    headers: {
+                        "Content-Type": "application/json",
+                        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                    },
                     body: JSON.stringify({
                         playerA: playerAId,
                         playerB: playerBId,

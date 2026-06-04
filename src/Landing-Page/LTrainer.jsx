@@ -330,7 +330,12 @@ function LTrainer() {
     (async () => {
       try {
         setLoading(true);
-        const res = await fetch("/api/trainer/trainers");
+        const token = localStorage.getItem("token");
+        const res = await fetch("/api/trainer/trainers", {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
         if (!res.ok) throw new Error("Failed to fetch trainers");
         setTrainers(await res.json());
       } catch (err) { setError(err.message); }

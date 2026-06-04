@@ -1,0 +1,9 @@
+export { LandingHeader } from "./components/LandingHeader";
+export { Hero } from "./components/Hero";
+export { ScrollingSportStrip } from "./components/ScrollingSportStrip";
+export { StatsBar } from "./components/StatsBar";
+export { HowItWorks } from "./components/HowItWorks";
+export { SportsGrid } from "./components/SportsGrid";
+export { ForClubs } from "./components/ForClubs";
+export { CTABanner } from "./components/CTABanner";
+export { LandingFooter } from "./components/LandingFooter";

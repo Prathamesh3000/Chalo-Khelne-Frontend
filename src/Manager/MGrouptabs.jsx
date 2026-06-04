@@ -1,6 +1,9 @@
 import { toast } from "react-toastify";
 import { useState, useEffect } from "react";
 import { FaMedal } from "react-icons/fa";
+import { assetUrl } from "../shared/lib/assetUrl";
+// TODO(runtime): confirm profile-image DB format. If it stores a BARE filename
+// (not "profiles/x.jpg"), switch these avatars to assetUrl('profiles/' + x).
 import {
   FiFlag,
   FiTable,
@@ -295,9 +298,12 @@ export default function Tournament({
             }
 
             try {
+              const token = localStorage.getItem("token");
+              const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
               // PRIMARY: Use the live-state endpoint (this is what scoreboard uses)
               const liveStateResponse = await fetch(
-                `/api/tournaments/matches/${match._id}/live-state?autoInit=false`
+                `/api/tournaments/matches/${match._id}/live-state?autoInit=false`,
+                { headers: { ...authHeaders } }
               );
 
               if (liveStateResponse.ok) {
@@ -343,7 +349,8 @@ export default function Tournament({
 
               // SECONDARY: Try the array scores endpoint (now fixed with route reordering)
               const scoresArrayResponse = await fetch(
-                `/api/tournaments/matches/${match._id}/scores`
+                `/api/tournaments/matches/${match._id}/scores`,
+                { headers: { ...authHeaders } }
               );
 
               if (scoresArrayResponse.ok) {
@@ -365,7 +372,8 @@ export default function Tournament({
 
               // TERTIARY: Fallback to single score endpoint
               const scoreResponse = await fetch(
-                `/api/tournaments/scores/${match._id}`
+                `/api/tournaments/scores/${match._id}`,
+                { headers: { ...authHeaders } }
               );
 
               if (scoreResponse.ok) {
@@ -785,11 +793,14 @@ export default function Tournament({
             let enrichedMatch = { ...match, type: 'super-knockout' };
 
             try {
+              const token = localStorage.getItem("token");
+              const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
               // If match is in-progress, get live state for current score/set/game data
               if (match.status === 'in-progress') {
                 hasInProgress = true;
                 const liveStateResponse = await fetch(
-                  `/api/tournaments/matches/${match._id}/live-state?autoInit=false`
+                  `/api/tournaments/matches/${match._id}/live-state?autoInit=false`,
+                  { headers: { ...authHeaders } }
                 );
 
                 if (liveStateResponse.ok) {
@@ -942,9 +953,12 @@ export default function Tournament({
               }
 
               try {
+                const token = localStorage.getItem("token");
+                const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
                 // PRIMARY: Use the live-state endpoint (same as Round 1 and scoreboard)
                 const liveStateResponse = await fetch(
-                  `/api/tournaments/matches/${match._id}/live-state?autoInit=false`
+                  `/api/tournaments/matches/${match._id}/live-state?autoInit=false`,
+                  { headers: { ...authHeaders } }
                 );
                 if (liveStateResponse.ok) {
                   const liveData = await liveStateResponse.json();
@@ -976,7 +990,8 @@ export default function Tournament({
 
                 // SECONDARY: Try the array scores endpoint
                 const scoresArrayResponse = await fetch(
-                  `/api/tournaments/matches/${match._id}/scores`
+                  `/api/tournaments/matches/${match._id}/scores`,
+                  { headers: { ...authHeaders } }
                 );
                 if (scoresArrayResponse.ok) {
                   const scoresArray = await scoresArrayResponse.json();
@@ -997,7 +1012,8 @@ export default function Tournament({
 
                 // TERTIARY: Fallback to single score endpoint
                 const scoreResponse = await fetch(
-                  `/api/tournaments/scores/${match._id}`
+                  `/api/tournaments/scores/${match._id}`,
+                  { headers: { ...authHeaders } }
                 );
                 if (scoreResponse.ok) {
                   const scoreData = await scoreResponse.json();
@@ -1624,7 +1640,7 @@ export default function Tournament({
         <p>Please select a tournament to view its details.</p>
         <button
           onClick={() => navigate('/mtournament-management')}
-          className="mt-4 bg-orange-500 text-white px-4 py-2 rounded"
+          className="mt-4 bg-orange-500/100 text-white px-4 py-2 rounded"
         >
           Back to Tournament Management
         </button>
@@ -1659,19 +1675,19 @@ export default function Tournament({
   const currentRound2Group = filteredRound2Groups.find(g => g._id === activeRound2Group) || filteredRound2Groups[0];
 
   return (
-    <div className="mt-6 bg-white p-4 rounded-[16px] shadow">
+    <div className="mt-6 bg-[#181A22] p-4 rounded-[16px] shadow">
 
 
       {/* Sub-Stage Tabs (segmented) */}
-      <div className="inline-flex items-center gap-1 p-1 bg-gray-100 rounded-lg mb-5">
+      <div className="inline-flex items-center gap-1 p-1 bg-white/[0.06] rounded-lg mb-5">
         {['League', 'Top Players', 'Knockout'].map((tab) => (
           <button
             key={tab}
             onClick={() => setactiveSubGroupTab(tab)}
             className={`px-5 py-1.5 rounded-md text-sm font-semibold transition-all w-auto ${
               activeSubGroupTab === tab
-                ? 'bg-white text-orange-600 shadow-sm'
-                : 'bg-transparent text-gray-600 hover:text-gray-900'
+                ? 'bg-[#181A22] text-orange-400 shadow-sm'
+                : 'bg-transparent text-gray-300 hover:text-white'
             }`}
           >
             {tab}
@@ -1684,7 +1700,7 @@ export default function Tournament({
         const _cats = getCategories(tournament);
         return _cats.length > 0 && (
         <div className="mb-5">
-          <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">
+          <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">
             Filter by category
           </div>
           <div className="flex flex-wrap gap-1.5">
@@ -1720,8 +1736,8 @@ export default function Tournament({
                   }}
                   className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all w-auto ${
                     isActive
-                      ? "bg-orange-500 text-white shadow-sm"
-                      : "bg-white text-gray-700 border border-gray-200 hover:border-orange-300 hover:text-orange-600"
+                      ? "bg-orange-500/100 text-white shadow-sm"
+                      : "bg-[#181A22] text-gray-300 border border-white/[0.06] hover:border-orange-500/40 hover:text-orange-400"
                   }`}
                 >
                   {cat.name}
@@ -1742,7 +1758,7 @@ export default function Tournament({
               checkbox mode. While selectionMode is on, the strip below shows
               checkbox-tabs and a sticky action bar appears for the selection. */}
           <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
-            <div className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+            <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">
               {filteredGroups.length} group{filteredGroups.length === 1 ? "" : "s"} in this sport
             </div>
             <div className="flex items-center gap-2">
@@ -1786,8 +1802,8 @@ export default function Tournament({
                     disabled={bulkBusy}
                     className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 w-auto ${
                       bulkBusy
-                        ? "bg-orange-200 text-white cursor-not-allowed"
-                        : "bg-orange-500 text-white hover:bg-orange-600"
+                        ? "bg-orange-500/20 text-white cursor-not-allowed"
+                        : "bg-orange-500/100 text-white hover:bg-orange-600"
                     }`}
                   >
                     <FiFlag size={13} />
@@ -1802,8 +1818,8 @@ export default function Tournament({
                 }}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold border w-auto ${
                   selectionMode
-                    ? "bg-gray-800 text-white border-gray-800 hover:bg-gray-900"
-                    : "bg-white text-gray-700 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                    ? "bg-gray-800 text-white border-white/[0.15] hover:bg-gray-900"
+                    : "bg-[#181A22] text-gray-300 border-white/[0.06] hover:border-white/[0.08] hover:bg-white/[0.04]"
                 }`}
               >
                 {selectionMode ? "Exit Select" : "Select"}
@@ -1813,9 +1829,9 @@ export default function Tournament({
 
           {/* Sticky bulk-action bar — only when selectionMode is on. */}
           {selectionMode && (
-            <div className="sticky top-0 z-20 mb-3 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 flex items-center justify-between gap-2 flex-wrap">
+            <div className="sticky top-0 z-20 mb-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-3 py-2 flex items-center justify-between gap-2 flex-wrap">
               <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-emerald-800">
+                <span className="text-xs font-bold text-emerald-300">
                   {selectedGroupIds.size} of {filteredGroups.length} selected
                 </span>
                 <button
@@ -1826,7 +1842,7 @@ export default function Tournament({
                       setSelectedGroupIds(new Set(filteredGroups.map((g) => g._id)));
                     }
                   }}
-                  className="text-[11px] font-semibold text-emerald-700 hover:text-emerald-900 underline w-auto bg-transparent"
+                  className="text-[11px] font-semibold text-emerald-300 hover:text-emerald-300 underline w-auto bg-transparent"
                 >
                   {selectedGroupIds.size === filteredGroups.length ? "Clear all" : "Select all"}
                 </button>
@@ -1861,7 +1877,7 @@ export default function Tournament({
                       setBulkBusy(false);
                     }
                   }}
-                  className="px-3 py-1 rounded-md text-[11px] font-bold text-white bg-orange-500 hover:bg-orange-600 disabled:bg-orange-200 disabled:cursor-not-allowed w-auto"
+                  className="px-3 py-1 rounded-md text-[11px] font-bold text-white bg-orange-500/100 hover:bg-orange-600 disabled:bg-orange-500/20 disabled:cursor-not-allowed w-auto"
                 >
                   Generate Matches
                 </button>
@@ -1903,13 +1919,13 @@ export default function Tournament({
                       setBulkBusy(false);
                     }
                   }}
-                  className="px-3 py-1 rounded-md text-[11px] font-bold text-white bg-red-600 hover:bg-red-700 disabled:bg-red-200 disabled:cursor-not-allowed w-auto"
+                  className="px-3 py-1 rounded-md text-[11px] font-bold text-white bg-red-600 hover:bg-red-700 disabled:bg-red-500/20 disabled:cursor-not-allowed w-auto"
                 >
                   Delete
                 </button>
                 <button
                   onClick={exitSelectionMode}
-                  className="px-3 py-1 rounded-md text-[11px] font-semibold text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 w-auto"
+                  className="px-3 py-1 rounded-md text-[11px] font-semibold text-gray-300 bg-[#181A22] border border-white/[0.06] hover:bg-white/[0.04] w-auto"
                 >
                   Cancel
                 </button>
@@ -1936,15 +1952,15 @@ export default function Tournament({
                   className={`px-3.5 py-1.5 text-xs font-semibold rounded-md transition-all whitespace-nowrap w-auto inline-flex items-center gap-1.5 ${
                     selectionMode
                       ? isSelected
-                        ? "bg-emerald-500 text-white"
-                        : "bg-white text-gray-700 border border-gray-200 hover:border-emerald-300"
+                        ? "bg-emerald-500/100 text-white"
+                        : "bg-[#181A22] text-gray-300 border border-white/[0.06] hover:border-emerald-500/40"
                       : isActive
-                        ? "bg-orange-500 text-white"
-                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                        ? "bg-orange-500/100 text-white"
+                        : "bg-white/[0.06] text-gray-300 hover:bg-white/[0.08]"
                   }`}
                 >
                   {selectionMode && (
-                    <span className={`inline-block w-3.5 h-3.5 rounded border ${isSelected ? "bg-white border-white text-emerald-600" : "border-gray-400"} flex items-center justify-center`}>
+                    <span className={`inline-block w-3.5 h-3.5 rounded border ${isSelected ? "bg-[#181A22] border-white text-emerald-400" : "border-white/[0.10]"} flex items-center justify-center`}>
                       {isSelected && <span className="text-[10px] font-black leading-none">✓</span>}
                     </span>
                   )}
@@ -1956,18 +1972,18 @@ export default function Tournament({
 
           {/* Group Content */}
           {currentGroup ? (
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="bg-[#181A22] rounded-xl border border-white/[0.08] overflow-hidden">
               {/* Group header strip */}
-              <div className="bg-gradient-to-r from-orange-50 to-white px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+              <div className="bg-gradient-to-r from-orange-500/10 to-transparent px-5 py-3 border-b border-white/[0.05] flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <h2 className="text-base font-bold text-gray-900">
+                  <h2 className="text-base font-bold text-white">
                     {currentGroup.groupName || `Group ${groups.indexOf(currentGroup) + 1}`}
                   </h2>
-                  <span className="text-[10px] font-bold bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                  <span className="text-[10px] font-bold bg-orange-500/15 text-orange-300 px-2 py-0.5 rounded-full uppercase tracking-wider">
                     {currentGroup.players?.length || 0} players
                   </span>
                   {currentGroup.category && (
-                    <span className="text-[10px] font-semibold bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+                    <span className="text-[10px] font-semibold bg-white/[0.06] text-gray-300 px-2 py-0.5 rounded-full">
                       {currentGroup.category}
                     </span>
                   )}
@@ -1975,7 +1991,7 @@ export default function Tournament({
                 {groupsWithMatches.has(currentGroup._id) ? (
                   <div className="relative group">
                     <button
-                      className="p-1.5 rounded text-gray-300 cursor-not-allowed bg-transparent w-auto"
+                      className="p-1.5 rounded text-gray-600 cursor-not-allowed bg-transparent w-auto"
                       disabled
                       title="Matches already generated — editing locked"
                     >
@@ -1987,7 +2003,7 @@ export default function Tournament({
                   </div>
                 ) : (
                   <button
-                    className="p-1.5 rounded text-gray-500 hover:text-orange-600 hover:bg-orange-50 bg-transparent w-auto"
+                    className="p-1.5 rounded text-gray-400 hover:text-orange-400 hover:bg-orange-500/10 bg-transparent w-auto"
                     onClick={() => handleEditGroup(currentGroup)}
                     title="Edit group"
                   >
@@ -1998,17 +2014,17 @@ export default function Tournament({
 
               {/* Players — chip grid */}
               <div className="px-5 py-4">
-                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Players</div>
+                <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Players</div>
                 <div className="flex flex-wrap gap-1.5">
                   {currentGroup.players?.map((player, index) => {
                     const name = player.userId?.name || player.userName || `Player ${index + 1}`;
                     return (
                       <div key={player._id || index}
-                        className="inline-flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-full pl-1 pr-3 py-1">
+                        className="inline-flex items-center gap-1.5 bg-white/[0.04] border border-white/[0.06] rounded-full pl-1 pr-3 py-1">
                         <span className="w-5 h-5 rounded-full bg-orange-400 text-white text-[10px] font-bold flex items-center justify-center">
                           {index + 1}
                         </span>
-                        <span className="text-xs font-medium text-gray-700">{name}</span>
+                        <span className="text-xs font-medium text-gray-300">{name}</span>
                       </div>
                     );
                   })}
@@ -2021,7 +2037,7 @@ export default function Tournament({
                 <div className="flex gap-2 flex-wrap">
                   {(!matchesData[activeGroup] || matchesData[activeGroup]?.length === 0) && (
                     <button
-                      className="flex-1 min-w-[140px] bg-orange-500 hover:bg-orange-600 text-white py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2"
+                      className="flex-1 min-w-[140px] bg-orange-500/100 hover:bg-orange-600 text-white py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2"
                       onClick={() => setIsModalOpen(true)}
                     >
                       <FiFlag size={14} />
@@ -2029,7 +2045,7 @@ export default function Tournament({
                     </button>
                   )}
                   <button
-                    className="flex-1 min-w-[140px] py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 text-orange-600 bg-orange-50 border border-orange-200 hover:bg-orange-100"
+                    className="flex-1 min-w-[140px] py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 text-white bg-orange-500 hover:bg-orange-600"
                     onClick={() => {
                       if (showStandings && standingsData[activeGroup]) {
                         setShowStandings(false);
@@ -2043,7 +2059,7 @@ export default function Tournament({
                     {showStandings && standingsData[activeGroup] ? "Hide Standings" : "Standings"}
                   </button>
                   <button
-                    className="flex-1 min-w-[140px] py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 text-gray-700 bg-white border border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                    className="flex-1 min-w-[140px] py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 text-gray-300 bg-white/[0.06] hover:bg-white/[0.10] border border-white/[0.08]"
                     onClick={() =>
                       navigate(`/tournament-management/group-stage/${tournamentId}/${activeGroup}/points-table`, {
                         state: { tournamentId, groupId: activeGroup, round: 1 }
@@ -2060,7 +2076,7 @@ export default function Tournament({
                 ) && (
                   <div className="flex gap-2 flex-wrap">
                     <button
-                      className="flex-1 min-w-[140px] py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 text-white bg-emerald-500 hover:bg-emerald-600"
+                      className="flex-1 min-w-[140px] py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 text-emerald-300 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/20"
                       onClick={() => openBulkScoreModal(
                         matchesData[activeGroup] || [],
                         activeGroup,
@@ -2071,7 +2087,7 @@ export default function Tournament({
                       Bulk Score Upload
                     </button>
                     <button
-                      className="flex-1 min-w-[140px] py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100"
+                      className="flex-1 min-w-[140px] py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/15"
                       onClick={() => setShowCsvUpload(true)}
                     >
                       <FiUpload size={14} />
@@ -2089,7 +2105,7 @@ export default function Tournament({
                 <div className="flex gap-2 flex-wrap">
                   {matchesData[activeGroup]?.length > 0 && (
                     <button
-                      className="flex-1 min-w-[160px] py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 text-red-600 bg-red-50 hover:bg-red-100 border border-red-200"
+                      className="flex-1 min-w-[160px] py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 text-red-400 bg-red-500/15 hover:bg-red-500/25 border border-red-500/20"
                       onClick={() => {
                         if (window.confirm(`Delete ALL ${matchesData[activeGroup]?.length || 0} matches from this group? This cannot be undone.`)) {
                           axios.delete(`/api/tournaments/matches/${tournamentId}/${activeGroup}/all`)
@@ -2106,7 +2122,7 @@ export default function Tournament({
                     </button>
                   )}
                   <button
-                    className="flex-1 min-w-[160px] py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 text-white bg-red-600 hover:bg-red-700 border border-red-700"
+                    className="flex-1 min-w-[160px] py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 text-red-400 bg-red-500/15 hover:bg-red-500/25 border border-red-500/20"
                     onClick={async () => {
                       const matchCount = matchesData[activeGroup]?.length || 0;
                       const name = currentGroup?.groupName || "this group";
@@ -2143,7 +2159,7 @@ export default function Tournament({
 
               {/* Inline Standings Table */}
               {showStandings && standingsData[activeGroup] && (
-                <div className="mt-4 bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div className="mt-4 bg-[#181A22] rounded-xl border border-white/[0.06] overflow-hidden">
                   <div className="bg-gradient-to-r from-orange-500 to-orange-600 px-4 py-2.5">
                     <h6 className="text-white text-sm font-bold">
                       {standingsData[activeGroup].groupName} — Standings
@@ -2152,7 +2168,7 @@ export default function Tournament({
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
-                        <tr className="bg-gray-50 text-gray-600 text-xs uppercase">
+                        <tr className="bg-white/[0.04] text-gray-300 text-xs uppercase">
                           <th className="px-3 py-2 text-left">#</th>
                           <th className="px-3 py-2 text-left">Player</th>
                           <th className="px-3 py-2 text-center">P</th>
@@ -2165,26 +2181,26 @@ export default function Tournament({
                       </thead>
                       <tbody>
                         {standingsData[activeGroup].standings.map((p, idx) => (
-                          <tr key={p.playerId} className={`border-t border-gray-100 ${
-                            p.qualified ? "bg-green-50" : ""
+                          <tr key={p.playerId} className={`border-t border-white/[0.05] ${
+                            p.qualified ? "bg-green-500/10" : ""
                           } ${idx < getQualifyPerGroup(tournament) ? "font-semibold" : ""}`}>
-                            <td className="px-3 py-2 text-gray-500">{p.rank}</td>
-                            <td className="px-3 py-2 text-gray-900 flex items-center gap-1.5">
+                            <td className="px-3 py-2 text-gray-400">{p.rank}</td>
+                            <td className="px-3 py-2 text-white flex items-center gap-1.5">
                               {p.playerName}
                               {p.qualified && (
-                                <span className="text-[9px] bg-green-500 text-white px-1.5 py-0.5 rounded-full">Q</span>
+                                <span className="text-[9px] bg-green-500/100 text-white px-1.5 py-0.5 rounded-full">Q</span>
                               )}
                             </td>
-                            <td className="px-3 py-2 text-center text-gray-600">{p.played}</td>
-                            <td className="px-3 py-2 text-center text-green-600 font-medium">{p.won}</td>
+                            <td className="px-3 py-2 text-center text-gray-300">{p.played}</td>
+                            <td className="px-3 py-2 text-center text-green-400 font-medium">{p.won}</td>
                             <td className="px-3 py-2 text-center text-red-500">{p.lost}</td>
-                            <td className="px-3 py-2 text-center text-gray-600">
+                            <td className="px-3 py-2 text-center text-gray-300">
                               {p.setsWon}-{p.setsLost}
                             </td>
-                            <td className="px-3 py-2 text-center text-gray-600">
+                            <td className="px-3 py-2 text-center text-gray-300">
                               {p.pointsScored}-{p.pointsConceded}
                             </td>
-                            <td className="px-3 py-2 text-center font-bold text-orange-600">{p.totalPoints}</td>
+                            <td className="px-3 py-2 text-center font-bold text-orange-400">{p.totalPoints}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -2213,7 +2229,7 @@ export default function Tournament({
                       </>
                     )}
                   </button>
-                  <p className="text-[11px] text-gray-400 text-center mt-1">
+                  <p className="text-[11px] text-gray-500 text-center mt-1">
                     All group matches must be completed. Top {getQualifyPerGroup(tournament)} per group will qualify.
                   </p>
                 </div>
@@ -2250,17 +2266,17 @@ export default function Tournament({
                         const umpireName = getUmpireName(match.referee);
 
                         const statusChip = isCompleted ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-300">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/100" />
                             COMPLETED
                           </span>
                         ) : isLive ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700">
-                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-300">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500/100 animate-pulse" />
                             LIVE
                           </span>
                         ) : (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-600">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/[0.06] text-gray-300">
                             SCHEDULED
                           </span>
                         );
@@ -2268,38 +2284,38 @@ export default function Tournament({
                         const renderPlayerRow = (name, won, avatar, align = "left") => (
                           <div className={`flex items-center gap-2 ${align === "right" ? "flex-row-reverse text-right" : ""}`}>
                             {avatar ? (
-                              <img src={`/uploads/profiles/${avatar}`} alt={name}
+                              <img src={assetUrl(avatar)} alt={name}
                                 className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
                             ) : (
-                              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0 ${won ? "bg-emerald-500" : "bg-orange-400"}`}>
+                              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0 ${won ? "bg-emerald-500/100" : "bg-orange-400"}`}>
                                 {name?.charAt(0)?.toUpperCase() || '?'}
                               </div>
                             )}
-                            <span className={`font-semibold text-sm truncate ${won ? "text-emerald-700" : "text-gray-800"}`}>
+                            <span className={`font-semibold text-sm truncate ${won ? "text-emerald-300" : "text-gray-100"}`}>
                               {name}
                             </span>
-                            {won && <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-bold flex-shrink-0">WON</span>}
+                            {won && <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300 font-bold flex-shrink-0">WON</span>}
                           </div>
                         );
 
                         return (
                           <div
                             key={index}
-                            className={`relative bg-white rounded-xl border cursor-pointer transition-all hover:shadow-md ${
-                              isCompleted ? "border-emerald-200" : isLive ? "border-amber-200" : "border-gray-200"
+                            className={`relative bg-[#181A22] rounded-xl border cursor-pointer transition-all hover:shadow-md ${
+                              isCompleted ? "border-emerald-500/30" : isLive ? "border-amber-500/30" : "border-white/[0.06]"
                             }`}
                             onClick={(e) => { e.stopPropagation(); openModal(match); }}
                           >
                             {/* Status accent strip */}
                             <div className={`absolute top-0 left-0 right-0 h-1 rounded-t-xl ${
-                              isCompleted ? "bg-emerald-500" : isLive ? "bg-amber-500" : "bg-gray-200"
+                              isCompleted ? "bg-emerald-500/100" : isLive ? "bg-amber-500/100" : "bg-white/[0.08]"
                             }`} />
 
                             <div className="p-4 pt-4">
                               {/* Header — match id / court / status + actions */}
                               <div className="flex items-center justify-between mb-3">
                                 <div className="flex items-center gap-1.5 flex-wrap">
-                                  <span className="text-[10px] font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded">
+                                  <span className="text-[10px] font-bold text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded">
                                     R1 · M{match.matchNumber}
                                   </span>
                                   {[3, 5, 7].includes(match.matchFormat?.totalSets) && (
@@ -2332,7 +2348,7 @@ export default function Tournament({
                                 <div className="flex items-center gap-0.5">
                                   <button
                                     onClick={(e) => { e.stopPropagation(); openModal(match); }}
-                                    className="p-1.5 rounded text-gray-400 hover:text-gray-700 hover:bg-gray-100 w-auto bg-transparent"
+                                    className="p-1.5 rounded text-gray-500 hover:text-gray-300 hover:bg-white/[0.06] w-auto bg-transparent"
                                     title="View details"
                                   >
                                     <FiEdit2 size={13} />
@@ -2346,7 +2362,7 @@ export default function Tournament({
                                           .catch((err) => toast.info("Delete failed: " + (err.response?.data?.message || err.message)));
                                       }
                                     }}
-                                    className="p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 w-auto bg-transparent"
+                                    className="p-1.5 rounded text-gray-500 hover:text-red-400 hover:bg-red-500/10 w-auto bg-transparent"
                                     title="Delete match"
                                   >
                                     <FiTrash2 size={13} />
@@ -2355,7 +2371,7 @@ export default function Tournament({
                               </div>
 
                               {/* Time */}
-                              <p className="text-[11px] text-gray-500 mb-3">
+                              <p className="text-[11px] text-gray-400 mb-3">
                                 {formatDate(match.startTime)} · {MatchformatTime(match.startTime)}
                                 {match.matchEndTime && MatchformatTime(match.matchEndTime) && ` → ${MatchformatTime(match.matchEndTime)}`}
                               </p>
@@ -2368,18 +2384,18 @@ export default function Tournament({
                                 <div className="flex-shrink-0 text-center">
                                   {isCompleted && p1Sets != null ? (
                                     <div className="flex items-center gap-1">
-                                      <span className={`text-lg font-bold ${p1Won ? "text-emerald-600" : "text-gray-400"}`}>{p1Sets}</span>
-                                      <span className="text-gray-300">-</span>
-                                      <span className={`text-lg font-bold ${p2Won ? "text-emerald-600" : "text-gray-400"}`}>{p2Sets}</span>
+                                      <span className={`text-lg font-bold ${p1Won ? "text-emerald-400" : "text-gray-500"}`}>{p1Sets}</span>
+                                      <span className="text-gray-600">-</span>
+                                      <span className={`text-lg font-bold ${p2Won ? "text-emerald-400" : "text-gray-500"}`}>{p2Sets}</span>
                                     </div>
                                   ) : isLive ? (
                                     <div className="flex items-center gap-1">
-                                      <span className="text-lg font-bold text-amber-600">{liveP1}</span>
-                                      <span className="text-gray-300">-</span>
-                                      <span className="text-lg font-bold text-amber-600">{liveP2}</span>
+                                      <span className="text-lg font-bold text-amber-400">{liveP1}</span>
+                                      <span className="text-gray-600">-</span>
+                                      <span className="text-lg font-bold text-amber-400">{liveP2}</span>
                                     </div>
                                   ) : (
-                                    <span className="text-xs font-bold text-gray-400">VS</span>
+                                    <span className="text-xs font-bold text-gray-500">VS</span>
                                   )}
                                 </div>
                                 <div className="flex-1 min-w-0">
@@ -2388,14 +2404,14 @@ export default function Tournament({
                               </div>
 
                               {/* Footer — umpire + assign */}
-                              <div className="mt-3 pt-2.5 border-t border-gray-100 flex items-center justify-between">
+                              <div className="mt-3 pt-2.5 border-t border-white/[0.05] flex items-center justify-between">
                                 {umpireName ? (
-                                  <span className="flex items-center gap-1.5 text-[11px] text-gray-600 min-w-0">
+                                  <span className="flex items-center gap-1.5 text-[11px] text-gray-300 min-w-0">
                                     <FiShield className="w-3 h-3 text-blue-500 flex-shrink-0" />
                                     <span className="truncate">{umpireName}</span>
                                   </span>
                                 ) : (
-                                  <span className="flex items-center gap-1.5 text-[11px] text-gray-400">
+                                  <span className="flex items-center gap-1.5 text-[11px] text-gray-500">
                                     <FiShield className="w-3 h-3" />
                                     <span>No umpire</span>
                                   </span>
@@ -2403,7 +2419,7 @@ export default function Tournament({
                                 {!umpireName && !isCompleted && (
                                   <button
                                     onClick={(e) => { e.stopPropagation(); setAssignModalMatch(match); }}
-                                    className="flex items-center gap-1 text-[11px] font-bold text-orange-600 hover:text-white hover:bg-orange-500 px-2 py-1 rounded w-auto bg-orange-50 transition-colors"
+                                    className="flex items-center gap-1 text-[11px] font-bold text-orange-400 hover:text-white hover:bg-orange-500/100 px-2 py-1 rounded w-auto bg-orange-500/10 transition-colors"
                                   >
                                     <FiUserPlus size={11} />
                                     Assign
@@ -2420,14 +2436,14 @@ export default function Tournament({
               </div>
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center p-12 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200 mt-4">
-              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                <FiInfo className="text-gray-400 text-3xl" />
+            <div className="flex flex-col items-center justify-center p-12 bg-white/[0.04] rounded-3xl border-2 border-dashed border-white/[0.06] mt-4">
+              <div className="w-16 h-16 bg-white/[0.06] rounded-full flex items-center justify-center mb-4">
+                <FiInfo className="text-gray-500 text-3xl" />
               </div>
-              <p className="text-gray-600 font-semibold text-lg text-center">
+              <p className="text-gray-300 font-semibold text-lg text-center">
                 No groups found for {selectedCategory || "this category"}
               </p>
-              <p className="text-gray-400 text-sm mt-1 text-center max-w-sm">
+              <p className="text-gray-500 text-sm mt-1 text-center max-w-sm">
                 To get started, go to the <strong>Registered Players</strong> tab and create groups for this category.
               </p>
             </div>
@@ -2450,7 +2466,7 @@ export default function Tournament({
                     }}
                     className={`px-4 py-2 text-sm w-auto font-semibold rounded-lg transition-all whitespace-nowrap ${activeRound2Group === group._id
                       ? "bg-[#F97316] text-white shadow-sm"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      : "bg-white/[0.06] text-gray-300 hover:bg-white/[0.08]"
                       }`}
                   >
                     {group.groupName || `Round 2 Group ${index + 1}`}
@@ -2460,7 +2476,7 @@ export default function Tournament({
 
               {/* Group Content - Exact same structure as League */}
               {currentRound2Group && (
-                <div className="w-full p-4 bg-white rounded-2xl">
+                <div className="w-full p-4 bg-[#181A22] rounded-2xl">
                   <div className="flex justify-between items-center mb-0">
                     <div className="flex items-center gap-3">
                       <h2 className="text-[18px] md:text-[18px] font-[500] text-orange-500">
@@ -2473,9 +2489,9 @@ export default function Tournament({
                   {/* Player List */}
                   <div className="space-y-1.5 mb-5">
                     {currentRound2Group.players?.map((player, index) => (
-                      <div key={player._id || index} className="flex items-center gap-3 px-3 py-2 rounded-xl bg-gray-50 hover:bg-orange-50/50 transition">
-                        <span className="w-6 h-6 rounded-full bg-orange-100 text-orange-600 text-xs font-bold flex items-center justify-center flex-shrink-0">{index + 1}</span>
-                        <span className="text-sm font-medium text-gray-800">{player.userName || player.playerName || `Player ${index + 1}`}</span>
+                      <div key={player._id || index} className="flex items-center gap-3 px-3 py-2 rounded-xl bg-white/[0.04] hover:bg-orange-500/10/50 transition">
+                        <span className="w-6 h-6 rounded-full bg-orange-500/15 text-orange-400 text-xs font-bold flex items-center justify-center flex-shrink-0">{index + 1}</span>
+                        <span className="text-sm font-medium text-gray-100">{player.userName || player.playerName || `Player ${index + 1}`}</span>
                       </div>
                     ))}
                   </div>
@@ -2484,7 +2500,7 @@ export default function Tournament({
                   <div className="grid grid-cols-2 gap-2 mb-6">
                     {(!round2MatchesData[activeRound2Group] || round2MatchesData[activeRound2Group]?.length === 0) && (
                       <button
-                        className="bg-orange-500 hover:bg-orange-600 text-white py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition active:scale-[0.97]"
+                        className="bg-orange-500/100 hover:bg-orange-600 text-white py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition active:scale-[0.97]"
                         onClick={() => {
                           setPendingRound2GroupId(activeRound2Group);
                           setIsModalOpen(true);
@@ -2496,7 +2512,7 @@ export default function Tournament({
                     )}
 
                     <button
-                      className="py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 text-orange-500 bg-orange-50 border border-orange-200 hover:bg-orange-100 transition"
+                      className="py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 text-orange-500 bg-orange-500/10 border border-orange-500/30 hover:bg-orange-500/15 transition"
                       onClick={() =>
                         navigate(`/tournament-management/group-stage/${tournamentId}/${activeRound2Group}/points-table`, {
                           state: { tournamentId, groupId: activeRound2Group, round: 2 }
@@ -2511,7 +2527,7 @@ export default function Tournament({
                       m => m.status !== 'completed' && m.status !== 'COMPLETED'
                     ) && (
                       <button
-                        className="py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 text-white bg-emerald-500 hover:bg-emerald-600 transition"
+                        className="py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 text-white bg-emerald-500/100 hover:bg-emerald-600 transition"
                         onClick={() => openBulkScoreModal(
                           round2MatchesData[activeRound2Group] || [],
                           activeRound2Group,
@@ -2525,7 +2541,7 @@ export default function Tournament({
 
                     {round2MatchesData[activeRound2Group]?.length > 0 && (
                       <button
-                        className="py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 text-red-500 bg-red-50 border border-red-200 hover:bg-red-100 transition"
+                        className="py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 text-red-500 bg-red-500/10 border border-red-500/30 hover:bg-red-500/15 transition"
                         onClick={() => {
                           if (window.confirm(`Delete ALL ${round2MatchesData[activeRound2Group]?.length || 0} matches? This cannot be undone.`)) {
                             axios.delete(`/api/tournaments/matches/${tournamentId}/${activeRound2Group}/all`)
@@ -2544,8 +2560,8 @@ export default function Tournament({
                   <div>
                     {round2MatchesData[activeRound2Group]?.length > 0 && (
                       <div>
-                        <h5 className="mb-3 text-sm font-bold text-gray-900 flex items-center gap-2">
-                          <span className="w-1.5 h-1.5 bg-orange-500 rounded-full"></span>
+                        <h5 className="mb-3 text-sm font-bold text-white flex items-center gap-2">
+                          <span className="w-1.5 h-1.5 bg-orange-500/100 rounded-full"></span>
                           Matches — {currentRound2Group.groupName || `Group ${round2Groups.indexOf(currentRound2Group) + 1}`}
                         </h5>
 
@@ -2554,15 +2570,15 @@ export default function Tournament({
                             <div
                               key={index}
                               className={`rounded-2xl p-4 cursor-pointer border transition-all hover:shadow-md ${
-                                match.status === 'COMPLETED' ? 'bg-emerald-50/50 border-emerald-200' :
-                                match.status === 'IN_PROGRESS' ? 'bg-amber-50/50 border-amber-200' :
-                                'bg-white border-gray-100 hover:border-orange-200'
+                                match.status === 'COMPLETED' ? 'bg-emerald-500/10/50 border-emerald-500/30' :
+                                match.status === 'IN_PROGRESS' ? 'bg-amber-500/10/50 border-amber-500/30' :
+                                'bg-[#181A22] border-white/[0.05] hover:border-orange-500/30'
                               }`}
                               onClick={(e) => { e.stopPropagation(); openModal(match); }}
                             >
                               <div className="flex justify-between items-center mb-3">
                                 <div className="flex items-center gap-2">
-                                  <span className="bg-orange-100 text-orange-700 rounded-lg text-[10px] font-bold px-2 py-0.5">
+                                  <span className="bg-orange-500/15 text-orange-300 rounded-lg text-[10px] font-bold px-2 py-0.5">
                                     R2-M{match.matchNumber}
                                   </span>
                                   <CourtPicker
@@ -2586,11 +2602,11 @@ export default function Tournament({
                                     }}
                                   />
                                   {match.status === 'COMPLETED' && (
-                                    <span className="bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-lg">Done</span>
+                                    <span className="bg-emerald-500/100 text-white text-[10px] font-bold px-2 py-0.5 rounded-lg">Done</span>
                                   )}
                                   {match.status === 'IN_PROGRESS' && (
-                                    <span className="bg-amber-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-lg flex items-center gap-1">
-                                      <span className="w-1 h-1 bg-white rounded-full animate-pulse"></span> Live
+                                    <span className="bg-amber-500/100 text-white text-[10px] font-bold px-2 py-0.5 rounded-lg flex items-center gap-1">
+                                      <span className="w-1 h-1 bg-[#181A22] rounded-full animate-pulse"></span> Live
                                     </span>
                                   )}
                                 </div>
@@ -2600,7 +2616,7 @@ export default function Tournament({
                                       e.stopPropagation();
                                       openModal(match);
                                     }}
-                                    className="text-gray-500 hover:bg-transparent focus:outline-none w-auto bg-transparent"
+                                    className="text-gray-400 hover:bg-transparent focus:outline-none w-auto bg-transparent"
                                   >
                                     <FiEdit2 />
                                   </button>
@@ -2613,14 +2629,14 @@ export default function Tournament({
                                           .catch((err) => toast.info("Delete failed: " + (err.response?.data?.message || err.message)));
                                       }
                                     }}
-                                    className="text-red-400 hover:text-red-600 hover:bg-transparent focus:outline-none w-auto bg-transparent"
+                                    className="text-red-400 hover:text-red-400 hover:bg-transparent focus:outline-none w-auto bg-transparent"
                                   >
                                     <FiTrash2 size={14} />
                                   </button>
                                 </div>
                               </div>
 
-                              <p className="text-center text-xs text-gray-400 mb-3">
+                              <p className="text-center text-xs text-gray-500 mb-3">
                                 {formatDate(match.startTime)} • {MatchformatTime(match.startTime)}
                                 {match.matchEndTime && MatchformatTime(match.matchEndTime) && ` → ${MatchformatTime(match.matchEndTime)}`}
                               </p>
@@ -2629,25 +2645,25 @@ export default function Tournament({
                                 {/* Player 1 */}
                                 <div className="flex items-center gap-2.5">
                                   {match.player1?.playerId?.profileImage ? (
-                                    <img src={`/uploads/profiles/${match.player1.playerId.profileImage}`} alt="" className="w-8 h-8 rounded-full object-cover border-2 border-white shadow-sm" />
+                                    <img src={assetUrl(match.player1.playerId.profileImage)} alt="" className="w-8 h-8 rounded-full object-cover border-2 border-white shadow-sm" />
                                   ) : (
-                                    <div className="w-8 h-8 rounded-full bg-orange-500 flex items-center justify-center text-white text-xs font-bold border-2 border-white shadow-sm">
+                                    <div className="w-8 h-8 rounded-full bg-orange-500/100 flex items-center justify-center text-white text-xs font-bold border-2 border-white shadow-sm">
                                       {(match.player1?.userName || match.player1?.name || '?').charAt(0)}
                                     </div>
                                   )}
-                                  <span className={`text-sm font-semibold ${match.winner?.playerId?.toString() === match.player1?.playerId?.toString() || match.winner?.playerName === (match.player1?.userName || match.player1?.name) ? 'text-emerald-600' : 'text-gray-800'}`}>
+                                  <span className={`text-sm font-semibold ${match.winner?.playerId?.toString() === match.player1?.playerId?.toString() || match.winner?.playerName === (match.player1?.userName || match.player1?.name) ? 'text-emerald-400' : 'text-gray-100'}`}>
                                     {match.player1?.userName || match.player1?.name || 'Player 1'}
                                   </span>
                                   {(match.winner?.playerId?.toString() === match.player1?.playerId?.toString() || match.winner?.playerName === (match.player1?.userName || match.player1?.name)) && match.status === 'COMPLETED' && (
-                                    <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded ml-auto">W</span>
+                                    <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded ml-auto">W</span>
                                   )}
                                 </div>
 
                                 {/* VS + Score */}
                                 <div className="flex items-center gap-2 pl-10">
-                                  <span className="text-[10px] font-bold text-gray-300 uppercase">vs</span>
+                                  <span className="text-[10px] font-bold text-gray-600 uppercase">vs</span>
                                   {match.status === 'COMPLETED' && match.result?.finalScore && (
-                                    <span className="text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md">
+                                    <span className="text-[10px] font-bold text-gray-400 bg-white/[0.06] px-2 py-0.5 rounded-md">
                                       {match.result.finalScore.player1Sets} - {match.result.finalScore.player2Sets}
                                     </span>
                                   )}
@@ -2656,36 +2672,36 @@ export default function Tournament({
                                 {/* Player 2 */}
                                 <div className="flex items-center gap-2.5">
                                   {match.player2?.playerId?.profileImage ? (
-                                    <img src={`/uploads/profiles/${match.player2.playerId.profileImage}`} alt="" className="w-8 h-8 rounded-full object-cover border-2 border-white shadow-sm" />
+                                    <img src={assetUrl(match.player2.playerId.profileImage)} alt="" className="w-8 h-8 rounded-full object-cover border-2 border-white shadow-sm" />
                                   ) : (
-                                    <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-white text-xs font-bold border-2 border-white shadow-sm">
+                                    <div className="w-8 h-8 rounded-full bg-emerald-500/100 flex items-center justify-center text-white text-xs font-bold border-2 border-white shadow-sm">
                                       {(match.player2?.userName || match.player2?.name || '?').charAt(0)}
                                     </div>
                                   )}
-                                  <span className={`text-sm font-semibold ${match.winner?.playerId?.toString() === match.player2?.playerId?.toString() || match.winner?.playerName === (match.player2?.userName || match.player2?.name) ? 'text-emerald-600' : 'text-gray-800'}`}>
+                                  <span className={`text-sm font-semibold ${match.winner?.playerId?.toString() === match.player2?.playerId?.toString() || match.winner?.playerName === (match.player2?.userName || match.player2?.name) ? 'text-emerald-400' : 'text-gray-100'}`}>
                                     {match.player2?.userName || match.player2?.name || 'Player 2'}
                                   </span>
                                   {(match.winner?.playerId?.toString() === match.player2?.playerId?.toString() || match.winner?.playerName === (match.player2?.userName || match.player2?.name)) && match.status === 'COMPLETED' && (
-                                    <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded ml-auto">W</span>
+                                    <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded ml-auto">W</span>
                                   )}
                                 </div>
                               </div>
 
                               {/* Enhanced Live Score Display for Top Players (Round 2) */}
                               {match.status === 'IN_PROGRESS' && match.liveScore && (
-                                <div className="mt-3 p-2 bg-yellow-50 rounded-lg border border-yellow-200">
+                                <div className="mt-3 p-2 bg-amber-500/100/10 rounded-lg border border-yellow-500/30">
                                   <div className="text-center">
-                                    <div className="text-sm text-yellow-700 font-medium mb-1 flex items-center justify-center gap-2">
-                                      <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
+                                    <div className="text-sm text-amber-300 font-medium mb-1 flex items-center justify-center gap-2">
+                                      <div className="w-2 h-2 bg-amber-500/100/100 rounded-full animate-pulse"></div>
                                       Live Score - Round 2
                                     </div>
-                                    <div className="text-lg font-bold text-gray-800">
+                                    <div className="text-lg font-bold text-gray-100">
                                       {match.liveScore.player1Points || 0} - {match.liveScore.player2Points || 0}
                                     </div>
-                                    <div className="text-xs text-yellow-600 mt-1">
+                                    <div className="text-xs text-amber-400 mt-1">
                                       Set {match.currentSet || 1}, Game {match.currentGame || 1}
                                     </div>
-                                    <div className="text-xs text-emerald-600 mt-1 bg-emerald-50 px-2 py-1 rounded">
+                                    <div className="text-xs text-emerald-400 mt-1 bg-emerald-500/10 px-2 py-1 rounded">
                                       Top Players championship impact
                                     </div>
                                   </div>
@@ -2695,9 +2711,9 @@ export default function Tournament({
 
                               {/* Legacy Score Format with Round 2 Context */}
                               {match.status === 'COMPLETED' && match.currentScore && !match.result && (
-                                <div className="mt-3 p-2 bg-green-50 rounded-lg border border-green-200">
+                                <div className="mt-3 p-2 bg-green-500/10 rounded-lg border border-green-500/30">
                                   <div className="text-center">
-                                    <div className="text-sm text-green-700 font-medium mb-1">Round 2 Complete</div>
+                                    <div className="text-sm text-green-300 font-medium mb-1">Round 2 Complete</div>
                                     <div className="text-xs space-y-1">
                                       {match.currentScore.setOne && (
                                         <div>Set 1: {Array.isArray(match.currentScore.setOne) ? `${match.currentScore.setOne[0]}-${match.currentScore.setOne[1]}` : match.currentScore.setOne}</div>
@@ -2710,11 +2726,11 @@ export default function Tournament({
                                       )}
                                     </div>
                                     {match.winner && (
-                                      <div className="text-xs text-green-600 mt-1 font-semibold">
+                                      <div className="text-xs text-green-400 mt-1 font-semibold">
                                         Winner: {typeof match.winner === 'object' ? (match.winner.playerName || match.winner.name || match.winner.userName || 'Unknown') : match.winner}
                                       </div>
                                     )}
-                                    <div className="text-xs text-emerald-600 mt-1 bg-emerald-50 px-2 py-1 rounded">
+                                    <div className="text-xs text-emerald-400 mt-1 bg-emerald-500/10 px-2 py-1 rounded">
                                       Top Players standings updated
                                     </div>
                                   </div>
@@ -2726,23 +2742,23 @@ export default function Tournament({
                                 const umpireName = getUmpireName(match.referee);
                                 const isComp = match.status === 'completed' || match.status === 'COMPLETED';
                                 return (
-                                  <div className="mt-3 pt-2 border-t border-gray-100 flex items-center justify-between">
+                                  <div className="mt-3 pt-2 border-t border-white/[0.05] flex items-center justify-between">
                                     {umpireName ? (
-                                      <span className="flex items-center gap-1.5 text-xs text-gray-600">
+                                      <span className="flex items-center gap-1.5 text-xs text-gray-300">
                                         <FiShield className="w-3.5 h-3.5 text-blue-500" />
                                         <span className="font-semibold">Umpire:</span>
-                                        <span className="text-gray-800 truncate max-w-[120px]">{umpireName}</span>
+                                        <span className="text-gray-100 truncate max-w-[120px]">{umpireName}</span>
                                       </span>
                                     ) : (
-                                      <span className="flex items-center gap-1.5 text-xs text-gray-400">
-                                        <FiShield className="w-3.5 h-3.5 text-gray-300" />
+                                      <span className="flex items-center gap-1.5 text-xs text-gray-500">
+                                        <FiShield className="w-3.5 h-3.5 text-gray-600" />
                                         <span>No umpire</span>
                                       </span>
                                     )}
                                     {!umpireName && !isComp && (
                                       <button
                                         onClick={(e) => { e.stopPropagation(); setAssignModalMatch(match); }}
-                                        className="flex items-center gap-1 text-xs font-semibold text-orange-600 hover:text-orange-700 px-2 py-0.5 rounded hover:bg-orange-50 w-auto"
+                                        className="flex items-center gap-1 text-xs font-semibold text-orange-400 hover:text-orange-300 px-2 py-0.5 rounded hover:bg-orange-500/10 w-auto"
                                       >
                                         <FiUserPlus className="w-3.5 h-3.5" />
                                         Assign
@@ -2762,14 +2778,14 @@ export default function Tournament({
             </>
           ) : (
             // No Round 2 groups yet - keeping the helpful message
-            <div className="flex flex-col items-center justify-center p-12 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200 mt-4">
-              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                <FiInfo className="text-gray-400 text-3xl" />
+            <div className="flex flex-col items-center justify-center p-12 bg-white/[0.04] rounded-3xl border-2 border-dashed border-white/[0.06] mt-4">
+              <div className="w-16 h-16 bg-white/[0.06] rounded-full flex items-center justify-center mb-4">
+                <FiInfo className="text-gray-500 text-3xl" />
               </div>
-              <p className="text-gray-600 font-semibold text-lg text-center">
+              <p className="text-gray-300 font-semibold text-lg text-center">
                 No Round 2 groups found for {selectedCategory || "this category"}
               </p>
-              <p className="text-gray-400 text-sm mt-1 text-center max-w-sm">
+              <p className="text-gray-500 text-sm mt-1 text-center max-w-sm">
                 Round 2 groups appear here after Top Players are selected.
                 Go to <strong>Registered Players → Top Players</strong> to proceed.
               </p>
@@ -2778,45 +2794,45 @@ export default function Tournament({
 
           {/* 🔥 DIRECT KNOCKOUT MODE - When no Round 2 groups but tournament supports Direct Knockout */}
           {round2Groups.length === 0 && tournamentMode === "direct-knockout" && availablePlayersForKnockout.length > 0 && (
-            <div className="mt-8 bg-gradient-to-r from-orange-50 to-orange-50 border border-emerald-200 rounded-xl p-6">
+            <div className="mt-8 bg-gradient-to-r from-orange-500/10 to-orange-500/10 border border-emerald-500/30 rounded-xl p-6">
               <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 bg-emerald-500 rounded-full flex items-center justify-center">
+                <div className="w-10 h-10 bg-emerald-500/100 rounded-full flex items-center justify-center">
                   <FaMedal className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold text-emerald-900">🔥 Direct Knockout Mode</h3>
-                  <p className="text-sm text-emerald-700">Skip Round 2 groups - Go straight to knockout bracket!</p>
+                  <h3 className="text-xl font-bold text-emerald-300">🔥 Direct Knockout Mode</h3>
+                  <p className="text-sm text-emerald-300">Skip Round 2 groups - Go straight to knockout bracket!</p>
                 </div>
               </div>
 
               {/* Player Selection */}
               <div className="mb-6">
-                <h4 className="text-lg font-semibold text-emerald-800 mb-3">
+                <h4 className="text-lg font-semibold text-emerald-300 mb-3">
                   Select Players for Direct Knockout ({selectedPlayersForKnockout.length} selected)
                 </h4>
 
                 {/* Enhanced Validation Status */}
                 <div className={`p-4 rounded-lg mb-4 border-2 transition-all duration-300 ${validationStatus.isValid
-                  ? "bg-green-50 border-green-300 text-green-800 shadow-sm"
+                  ? "bg-green-500/10 border-green-500/40 text-green-300 shadow-sm"
                   : selectedPlayersForKnockout.length === 0
-                    ? "bg-orange-50 border-orange-200 text-orange-600"
-                    : "bg-red-50 border-red-300 text-red-800 shadow-sm"
+                    ? "bg-orange-500/10 border-orange-500/30 text-orange-400"
+                    : "bg-red-500/10 border-red-500/40 text-red-300 shadow-sm"
                   }`}>
                   <div className="flex items-center gap-2 mb-2">
                     {validationStatus.isValid ? (
-                      <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
+                      <div className="w-5 h-5 bg-green-500/100 rounded-full flex items-center justify-center">
                         <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                         </svg>
                       </div>
                     ) : selectedPlayersForKnockout.length === 0 ? (
-                      <div className="w-5 h-5 bg-orange-500 rounded-full flex items-center justify-center">
+                      <div className="w-5 h-5 bg-orange-500/100 rounded-full flex items-center justify-center">
                         <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                         </svg>
                       </div>
                     ) : (
-                      <div className="w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
+                      <div className="w-5 h-5 bg-red-500/100 rounded-full flex items-center justify-center">
                         <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
                         </svg>
@@ -2835,7 +2851,7 @@ export default function Tournament({
                     <div className="text-xs mt-2 space-y-1">
                       <div>Valid tournament sizes: 4, 8, 16, 32 players (power of 2)</div>
                       {validationStatus.isValid && (
-                        <div className="bg-white bg-opacity-60 p-2 rounded text-xs">
+                        <div className="bg-[#181A22] bg-opacity-60 p-2 rounded text-xs">
                           <strong>Tournament Preview:</strong> {Math.log2(selectedPlayersForKnockout.length)} rounds • {selectedPlayersForKnockout.length - 1} total matches • Winner determined in {Math.log2(selectedPlayersForKnockout.length)} stages
                         </div>
                       )}
@@ -2878,14 +2894,14 @@ export default function Tournament({
                             validateSelectedPlayers(newSelection);
                           }}
                           className={`p-3 rounded-lg border-2 cursor-pointer transition-all hover:shadow-md ${isSelected
-                            ? "border-emerald-500 bg-emerald-100 text-emerald-900"
-                            : "border-gray-200 bg-white hover:border-emerald-300"
+                            ? "border-emerald-500 bg-emerald-500/15 text-emerald-300"
+                            : "border-white/[0.06] bg-[#181A22] hover:border-emerald-500/40"
                             }`}
                         >
                           <div className="text-sm font-medium">{player.userName}</div>
-                          <div className="text-xs text-gray-500">{player.sourceGroup}</div>
+                          <div className="text-xs text-gray-400">{player.sourceGroup}</div>
                           {isSelected && (
-                            <div className="text-xs text-emerald-600 font-medium mt-1">✓ Selected</div>
+                            <div className="text-xs text-emerald-400 font-medium mt-1">✓ Selected</div>
                           )}
                         </div>
                       );
@@ -2907,8 +2923,8 @@ export default function Tournament({
                     }}
                     disabled={availablePlayersForKnockout.length < count}
                     className={`px-3 py-2 rounded-lg text-sm font-medium transition ${availablePlayersForKnockout.length >= count
-                      ? "bg-emerald-500 text-white hover:bg-emerald-600"
-                      : "bg-gray-200 text-gray-500 cursor-not-allowed"
+                      ? "bg-emerald-500/100 text-white hover:bg-emerald-600"
+                      : "bg-white/[0.08] text-gray-400 cursor-not-allowed"
                       }`}
                   >
                     Select {count}
@@ -2930,14 +2946,14 @@ export default function Tournament({
                 onClick={() => setIsDirectKnockoutScheduleModalOpen(true)}
                 disabled={!validationStatus.isValid}
                 className={`w-full py-3 rounded-lg font-semibold transition flex items-center justify-center gap-3 ${validationStatus.isValid
-                  ? "bg-emerald-500 text-white hover:bg-emerald-600"
-                  : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                  ? "bg-emerald-500/100 text-white hover:bg-emerald-600"
+                  : "bg-white/[0.10] text-gray-400 cursor-not-allowed"
                   }`}
               >
                 <FaMedal className="w-5 h-5" />
                 Create Direct Knockout Tournament
                 {validationStatus.isValid && selectedPlayersForKnockout.length > 0 && (
-                  <span className="bg-white bg-opacity-20 px-2 py-1 rounded text-sm">
+                  <span className="bg-[#181A22] bg-opacity-20 px-2 py-1 rounded text-sm">
                     {Math.log2(selectedPlayersForKnockout.length)} Rounds
                   </span>
                 )}
@@ -2952,16 +2968,16 @@ export default function Tournament({
         activeSubGroupTab === "Knockout" && (
           <div>
             {knockoutLoading ? (
-              <div className="text-center py-12 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+              <div className="text-center py-12 bg-white/[0.04] rounded-xl border border-dashed border-white/[0.06]">
                 <div className="inline-block w-8 h-8 border-3 border-orange-500 border-t-transparent rounded-full animate-spin mb-3" />
-                <h3 className="text-base font-bold text-gray-700 mb-1">Loading bracket…</h3>
-                <p className="text-sm text-gray-500">Fetching the latest knockout matches.</p>
+                <h3 className="text-base font-bold text-gray-300 mb-1">Loading bracket…</h3>
+                <p className="text-sm text-gray-400">Fetching the latest knockout matches.</p>
               </div>
             ) : Object.keys(knockoutMatchesByRound).length === 0 ? (
-              <div className="text-center py-12 bg-gray-50 rounded-xl border border-dashed border-gray-200">
-                <FiFlag size={40} className="mx-auto text-gray-300 mb-3" />
-                <h3 className="text-base font-bold text-gray-700 mb-1">No knockout matches yet</h3>
-                <p className="text-sm text-gray-500 max-w-md mx-auto">
+              <div className="text-center py-12 bg-white/[0.04] rounded-xl border border-dashed border-white/[0.06]">
+                <FiFlag size={40} className="mx-auto text-gray-600 mb-3" />
+                <h3 className="text-base font-bold text-gray-300 mb-1">No knockout matches yet</h3>
+                <p className="text-sm text-gray-400 max-w-md mx-auto">
                   Generate knockout matches from the <strong>Super Players</strong> section to see brackets here.
                 </p>
               </div>
@@ -2975,13 +2991,13 @@ export default function Tournament({
                 {/* Summary header */}
                 <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
                   <div>
-                    <h3 className="text-base font-bold text-gray-900">Knockout Bracket</h3>
-                    <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
+                    <h3 className="text-base font-bold text-white">Knockout Bracket</h3>
+                    <div className="flex items-center gap-2 mt-1 text-xs text-gray-400">
                       <span>{totalCount} matches</span>
-                      <span className="text-gray-300">·</span>
+                      <span className="text-gray-600">·</span>
                       <span>{roundCount} rounds</span>
-                      <span className="text-gray-300">·</span>
-                      <span className="text-emerald-600 font-semibold">{completedCount}/{totalCount} completed</span>
+                      <span className="text-gray-600">·</span>
+                      <span className="text-emerald-400 font-semibold">{completedCount}/{totalCount} completed</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -2997,7 +3013,7 @@ export default function Tournament({
                           onClick={() =>
                             openBulkScoreModal(pending, null, `Bulk Score Upload — Knockout (${pending.length} match${pending.length === 1 ? "" : "es"})`)
                           }
-                          className="px-3 py-2 rounded-lg text-xs font-semibold text-white bg-emerald-500 hover:bg-emerald-600 flex items-center gap-1.5 w-auto"
+                          className="px-3 py-2 rounded-lg text-xs font-semibold text-white bg-emerald-500/100 hover:bg-emerald-600 flex items-center gap-1.5 w-auto"
                         >
                           <FiUpload size={13} />
                           Bulk Upload
@@ -3038,7 +3054,7 @@ export default function Tournament({
                           })
                           .catch((err) => toast.error(err.response?.data?.message || "Failed to delete knockout matches"));
                       }}
-                      className="px-3 py-2 rounded-lg text-xs font-semibold text-red-600 bg-red-50 border border-red-200 hover:bg-red-100 flex items-center gap-1.5 w-auto"
+                      className="px-3 py-2 rounded-lg text-xs font-semibold text-red-400 bg-red-500/10 border border-red-500/30 hover:bg-red-500/15 flex items-center gap-1.5 w-auto"
                     >
                       <FiTrash2 size={13} />
                       Delete All
@@ -3069,15 +3085,15 @@ export default function Tournament({
                   const COL_GAP = 40;  // horizontal gap between rounds
 
                   return (
-                    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                      <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                    <div className="bg-[#181A22] rounded-xl border border-white/[0.06] overflow-hidden">
+                      <div className="px-4 py-3 border-b border-white/[0.05] flex items-center justify-between">
                         <div>
-                          <h4 className="text-sm font-bold text-gray-900">Bracket</h4>
-                          <p className="text-[11px] text-gray-500 mt-0.5">Scroll horizontally to see all rounds</p>
+                          <h4 className="text-sm font-bold text-white">Bracket</h4>
+                          <p className="text-[11px] text-gray-400 mt-0.5">Scroll horizontally to see all rounds</p>
                         </div>
                       </div>
 
-                      <div className="overflow-x-auto p-6 bg-gray-50 overflow-y-scroll max-h-screen">
+                      <div className="overflow-x-auto p-6 bg-white/[0.04] overflow-y-scroll max-h-screen">
                         <div className="flex" style={{ gap: COL_GAP }}>
                           {entries.map(([roundName, matches], roundIdx) => {
                             const pow = Math.pow(2, roundIdx);
@@ -3093,10 +3109,10 @@ export default function Tournament({
                               <div key={roundName} className="flex-shrink-0" style={{ width: CARD_W }}>
                                 {/* Column header */}
                                 <div className="text-center mb-4">
-                                  <div className="text-[11px] font-extrabold text-orange-600 uppercase tracking-wider">
+                                  <div className="text-[11px] font-extrabold text-orange-400 uppercase tracking-wider">
                                     {roundTitle}
                                   </div>
-                                  <div className="text-[10px] text-gray-500 mt-0.5 font-semibold">
+                                  <div className="text-[10px] text-gray-400 mt-0.5 font-semibold">
                                     {rDone}/{rTotal} done
                                   </div>
                                 </div>
@@ -3126,42 +3142,42 @@ export default function Tournament({
                                       <div
                                         key={match._id}
                                         onClick={() => openModal(match)}
-                                        className={`relative bg-white rounded-lg border cursor-pointer hover:shadow-md transition-all ${
-                                          isCompleted ? "border-emerald-200" : isInProgress ? "border-amber-200" : "border-gray-200"
+                                        className={`relative bg-[#181A22] rounded-lg border cursor-pointer hover:shadow-md transition-all ${
+                                          isCompleted ? "border-emerald-500/30" : isInProgress ? "border-amber-500/30" : "border-white/[0.06]"
                                         }`}
                                         style={{ height: CARD_H, marginTop }}
                                       >
                                         {/* Round badge on top */}
                                         <div className="absolute -top-2 left-2 flex items-center gap-1">
-                                          <span className="text-[9px] font-bold text-white bg-orange-500 px-1.5 py-0.5 rounded">
+                                          <span className="text-[9px] font-bold text-white bg-orange-500/100 px-1.5 py-0.5 rounded">
                                             M{match.matchNumber}
                                           </span>
                                           {isInProgress && (
-                                            <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-white bg-amber-500 px-1.5 py-0.5 rounded">
-                                              <span className="w-1 h-1 rounded-full bg-white animate-pulse" />LIVE
+                                            <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-white bg-amber-500/100 px-1.5 py-0.5 rounded">
+                                              <span className="w-1 h-1 rounded-full bg-[#181A22] animate-pulse" />LIVE
                                             </span>
                                           )}
                                         </div>
 
                                         {/* Player 1 row */}
-                                        <div className={`flex items-center justify-between px-3 h-[38px] border-b border-gray-100 ${
-                                          p1Won ? "bg-emerald-50" : ""
+                                        <div className={`flex items-center justify-between px-3 h-[38px] border-b border-white/[0.05] ${
+                                          p1Won ? "bg-emerald-500/10" : ""
                                         }`}>
-                                          <span className={`text-xs font-semibold truncate pr-2 ${p1Won ? "text-emerald-700" : "text-gray-800"}`}>
+                                          <span className={`text-xs font-semibold truncate pr-2 ${p1Won ? "text-emerald-300" : "text-gray-100"}`}>
                                             {p1Name}
                                           </span>
-                                          <span className={`text-sm font-bold flex-shrink-0 ${p1Won ? "text-emerald-600" : "text-gray-400"}`}>
+                                          <span className={`text-sm font-bold flex-shrink-0 ${p1Won ? "text-emerald-400" : "text-gray-500"}`}>
                                             {isCompleted && p1Sets != null ? p1Sets : (isInProgress ? liveP1 : '—')}
                                           </span>
                                         </div>
                                         {/* Player 2 row */}
                                         <div className={`flex items-center justify-between px-3 h-[38px] ${
-                                          p2Won ? "bg-emerald-50" : ""
+                                          p2Won ? "bg-emerald-500/10" : ""
                                         }`}>
-                                          <span className={`text-xs font-semibold truncate pr-2 ${p2Won ? "text-emerald-700" : "text-gray-800"}`}>
+                                          <span className={`text-xs font-semibold truncate pr-2 ${p2Won ? "text-emerald-300" : "text-gray-100"}`}>
                                             {p2Name}
                                           </span>
-                                          <span className={`text-sm font-bold flex-shrink-0 ${p2Won ? "text-emerald-600" : "text-gray-400"}`}>
+                                          <span className={`text-sm font-bold flex-shrink-0 ${p2Won ? "text-emerald-400" : "text-gray-500"}`}>
                                             {isCompleted && p2Sets != null ? p2Sets : (isInProgress ? liveP2 : '—')}
                                           </span>
                                         </div>
@@ -3171,12 +3187,12 @@ export default function Tournament({
                                           <>
                                             {/* Horizontal stub: card right edge -> mid-gutter */}
                                             <div
-                                              className="absolute bg-gray-300"
+                                              className="absolute bg-white/[0.10]"
                                               style={{ top: '50%', right: -COL_GAP / 2, width: COL_GAP / 2, height: 1 }}
                                             />
                                             {/* Vertical line from this card's midpoint toward the pair's midpoint */}
                                             <div
-                                              className="absolute bg-gray-300"
+                                              className="absolute bg-white/[0.10]"
                                               style={{
                                                 right: -COL_GAP / 2 - 1,
                                                 width: 1,
@@ -3188,7 +3204,7 @@ export default function Tournament({
                                             {/* Horizontal stub from gutter midpoint into next column (draw once per pair) */}
                                             {mIdx % 2 === 1 && (
                                               <div
-                                                className="absolute bg-gray-300"
+                                                className="absolute bg-white/[0.10]"
                                                 style={{
                                                   top: `-${(CARD_H + BASE_GAP) * pow / 2 - CARD_H / 2}px`,
                                                   right: -COL_GAP,
@@ -3211,7 +3227,7 @@ export default function Tournament({
                           {champion && (
                             <div className="flex-shrink-0 flex flex-col items-center" style={{ width: CARD_W }}>
                               <div className="text-center mb-4">
-                                <div className="text-[11px] font-extrabold text-yellow-600 uppercase tracking-wider">
+                                <div className="text-[11px] font-extrabold text-amber-400 uppercase tracking-wider">
                                   Champion
                                 </div>
                               </div>
@@ -3222,12 +3238,12 @@ export default function Tournament({
                                 <div className="w-14 h-14 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center text-white shadow-md mb-2">
                                   <FaMedal size={24} />
                                 </div>
-                                <div className="bg-white rounded-lg border-2 border-yellow-300 px-4 py-2 text-center shadow-sm">
-                                  <div className="text-sm font-extrabold text-gray-900">{champion}</div>
+                                <div className="bg-[#181A22] rounded-lg border-2 border-yellow-500/40 px-4 py-2 text-center shadow-sm">
+                                  <div className="text-sm font-extrabold text-white">{champion}</div>
                                 </div>
                                 <button
                                   onClick={() => navigate(`/tournament-management/group-stage/${tournamentId}/leaderboard`)}
-                                  className="mt-3 px-3 py-1.5 rounded-lg text-[11px] font-bold text-white bg-orange-500 hover:bg-orange-600 w-auto"
+                                  className="mt-3 px-3 py-1.5 rounded-lg text-[11px] font-bold text-white bg-orange-500/100 hover:bg-orange-600 w-auto"
                                 >
                                   Final Rankings
                                 </button>
@@ -3247,19 +3263,19 @@ export default function Tournament({
                           if (!isLatestRound || !allCompleted) return null;
                           if (lastMatches.length >= 2) {
                             return (
-                              <div className="mt-4 flex items-center justify-between p-4 bg-white border border-orange-200 rounded-xl">
+                              <div className="mt-4 flex items-center justify-between p-4 bg-[#181A22] border border-orange-500/30 rounded-xl">
                                 <div className="flex items-center gap-3">
-                                  <div className="w-9 h-9 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center">
+                                  <div className="w-9 h-9 rounded-lg bg-orange-500/15 text-orange-400 flex items-center justify-center">
                                     <FiFlag size={16} />
                                   </div>
                                   <div>
-                                    <p className="text-sm font-bold text-gray-900">Round complete</p>
-                                    <p className="text-xs text-gray-500">{lastMatches.length} winners ready for the next stage</p>
+                                    <p className="text-sm font-bold text-white">Round complete</p>
+                                    <p className="text-xs text-gray-400">{lastMatches.length} winners ready for the next stage</p>
                                   </div>
                                 </div>
                                 <button
                                   onClick={() => handleInitiateNextRound(lastMatches)}
-                                  className="px-4 py-2 rounded-lg text-sm font-bold text-white bg-orange-500 hover:bg-orange-600 flex items-center gap-1.5 w-auto"
+                                  className="px-4 py-2 rounded-lg text-sm font-bold text-white bg-orange-500/100 hover:bg-orange-600 flex items-center gap-1.5 w-auto"
                                 >
                                   <FiPlus size={14} />
                                   Generate Next Round
@@ -3284,7 +3300,7 @@ export default function Tournament({
       {
         isModalOpen && (
           <div className="fixed inset-0 flex items-center justify-center bg-gray-900 bg-opacity-50">
-            <div className="bg-white w-96 p-6 rounded-xl shadow-lg">
+            <div className="bg-[#181A22] w-96 p-6 rounded-xl shadow-lg">
               <div className="flex justify-between items-center">
                 <h3 className="text-lg font-semibold">Match Settings</h3>
                 <FiX
@@ -3304,7 +3320,7 @@ export default function Tournament({
                   />
                 ) : (
                   <>
-                    <label className="block text-sm font-medium text-gray-700">
+                    <label className="block text-sm font-medium text-gray-300">
                       Court Number
                     </label>
                     <input
@@ -3318,7 +3334,7 @@ export default function Tournament({
 
                 <div className="grid grid-cols-2 gap-3 mt-3">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">
+                    <label className="block text-sm font-medium text-gray-300">
                       Slot Duration (mins)
                     </label>
                     <input
@@ -3331,7 +3347,7 @@ export default function Tournament({
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">
+                    <label className="block text-sm font-medium text-gray-300">
                       Match Duration (mins)
                     </label>
                     <input
@@ -3344,14 +3360,14 @@ export default function Tournament({
                     />
                   </div>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-gray-400 mt-1">
                   Gap between matches:{" "}
-                  <span className="font-semibold text-gray-700">
+                  <span className="font-semibold text-gray-300">
                     {Math.max(0, slotDurationMinutes - matchDurationMinutes)} mins
                   </span>
                 </p>
 
-                <label className="block text-sm font-medium text-gray-700 mt-3">
+                <label className="block text-sm font-medium text-gray-300 mt-3">
                   Match Start Time
                 </label>
                 <input
@@ -3363,7 +3379,7 @@ export default function Tournament({
               </div>
 
               <button
-                className="mt-4 w-full bg-orange-500 text-white py-2 rounded-full text-sm font-medium"
+                className="mt-4 w-full bg-orange-500/100 text-white py-2 rounded-full text-sm font-medium"
                 onClick={() => {
                   // Check which tab is active to determine which generation function to use
                   if (activeSubGroupTab === "Top Players") {
@@ -3384,39 +3400,39 @@ export default function Tournament({
       {
         isDirectKnockoutScheduleModalOpen && (
           <div className="fixed inset-0 flex items-center justify-center bg-gray-900 bg-opacity-50 z-50">
-            <div className="bg-white w-full max-w-2xl p-6 rounded-xl shadow-lg mx-4">
+            <div className="bg-[#181A22] w-full max-w-2xl p-6 rounded-xl shadow-lg mx-4">
               <div className="flex justify-between items-center mb-6">
                 <div>
-                  <h3 className="text-xl font-bold text-gray-800">Create Direct Knockout Tournament</h3>
-                  <p className="text-sm text-gray-600 mt-1">
+                  <h3 className="text-xl font-bold text-gray-100">Create Direct Knockout Tournament</h3>
+                  <p className="text-sm text-gray-300 mt-1">
                     Schedule matches for {selectedPlayersForKnockout.length} players • {Math.log2(selectedPlayersForKnockout.length)} rounds
                   </p>
                 </div>
                 <FiX
-                  className="cursor-pointer text-gray-500 hover:text-gray-700 text-xl"
+                  className="cursor-pointer text-gray-400 hover:text-gray-300 text-xl"
                   onClick={() => setIsDirectKnockoutScheduleModalOpen(false)}
                 />
               </div>
 
               <div className="space-y-6">
                 {/* Tournament Overview */}
-                <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-200">
-                  <h4 className="font-semibold text-emerald-800 mb-2">Tournament Overview</h4>
+                <div className="bg-emerald-500/10 p-4 rounded-lg border border-emerald-500/30">
+                  <h4 className="font-semibold text-emerald-300 mb-2">Tournament Overview</h4>
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
-                      <span className="text-gray-600">Players:</span>
+                      <span className="text-gray-300">Players:</span>
                       <span className="font-medium ml-2">{selectedPlayersForKnockout.length}</span>
                     </div>
                     <div>
-                      <span className="text-gray-600">Rounds:</span>
+                      <span className="text-gray-300">Rounds:</span>
                       <span className="font-medium ml-2">{Math.log2(selectedPlayersForKnockout.length)}</span>
                     </div>
                     <div>
-                      <span className="text-gray-600">Total Matches:</span>
+                      <span className="text-gray-300">Total Matches:</span>
                       <span className="font-medium ml-2">{selectedPlayersForKnockout.length - 1}</span>
                     </div>
                     <div>
-                      <span className="text-gray-600">Estimated Duration:</span>
+                      <span className="text-gray-300">Estimated Duration:</span>
                       <span className="font-medium ml-2">
                         {((selectedPlayersForKnockout.length - 1) * (directKnockoutSchedule.slotDurationMinutes || 30) / 60).toFixed(1)} hours
                       </span>
@@ -3429,12 +3445,12 @@ export default function Tournament({
                   {/* Court & Date */}
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
                         Court Number <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="text"
-                        className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                        className="w-full border border-white/[0.08] rounded-lg p-3 focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                         placeholder="e.g., Court 1, Main Court"
                         value={directKnockoutSchedule.courtNumber}
                         onChange={(e) => setDirectKnockoutSchedule(prev => ({
@@ -3445,12 +3461,12 @@ export default function Tournament({
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
                         Start Date <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="date"
-                        className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                        className="w-full border border-white/[0.08] rounded-lg p-3 focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                         value={directKnockoutSchedule.startDate}
                         onChange={(e) => setDirectKnockoutSchedule(prev => ({
                           ...prev,
@@ -3463,12 +3479,12 @@ export default function Tournament({
                   {/* Time & Intervals */}
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
                         Start Time <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="time"
-                        className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                        className="w-full border border-white/[0.08] rounded-lg p-3 focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                         value={directKnockoutSchedule.startTime}
                         onChange={(e) => setDirectKnockoutSchedule(prev => ({
                           ...prev,
@@ -3505,11 +3521,11 @@ export default function Tournament({
 
                 {/* Match Duration Setting */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
                     Estimated Match Duration (minutes)
                   </label>
                   <select
-                    className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                    className="w-full border border-white/[0.08] rounded-lg p-3 focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                     value={directKnockoutSchedule.estimatedDuration}
                     onChange={(e) => setDirectKnockoutSchedule(prev => ({
                       ...prev,
@@ -3522,18 +3538,18 @@ export default function Tournament({
                     <option value={75}>75 minutes</option>
                     <option value={90}>90 minutes</option>
                   </select>
-                  <p className="text-xs text-gray-500 mt-1">Expected duration for each match</p>
+                  <p className="text-xs text-gray-400 mt-1">Expected duration for each match</p>
                 </div>
 
                 {/* Selected Players Preview */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
                     Selected Players ({selectedPlayersForKnockout.length})
                   </label>
-                  <div className="max-h-32 overflow-y-auto bg-gray-50 rounded-lg p-3 border">
+                  <div className="max-h-32 overflow-y-auto bg-white/[0.04] rounded-lg p-3 border">
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                       {selectedPlayersForKnockout.map((player, index) => (
-                        <div key={player.playerId} className="text-sm text-gray-700 truncate">
+                        <div key={player.playerId} className="text-sm text-gray-300 truncate">
                           {index + 1}. {player.userName}
                         </div>
                       ))}
@@ -3545,7 +3561,7 @@ export default function Tournament({
               {/* Action Buttons */}
               <div className="flex justify-end space-x-3 mt-8 pt-6 border-t">
                 <button
-                  className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition"
+                  className="px-6 py-2 border border-white/[0.08] rounded-lg text-gray-300 font-medium hover:bg-white/[0.04] transition"
                   onClick={() => setIsDirectKnockoutScheduleModalOpen(false)}
                   disabled={isCreatingKnockout}
                 >
@@ -3553,8 +3569,8 @@ export default function Tournament({
                 </button>
                 <button
                   className={`px-6 py-2 rounded-lg font-medium transition flex items-center gap-2 ${isCreatingKnockout || !directKnockoutSchedule.courtNumber || !directKnockoutSchedule.startDate || !directKnockoutSchedule.startTime
-                    ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                    : "bg-emerald-500 text-white hover:bg-emerald-600"
+                    ? "bg-white/[0.10] text-gray-400 cursor-not-allowed"
+                    : "bg-emerald-500/100 text-white hover:bg-emerald-600"
                     }`}
                   onClick={handleCreateDirectKnockoutTournament}
                   disabled={isCreatingKnockout || !directKnockoutSchedule.courtNumber || !directKnockoutSchedule.startDate || !directKnockoutSchedule.startTime}
@@ -3599,17 +3615,17 @@ export default function Tournament({
             winnerName === p2Name
           );
           const statusChip = isComp ? (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-700">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-300">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/100" />
               COMPLETED
             </span>
           ) : isLive ? (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-100 text-amber-700">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-500/15 text-amber-300">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500/100 animate-pulse" />
               LIVE
             </span>
           ) : (
-            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-gray-100 text-gray-600">
+            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-white/[0.06] text-gray-300">
               SCHEDULED
             </span>
           );
@@ -3618,22 +3634,22 @@ export default function Tournament({
             : m.roundName || m.tournamentId?.type || m.tournament?.type || 'Group Stage';
 
           const renderPlayerCard = (name, img, won, accent) => (
-            <div className={`flex-1 rounded-xl p-4 border ${won ? "bg-emerald-50 border-emerald-200" : "bg-gray-50 border-gray-200"}`}>
+            <div className={`flex-1 rounded-xl p-4 border ${won ? "bg-emerald-500/10 border-emerald-500/30" : "bg-white/[0.04] border-white/[0.06]"}`}>
               <div className="flex items-center gap-3">
                 {img ? (
-                  <img src={`/uploads/profiles/${img}`} alt={name}
+                  <img src={assetUrl(img)} alt={name}
                     className="w-14 h-14 rounded-full object-cover flex-shrink-0" />
                 ) : (
-                  <div className={`w-14 h-14 rounded-full flex items-center justify-center text-white text-xl font-bold flex-shrink-0 ${won ? "bg-emerald-500" : accent === "p1" ? "bg-orange-400" : "bg-blue-400"}`}>
+                  <div className={`w-14 h-14 rounded-full flex items-center justify-center text-white text-xl font-bold flex-shrink-0 ${won ? "bg-emerald-500/100" : accent === "p1" ? "bg-orange-400" : "bg-blue-400"}`}>
                     {name?.charAt(0)?.toUpperCase() || '?'}
                   </div>
                 )}
                 <div className="min-w-0 flex-1">
-                  <h3 className={`font-bold text-base truncate ${won ? "text-emerald-700" : "text-gray-800"}`}>
+                  <h3 className={`font-bold text-base truncate ${won ? "text-emerald-300" : "text-gray-100"}`}>
                     {name}
                   </h3>
                   {won && (
-                    <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full bg-emerald-500 text-white text-[10px] font-bold">
+                    <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full bg-emerald-500/100 text-white text-[10px] font-bold">
                       <FaMedal className="text-yellow-300" size={10} /> WINNER
                     </span>
                   )}
@@ -3648,13 +3664,13 @@ export default function Tournament({
             onClick={closeModal}
           >
             <div
-              className="bg-white rounded-2xl shadow-2xl w-full max-w-[880px] max-h-[90vh] overflow-hidden flex flex-col relative"
+              className="bg-[#181A22] rounded-2xl shadow-2xl w-full max-w-[880px] max-h-[90vh] overflow-hidden flex flex-col relative"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header */}
-              <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+              <div className="px-6 py-4 border-b border-white/[0.05] flex items-center justify-between">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-bold text-orange-600 bg-orange-50 px-2.5 py-1 rounded">
+                  <span className="text-sm font-bold text-orange-400 bg-orange-500/10 px-2.5 py-1 rounded">
                     Match {m.matchNumber}
                   </span>
                   {[3, 5, 7].includes(m.matchFormat?.totalSets) && (
@@ -3680,14 +3696,14 @@ export default function Tournament({
                       });
                     }}
                   />
-                  <span className="text-xs text-gray-500">
+                  <span className="text-xs text-gray-400">
                     {formatDate(m.startTime || m.matchStartTime)} · {MatchformatTime(m.startTime || m.matchStartTime)}
                     {m.matchEndTime && MatchformatTime(m.matchEndTime) && ` → ${MatchformatTime(m.matchEndTime)}`}
                   </span>
                   {statusChip}
                 </div>
                 <button
-                  className="p-2 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 bg-transparent w-auto"
+                  className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/[0.06] bg-transparent w-auto"
                   onClick={closeModal}
                   aria-label="Close"
                 >
@@ -3702,31 +3718,31 @@ export default function Tournament({
                   <div className="flex-shrink-0 flex flex-col items-center justify-center px-2">
                     {(isComp || isLive) ? (
                       <div className="flex items-center gap-2">
-                        <span className={`text-4xl font-extrabold ${p1Won ? "text-emerald-600" : "text-gray-400"}`}>{p1Sets}</span>
-                        <span className="text-2xl text-gray-300">–</span>
-                        <span className={`text-4xl font-extrabold ${p2Won ? "text-emerald-600" : "text-gray-400"}`}>{p2Sets}</span>
+                        <span className={`text-4xl font-extrabold ${p1Won ? "text-emerald-400" : "text-gray-500"}`}>{p1Sets}</span>
+                        <span className="text-2xl text-gray-600">–</span>
+                        <span className={`text-4xl font-extrabold ${p2Won ? "text-emerald-400" : "text-gray-500"}`}>{p2Sets}</span>
                       </div>
                     ) : (
-                      <span className="text-xl font-bold text-gray-400">VS</span>
+                      <span className="text-xl font-bold text-gray-500">VS</span>
                     )}
-                    <span className="text-[10px] text-gray-400 font-bold mt-1 uppercase tracking-wider">Sets</span>
+                    <span className="text-[10px] text-gray-500 font-bold mt-1 uppercase tracking-wider">Sets</span>
                   </div>
                   {renderPlayerCard(p2Name, p2Img, p2Won, "p2")}
                 </div>
 
                 {/* Meta strip */}
-                <div className="bg-gray-50 rounded-xl px-4 py-3 grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
+                <div className="bg-white/[0.04] rounded-xl px-4 py-3 grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
                   <div>
-                    <p className="text-[11px] text-gray-500 uppercase font-bold tracking-wider">Tournament</p>
-                    <p className="font-semibold text-gray-800 truncate">{m.tournamentId?.title || m.tournament?.title || '—'}</p>
+                    <p className="text-[11px] text-gray-400 uppercase font-bold tracking-wider">Tournament</p>
+                    <p className="font-semibold text-gray-100 truncate">{m.tournamentId?.title || m.tournament?.title || '—'}</p>
                   </div>
                   <div>
-                    <p className="text-[11px] text-gray-500 uppercase font-bold tracking-wider">Round</p>
-                    <p className="font-semibold text-gray-800 truncate">{roundLabel}</p>
+                    <p className="text-[11px] text-gray-400 uppercase font-bold tracking-wider">Round</p>
+                    <p className="font-semibold text-gray-100 truncate">{roundLabel}</p>
                   </div>
                   <div>
-                    <p className="text-[11px] text-gray-500 uppercase font-bold tracking-wider">Type</p>
-                    <p className="font-semibold text-gray-800 truncate">
+                    <p className="text-[11px] text-gray-400 uppercase font-bold tracking-wider">Type</p>
+                    <p className="font-semibold text-gray-100 truncate">
                       {m.nextMatchId ? 'Knockout' : (activeSubGroupTab || 'League')}
                     </p>
                   </div>
@@ -3734,27 +3750,27 @@ export default function Tournament({
 
                 {/* Live points (in-progress only) */}
                 {isLive && (m.liveScore || m.liveMatchData?.liveScore) && (
-                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4">
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                        <span className="font-bold text-amber-700 text-sm">LIVE POINTS</span>
+                        <span className="w-2 h-2 rounded-full bg-amber-500/100 animate-pulse" />
+                        <span className="font-bold text-amber-300 text-sm">LIVE POINTS</span>
                       </div>
-                      <span className="text-xs text-amber-600">
+                      <span className="text-xs text-amber-400">
                         Set {m.currentSet || m.liveMatchData?.currentSet || 1} · Game {m.currentGame || m.liveMatchData?.currentGame || 1}
                       </span>
                     </div>
                     <div className="flex items-center justify-around">
                       <div className="text-center">
-                        <p className="text-xs text-gray-600 mb-1">{p1Name}</p>
-                        <p className="text-3xl font-extrabold text-gray-900">
+                        <p className="text-xs text-gray-300 mb-1">{p1Name}</p>
+                        <p className="text-3xl font-extrabold text-white">
                           {m.liveScore?.player1Points ?? m.liveMatchData?.liveScore?.player1Points ?? 0}
                         </p>
                       </div>
-                      <span className="text-xl text-gray-400">–</span>
+                      <span className="text-xl text-gray-500">–</span>
                       <div className="text-center">
-                        <p className="text-xs text-gray-600 mb-1">{p2Name}</p>
-                        <p className="text-3xl font-extrabold text-gray-900">
+                        <p className="text-xs text-gray-300 mb-1">{p2Name}</p>
+                        <p className="text-3xl font-extrabold text-white">
                           {m.liveScore?.player2Points ?? m.liveMatchData?.liveScore?.player2Points ?? 0}
                         </p>
                       </div>
@@ -3764,14 +3780,14 @@ export default function Tournament({
 
                 {/* Set-by-set breakdown */}
                 {(m.sets || m.liveMatchData?.sets) && (m.sets?.length > 0 || m.liveMatchData?.sets?.length > 0) && (
-                  <div className="border border-gray-200 rounded-xl overflow-hidden">
-                    <div className="bg-gray-50 px-4 py-2.5 border-b border-gray-200 flex items-center justify-between">
-                      <h4 className="text-sm font-bold text-gray-700">Set-by-Set Breakdown</h4>
-                      <span className="text-[10px] text-gray-500 uppercase tracking-wider font-bold">
+                  <div className="border border-white/[0.06] rounded-xl overflow-hidden">
+                    <div className="bg-white/[0.04] px-4 py-2.5 border-b border-white/[0.06] flex items-center justify-between">
+                      <h4 className="text-sm font-bold text-gray-300">Set-by-Set Breakdown</h4>
+                      <span className="text-[10px] text-gray-400 uppercase tracking-wider font-bold">
                         {(m.sets || m.liveMatchData?.sets || []).length} set{(m.sets || m.liveMatchData?.sets || []).length !== 1 ? 's' : ''}
                       </span>
                     </div>
-                    <div className="divide-y divide-gray-100">
+                    <div className="divide-y divide-white/[0.05]">
                       {(m.sets || m.liveMatchData?.sets || []).map((set, idx) => {
                         const setDone = set.status === 'COMPLETED';
                         const setWinnerName = set.winner?.playerName || set.winner?.userName;
@@ -3781,17 +3797,17 @@ export default function Tournament({
                         return (
                           <div key={idx} className="px-4 py-3">
                             <div className="flex items-center justify-between mb-2">
-                              <span className="text-sm font-bold text-gray-700">Set {set.setNumber || idx + 1}</span>
+                              <span className="text-sm font-bold text-gray-300">Set {set.setNumber || idx + 1}</span>
                               {setDone ? (
-                                <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">COMPLETED</span>
+                                <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">COMPLETED</span>
                               ) : (
-                                <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded">IN PROGRESS</span>
+                                <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded">IN PROGRESS</span>
                               )}
                             </div>
 
                             {games.length > 0 ? (
                               <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-                                <div className={`text-sm font-semibold truncate ${setWonByP1 ? "text-emerald-700" : "text-gray-700"}`}>{p1Name}</div>
+                                <div className={`text-sm font-semibold truncate ${setWonByP1 ? "text-emerald-300" : "text-gray-300"}`}>{p1Name}</div>
                                 <div className="flex items-center gap-1.5 flex-wrap justify-center">
                                   {games.map((game, gi) => {
                                     const p1s = game.finalScore?.player1 ?? 0;
@@ -3799,17 +3815,17 @@ export default function Tournament({
                                     const gameDone = game.status === 'COMPLETED';
                                     return (
                                       <span key={gi}
-                                        className={`text-xs font-bold px-2 py-1 rounded font-mono ${gameDone ? "bg-gray-100 text-gray-800" : "bg-amber-50 text-amber-700 border border-amber-200"}`}
+                                        className={`text-xs font-bold px-2 py-1 rounded font-mono ${gameDone ? "bg-white/[0.06] text-gray-100" : "bg-amber-500/10 text-amber-300 border border-amber-500/30"}`}
                                         title={`Game ${game.gameNumber || gi + 1}`}>
                                         {p1s}–{p2s}
                                       </span>
                                     );
                                   })}
                                 </div>
-                                <div className={`text-sm font-semibold truncate text-right ${setWonByP2 ? "text-emerald-700" : "text-gray-700"}`}>{p2Name}</div>
+                                <div className={`text-sm font-semibold truncate text-right ${setWonByP2 ? "text-emerald-300" : "text-gray-300"}`}>{p2Name}</div>
                               </div>
                             ) : (
-                              <p className="text-xs text-gray-400 italic">Set not started yet</p>
+                              <p className="text-xs text-gray-500 italic">Set not started yet</p>
                             )}
                           </div>
                         );
@@ -3820,15 +3836,15 @@ export default function Tournament({
 
                 {/* Legacy fallback for older records */}
                 {!m.sets && !m.liveMatchData?.sets && m.hasScores && m.currentScore && (
-                  <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
-                    <h4 className="text-sm font-bold text-gray-700 mb-2">Score</h4>
-                    <div className="space-y-1 text-sm text-gray-700 font-mono">
+                  <div className="bg-white/[0.04] border border-white/[0.06] rounded-xl p-4">
+                    <h4 className="text-sm font-bold text-gray-300 mb-2">Score</h4>
+                    <div className="space-y-1 text-sm text-gray-300 font-mono">
                       {['setOne', 'setTwo', 'setThree'].map((k, i) => {
                         const val = m.currentScore[k];
                         if (!val) return null;
                         const label = `Set ${i + 1}`;
                         const text = Array.isArray(val) ? `${val[0]}–${val[1]}` : val;
-                        return <div key={k}><span className="text-gray-500 mr-2">{label}:</span>{text}</div>;
+                        return <div key={k}><span className="text-gray-400 mr-2">{label}:</span>{text}</div>;
                       })}
                     </div>
                   </div>
@@ -3836,17 +3852,17 @@ export default function Tournament({
               </div>
 
               {/* Footer */}
-              <div className="px-6 py-3 border-t border-gray-100 flex items-center justify-end gap-2">
+              <div className="px-6 py-3 border-t border-white/[0.05] flex items-center justify-end gap-2">
                 <button
                   onClick={closeModal}
-                  className="px-4 py-2 rounded-lg text-sm font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 w-auto"
+                  className="px-4 py-2 rounded-lg text-sm font-semibold text-gray-300 bg-white/[0.06] hover:bg-white/[0.08] w-auto"
                 >
                   Close
                 </button>
                 {!isComp && (
                   <button
                     onClick={handleStartMatch}
-                    className="px-5 py-2 rounded-lg text-sm font-semibold text-white bg-orange-500 hover:bg-orange-600 w-auto"
+                    className="px-5 py-2 rounded-lg text-sm font-semibold text-white bg-orange-500/100 hover:bg-orange-600 w-auto"
                   >
                     {isLive ||
                       (m.liveScore && (m.liveScore.player1Points > 0 || m.liveScore.player2Points > 0)) ||
@@ -3866,7 +3882,7 @@ export default function Tournament({
       {
         isEditGroupModalOpen && currentEditGroup && (
           <div className="fixed inset-0 bg-gradient-to-br from-black/60 via-black/50 to-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-4 overflow-y-auto animate-fadeIn">
-            <div className="bg-white rounded-3xl shadow-2xl w-[80%] mt-[90px] transform transition-all duration-300 animate-slideUp">
+            <div className="bg-[#181A22] rounded-3xl shadow-2xl w-[80%] mt-[90px] transform transition-all duration-300 animate-slideUp">
               {/* 🎯 PREMIUM HEADER with Gradient */}
               <div className="relative bg-gradient-to-r from-orange-500 via-emerald-600 to-rose-600 rounded-t-3xl p-6 overflow-hidden">
                 {/* Animated Background Pattern */}
@@ -3922,8 +3938,8 @@ export default function Tournament({
 
                     {/* Group Name Input */}
                     <div className="group">
-                      <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 bg-orange-500 rounded-full"></span>
+                      <label className="block text-sm font-semibold text-gray-300 mb-2 flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 bg-orange-500/100 rounded-full"></span>
                         Group Name
                       </label>
                       <div className="relative">
@@ -3936,10 +3952,10 @@ export default function Tournament({
                               groupName: e.target.value
                             }));
                           }}
-                          className="w-full p-4 pr-12 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-orange-100 focus:border-orange-500 transition-all duration-200 text-gray-800 font-medium placeholder-gray-400 hover:border-gray-300"
+                          className="w-full p-4 pr-12 border-2 border-white/[0.06] rounded-xl focus:ring-4 focus:ring-orange-100 focus:border-orange-500 transition-all duration-200 text-gray-100 font-medium placeholder-gray-400 hover:border-white/[0.08]"
                           placeholder="Enter group name (e.g., Group A)"
                         />
-                        <div className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500">
                           <FiEdit2 size={18} />
                         </div>
                       </div>
@@ -3947,8 +3963,8 @@ export default function Tournament({
 
                     {/* Category Input */}
                     <div className="group">
-                      <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
+                      <label className="block text-sm font-semibold text-gray-300 mb-2 flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 bg-emerald-500/100 rounded-full"></span>
                         Category
                       </label>
                       <div className="relative">
@@ -3961,10 +3977,10 @@ export default function Tournament({
                               category: e.target.value
                             }));
                           }}
-                          className="w-full p-4 pr-12 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 transition-all duration-200 text-gray-800 font-medium placeholder-gray-400 hover:border-gray-300"
+                          className="w-full p-4 pr-12 border-2 border-white/[0.06] rounded-xl focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 transition-all duration-200 text-gray-100 font-medium placeholder-gray-400 hover:border-white/[0.08]"
                           placeholder="Enter category (e.g., Open, Men's Singles)"
                         />
-                        <div className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500">
                           <FiFlag size={18} />
                         </div>
                       </div>
@@ -3972,9 +3988,9 @@ export default function Tournament({
 
                     {/* Players List */}
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-3 flex items-center justify-between">
+                      <label className="block text-sm font-semibold text-gray-300 mb-3 flex items-center justify-between">
                         <span className="flex items-center gap-2">
-                          <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
+                          <span className="w-1.5 h-1.5 bg-green-500/100 rounded-full"></span>
                           Players
                         </span>
                         <span className="px-3 py-1 bg-gradient-to-r from-orange-500 to-emerald-500 text-white text-xs font-bold rounded-full shadow-md">
@@ -3982,13 +3998,13 @@ export default function Tournament({
                         </span>
                       </label>
 
-                      <div className="max-h-96 overflow-y-auto border-2 border-gray-200 rounded-xl p-4 bg-gradient-to-br from-gray-50 to-orange-50/30 custom-scrollbar">
+                      <div className="max-h-96 overflow-y-auto border-2 border-white/[0.06] rounded-xl p-4 bg-gradient-to-br from-gray-50 to-orange-500/10/30 custom-scrollbar">
                         {currentEditGroup.players && currentEditGroup.players.length > 0 ? (
                           <ul className="space-y-3">
                             {currentEditGroup.players.map((player, index) => (
                               <li
                                 key={player._id || index}
-                                className="group bg-white p-4 rounded-xl border-2 border-gray-100 hover:border-orange-300 hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5"
+                                className="group bg-[#181A22] p-4 rounded-xl border-2 border-white/[0.05] hover:border-orange-500/40 hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5"
                               >
                                 <div className="flex justify-between items-center">
                                   <div className="flex items-center gap-3 flex-1">
@@ -3997,15 +4013,15 @@ export default function Tournament({
                                       <div className="w-11 h-11 rounded-full bg-gradient-to-br from-orange-500 to-emerald-600 flex items-center justify-center font-bold text-white text-base shadow-lg ring-2 ring-white">
                                         {(player.userId?.name || player.userName || `P${index + 1}`).charAt(0).toUpperCase()}
                                       </div>
-                                      <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white"></div>
+                                      <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500/100 rounded-full border-2 border-white"></div>
                                     </div>
 
                                     {/* Player Info */}
                                     <div className="flex-1">
-                                      <span className="font-semibold text-gray-800 block">
+                                      <span className="font-semibold text-gray-100 block">
                                         {player.userId?.name || player.userName || `Player ${index + 1}`}
                                       </span>
-                                      <span className="text-xs text-gray-500">Player #{index + 1}</span>
+                                      <span className="text-xs text-gray-400">Player #{index + 1}</span>
                                     </div>
                                   </div>
 
@@ -4022,7 +4038,7 @@ export default function Tournament({
                                           setDestinationGroupId(availableGroups[0]._id);
                                         }
                                       }}
-                                      className="p-2.5 text-orange-500 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-all duration-200 transform hover:scale-110"
+                                      className="p-2.5 text-orange-500 hover:text-orange-400 hover:bg-orange-500/10 rounded-lg transition-all duration-200 transform hover:scale-110"
                                       title="Move player to another group"
                                     >
                                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -4038,7 +4054,7 @@ export default function Tournament({
                                           players: prev.players.filter((_, i) => i !== index)
                                         }));
                                       }}
-                                      className="p-2.5 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-all duration-200 transform hover:scale-110"
+                                      className="p-2.5 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-all duration-200 transform hover:scale-110"
                                       title="Remove player from group"
                                     >
                                       <FiX size={18} />
@@ -4050,11 +4066,11 @@ export default function Tournament({
                           </ul>
                         ) : (
                           <div className="text-center py-12">
-                            <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                              <FiEdit2 className="text-gray-400 text-2xl" />
+                            <div className="w-20 h-20 bg-white/[0.06] rounded-full flex items-center justify-center mx-auto mb-4">
+                              <FiEdit2 className="text-gray-500 text-2xl" />
                             </div>
-                            <p className="text-gray-500 font-medium">No players in this group</p>
-                            <p className="text-gray-400 text-sm mt-1">Add players to get started</p>
+                            <p className="text-gray-400 font-medium">No players in this group</p>
+                            <p className="text-gray-500 text-sm mt-1">Add players to get started</p>
                           </div>
                         )}
                       </div>
@@ -4077,17 +4093,17 @@ export default function Tournament({
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {/* Tournament Default Info */}
                       {tournament && tournament.setFormat && (
-                        <div className="relative overflow-hidden bg-gradient-to-br from-orange-50 to-orange-50 border-2 border-orange-200 rounded-xl p-4 shadow-sm">
-                          <div className="absolute top-0 right-0 w-24 h-24 bg-orange-200/30 rounded-full -mr-12 -mt-12"></div>
+                        <div className="relative overflow-hidden bg-gradient-to-br from-orange-500/10 to-orange-500/10 border-2 border-orange-500/30 rounded-xl p-4 shadow-sm">
+                          <div className="absolute top-0 right-0 w-24 h-24 bg-orange-500/20/30 rounded-full -mr-12 -mt-12"></div>
                           <div className="relative">
                             <div className="flex items-center gap-2 mb-2">
-                              <div className="w-7 h-7 bg-orange-500 rounded-lg flex items-center justify-center">
+                              <div className="w-7 h-7 bg-orange-500/100 rounded-lg flex items-center justify-center">
                                 <FiFlag className="text-white text-xs" />
                               </div>
-                              <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Tournament Default</h4>
+                              <h4 className="text-xs font-bold text-white uppercase tracking-wider">Tournament Default</h4>
                             </div>
                             <div className="flex items-center gap-2">
-                              <span className="px-3 py-1.5 bg-white rounded-lg shadow-sm font-bold text-orange-600 text-base">
+                              <span className="px-3 py-1.5 bg-[#181A22] rounded-lg shadow-sm font-bold text-orange-400 text-base">
                                 {tournament.setFormat === 'bestOf3' && 'Best of 3 Sets'}
                                 {tournament.setFormat === 'bestOf5' && 'Best of 5 Sets'}
                                 {tournament.setFormat === 'bestOf7' && 'Best of 7 Sets'}
@@ -4098,20 +4114,20 @@ export default function Tournament({
                       )}
 
                       {/* Current Configuration Display */}
-                      <div className="bg-gradient-to-br from-orange-50 via-amber-50 to-amber-50 border-2 border-emerald-200 rounded-xl p-4 shadow-sm">
-                        <h4 className="text-xs font-bold text-emerald-900 uppercase tracking-wider mb-2 flex items-center gap-2">
-                          <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                      <div className="bg-gradient-to-br from-orange-500/10 via-amber-500/10 to-amber-500/10 border-2 border-emerald-500/30 rounded-xl p-4 shadow-sm">
+                        <h4 className="text-xs font-bold text-emerald-300 uppercase tracking-wider mb-2 flex items-center gap-2">
+                          <span className="w-2 h-2 bg-emerald-500/100 rounded-full animate-pulse"></span>
                           Current Configuration
                         </h4>
                         <div className="grid grid-cols-2 gap-2">
-                          <div className="bg-white rounded-lg p-2 text-center shadow-sm border border-emerald-100">
+                          <div className="bg-[#181A22] rounded-lg p-2 text-center shadow-sm border border-emerald-500/20">
                             <div className="text-orange-500 font-bold text-[10px] uppercase">Sets</div>
-                            <div className="text-gray-900 text-xl font-black leading-tight">{groupMatchFormat.totalSets || 5}</div>
+                            <div className="text-white text-xl font-black leading-tight">{groupMatchFormat.totalSets || 5}</div>
                             <div className="text-[9px] font-medium text-orange-500">First to {Math.ceil((groupMatchFormat.totalSets || 5) / 2)}</div>
                           </div>
-                          <div className="bg-white rounded-lg p-2 text-center shadow-sm border border-green-100">
-                            <div className="text-green-600 font-bold text-[10px] uppercase">Games</div>
-                            <div className="text-green-900 text-xl font-black leading-tight">{groupMatchFormat.totalGames || 5}</div>
+                          <div className="bg-[#181A22] rounded-lg p-2 text-center shadow-sm border border-green-500/20">
+                            <div className="text-green-400 font-bold text-[10px] uppercase">Games</div>
+                            <div className="text-green-300 text-xl font-black leading-tight">{groupMatchFormat.totalGames || 5}</div>
                             <div className="text-[9px] font-medium text-green-500">First to {Math.ceil((groupMatchFormat.totalGames || 5) / 2)}</div>
                           </div>
                         </div>
@@ -4121,9 +4137,9 @@ export default function Tournament({
                     {/* Sets & Games side-by-side */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {/* Sets Configuration */}
-                      <div className="bg-gradient-to-br from-orange-50 to-cyan-50 rounded-xl p-4 border-2 border-orange-100">
-                        <label className="block text-xs font-bold text-gray-800 mb-3 flex items-center gap-2 uppercase tracking-wider">
-                          <span className="w-1.5 h-1.5 bg-orange-500 rounded-full"></span>
+                      <div className="bg-gradient-to-br from-orange-500/10 to-cyan-50 rounded-xl p-4 border-2 border-orange-500/20">
+                        <label className="block text-xs font-bold text-gray-100 mb-3 flex items-center gap-2 uppercase tracking-wider">
+                          <span className="w-1.5 h-1.5 bg-orange-500/100 rounded-full"></span>
                           Sets per Match
                         </label>
                         <div className="grid grid-cols-3 gap-2">
@@ -4137,7 +4153,7 @@ export default function Tournament({
                               }))}
                               className={`group relative p-2.5 rounded-lg border-2 transition-all duration-200 transform hover:scale-105 ${groupMatchFormat.totalSets === sets
                                 ? 'border-orange-500 bg-gradient-to-br from-orange-500 to-orange-500 text-white shadow-md'
-                                : 'border-gray-200 bg-white text-gray-700 hover:border-orange-300'
+                                : 'border-white/[0.06] bg-[#181A22] text-gray-300 hover:border-orange-500/40'
                                 }`}
                             >
                               <div className="text-center">
@@ -4152,9 +4168,9 @@ export default function Tournament({
                       </div>
 
                       {/* Games Configuration */}
-                      <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-4 border-2 border-green-100">
-                        <label className="block text-xs font-bold text-gray-800 mb-3 flex items-center gap-2 uppercase tracking-wider">
-                          <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
+                      <div className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 rounded-xl p-4 border-2 border-green-500/20">
+                        <label className="block text-xs font-bold text-gray-100 mb-3 flex items-center gap-2 uppercase tracking-wider">
+                          <span className="w-1.5 h-1.5 bg-green-500/100 rounded-full"></span>
                           Games per Set
                         </label>
                         <div className="grid grid-cols-3 gap-2">
@@ -4168,11 +4184,11 @@ export default function Tournament({
                               }))}
                               className={`group relative p-2.5 rounded-lg border-2 transition-all duration-200 transform hover:scale-105 ${groupMatchFormat.totalGames === games
                                 ? 'border-green-500 bg-gradient-to-br from-green-500 to-emerald-600 text-white shadow-md'
-                                : 'border-gray-200 bg-white text-gray-700 hover:border-green-300'
+                                : 'border-white/[0.06] bg-[#181A22] text-gray-300 hover:border-green-500/40'
                                 }`}
                             >
                               <div className="text-center">
-                                <div className={`text-xl font-black leading-tight ${groupMatchFormat.totalGames === games ? 'text-white' : 'text-green-600'}`}>
+                                <div className={`text-xl font-black leading-tight ${groupMatchFormat.totalGames === games ? 'text-white' : 'text-green-400'}`}>
                                   {games}
                                 </div>
                                 <div className="text-[10px] font-bold opacity-80">{games} Games</div>
@@ -4184,33 +4200,33 @@ export default function Tournament({
                     </div>
 
                     {/* Live Preview - More Compact */}
-                    <div className="relative overflow-hidden bg-gradient-to-br from-emerald-100 via-rose-100 to-orange-100 border-2 border-emerald-300 rounded-xl p-4 shadow-lg">
+                    <div className="relative overflow-hidden bg-gradient-to-br from-emerald-500/15 via-rose-500/15 to-orange-500/15 border-2 border-emerald-500/40 rounded-xl p-4 shadow-lg">
                       <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-300/30 rounded-full -mr-16 -mt-16"></div>
                       <div className="relative flex items-center justify-between gap-4">
                         <div>
-                          <h4 className="text-xs font-bold text-gray-800 flex items-center gap-2 uppercase tracking-wider">
+                          <h4 className="text-xs font-bold text-gray-100 flex items-center gap-2 uppercase tracking-wider">
                             <span className="text-base">📊</span>
                             <span>Live Preview</span>
                           </h4>
                         </div>
-                        <div className="flex-1 bg-white/80 backdrop-blur-sm rounded-xl px-4 py-2 shadow-sm border border-emerald-200">
+                        <div className="flex-1 bg-white/80 backdrop-blur-sm rounded-xl px-4 py-2 shadow-sm border border-emerald-500/30">
                           <div className="flex items-center justify-center gap-6">
-                            <div className="text-xl font-black text-gray-900">
+                            <div className="text-xl font-black text-white">
                               <span className="text-orange-500">{groupMatchFormat.totalSets || 5}</span>
-                              <span className="text-gray-400 mx-1">sets</span>
-                              <span className="text-gray-400">×</span>
-                              <span className="text-green-600 ml-1">{groupMatchFormat.totalGames || 5}</span>
-                              <span className="text-gray-400 ml-1">games</span>
+                              <span className="text-gray-500 mx-1">sets</span>
+                              <span className="text-gray-500">×</span>
+                              <span className="text-green-400 ml-1">{groupMatchFormat.totalGames || 5}</span>
+                              <span className="text-gray-500 ml-1">games</span>
                             </div>
-                            <div className="h-8 w-px bg-gray-200"></div>
+                            <div className="h-8 w-px bg-white/[0.08]"></div>
                             <div className="flex gap-2">
                               <div className="flex flex-col">
-                                <span className="text-[9px] text-gray-500 font-bold uppercase">To Win Match</span>
-                                <span className="text-xs font-black text-orange-600">{Math.ceil((groupMatchFormat.totalSets || 5) / 2)} Sets</span>
+                                <span className="text-[9px] text-gray-400 font-bold uppercase">To Win Match</span>
+                                <span className="text-xs font-black text-orange-400">{Math.ceil((groupMatchFormat.totalSets || 5) / 2)} Sets</span>
                               </div>
                               <div className="flex flex-col">
-                                <span className="text-[9px] text-gray-500 font-bold uppercase">To Win Set</span>
-                                <span className="text-xs font-black text-green-700">{Math.ceil((groupMatchFormat.totalGames || 5) / 2)} Games</span>
+                                <span className="text-[9px] text-gray-400 font-bold uppercase">To Win Set</span>
+                                <span className="text-xs font-black text-green-300">{Math.ceil((groupMatchFormat.totalGames || 5) / 2)} Games</span>
                               </div>
                             </div>
                           </div>
@@ -4222,10 +4238,10 @@ export default function Tournament({
               </div>
 
               {/* 🚀 ACTION BUTTONS - Premium Footer */}
-              <div className="bg-gradient-to-r from-gray-50 to-orange-50/30 border-t-2 border-gray-200 rounded-b-3xl p-6">
+              <div className="bg-gradient-to-r from-gray-50 to-orange-500/10/30 border-t-2 border-white/[0.06] rounded-b-3xl p-6">
                 <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
+                  <div className="flex items-center gap-2 text-sm text-gray-300">
+                    <div className="w-2 h-2 bg-orange-500/100 rounded-full animate-pulse"></div>
                     <span className="font-medium">Note:</span>
                     <span>Match format changes apply to future matches</span>
                   </div>
@@ -4236,7 +4252,7 @@ export default function Tournament({
                         setIsEditGroupModalOpen(false);
                         setCurrentEditGroup(null);
                       }}
-                      className="px-8 py-3 border-2 border-gray-300 rounded-xl hover:bg-gray-100 hover:border-gray-400 font-semibold text-gray-700 transition-all duration-200 transform hover:scale-105"
+                      className="px-8 py-3 border-2 border-white/[0.08] rounded-xl hover:bg-white/[0.06] hover:border-white/[0.10] font-semibold text-gray-300 transition-all duration-200 transform hover:scale-105"
                     >
                       Cancel
                     </button>
@@ -4253,7 +4269,7 @@ export default function Tournament({
                       }}
                       disabled={isUpdatingFormat}
                       className={`px-8 py-3 rounded-xl text-white font-bold transition-all duration-300 transform hover:scale-105 flex items-center gap-2 ${isUpdatingFormat
-                        ? 'bg-gray-400 cursor-not-allowed'
+                        ? 'bg-white/[0.12] cursor-not-allowed'
                         : 'bg-gradient-to-r from-orange-500 via-emerald-600 to-rose-600 hover:from-gray-700 hover:via-emerald-700 hover:to-pink-700 shadow-xl hover:shadow-2xl'
                         }`}
                     >
@@ -4285,11 +4301,11 @@ export default function Tournament({
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
 
             {/* Modal */}
-            <div className="relative w-full max-w-md rounded-2xl bg-white shadow-2xl animate-[scaleIn_0.2s_ease-out]">
+            <div className="relative w-full max-w-md rounded-2xl bg-[#181A22] shadow-2xl animate-[scaleIn_0.2s_ease-out]">
 
               {/* Header */}
               <div className="flex items-center justify-between px-6 py-4 border-b">
-                <h2 className="text-lg font-semibold text-gray-900">
+                <h2 className="text-lg font-semibold text-white">
                   Move Player
                 </h2>
                 <button
@@ -4297,7 +4313,7 @@ export default function Tournament({
                     setSelectedPlayerForMovement(null);
                     setDestinationGroupId('');
                   }}
-                  className="p-2 rounded-full hover:bg-gray-100 text-gray-500"
+                  className="p-2 rounded-full hover:bg-white/[0.06] text-gray-400"
                 >
                   <FiX size={18} />
                 </button>
@@ -4305,22 +4321,22 @@ export default function Tournament({
 
               {/* Body */}
               <div className="px-6 py-5 space-y-4">
-                <div className="rounded-lg bg-gray-50 p-3 text-sm text-gray-700">
+                <div className="rounded-lg bg-white/[0.04] p-3 text-sm text-gray-300">
                   Moving player:
-                  <span className="ml-1 font-semibold text-gray-900">
+                  <span className="ml-1 font-semibold text-white">
                     {selectedPlayerForMovement.userId?.name ||
                       selectedPlayerForMovement.userName}
                   </span>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-300 mb-1">
                     Destination Group
                   </label>
                   <select
                     value={destinationGroupId}
                     onChange={(e) => setDestinationGroupId(e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                    className="w-full rounded-lg border border-white/[0.08] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                   >
                     <option value="">Select a group</option>
                     {groupsWithoutMatches
@@ -4342,7 +4358,7 @@ export default function Tournament({
                     setSelectedPlayerForMovement(null);
                     setDestinationGroupId('');
                   }}
-                  className="rounded-lg border px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
+                  className="rounded-lg border px-4 py-2 text-sm font-medium text-gray-300 hover:bg-white/[0.06]"
                 >
                   Cancel
                 </button>
@@ -4442,7 +4458,7 @@ export default function Tournament({
                     }
                   }}
                   disabled={!destinationGroupId}
-                  className="rounded-lg bg-orange-500 px-5 py-2 text-sm font-semibold text-white hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="rounded-lg bg-orange-500/100 px-5 py-2 text-sm font-semibold text-white hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Move Player
                 </button>

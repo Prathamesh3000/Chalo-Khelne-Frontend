@@ -1,6 +1,6 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { AuthContext } from "./context/AuthContext";
-import Login from "./components/Login";
+import Login from "./pages/auth/Login";
 import ManagerApp from "./ManagerApp";
 import PlayerApp from "./PlayerApp";
 import LandingApp from "./LandingApp";
@@ -8,6 +8,8 @@ import ClubAdminApp from "./ClubAdminApp";
 import CorporateApp from "./CorporateApp";
 import SuperAdminapp from "./SuperAdminapp";
 import TrainerApp from "./TrainerApp";
+import VendorApp from "./VendorApp";
+import RegisterTurf from "./pages/RegisterTurf";
 import LAboutus from './Landing-Page/LAboutus';
 import LPrivacyPolicy from './Landing-Page/LPrivacyPolicy';
 import LTermsConditions from './Landing-Page/LTermsConditions';
@@ -23,6 +25,8 @@ const App = () => {
   return (
     <Routes>
       <Route path="/login" element={isAuthenticated ? <Navigate to="/" /> : <Login />} />
+      {/* /register removed — web is admin-only. Players register on mobile;
+          admin roles (ClubAdmin/Manager/Corporate) are created by SuperAdmin. */}
 
       {/* Default route */}
       <Route
@@ -39,6 +43,8 @@ const App = () => {
               <Navigate to="/corporate-dashboard" />
             ) : role === "trainer" ? (
               <Navigate to="/trainer-dashboard" />
+            ) : role === "vendor" ? (
+              <Navigate to="/vendor-dashboard" />
             ) : (
               <Navigate to="/phome" />
             )
@@ -69,6 +75,8 @@ const App = () => {
                 <Navigate to="/corporate-dashboard" />
               ) : role === "trainer" ? (
                 <Navigate to="/trainer-dashboard" />
+              ) : role === "vendor" ? (
+                <Navigate to="/vendor-dashboard" />
               ) : (
                 <Navigate to="/phome" />
               )
@@ -77,6 +85,12 @@ const App = () => {
           )
         }
       />
+
+      {/* Self-serve turf registration — available to any authenticated user
+          (User principals). Matched over the role catch-all below. */}
+      {isAuthenticated && (
+        <Route path="/register-turf" element={<RegisterTurf />} />
+      )}
 
       {/* Authenticated routes */}
       {isAuthenticated && (
@@ -94,6 +108,8 @@ const App = () => {
                 <CorporateApp />
               ) : role === "trainer" ? (
                 <TrainerApp />
+              ) : role === "vendor" ? (
+                <VendorApp />
               ) : (
                 <PlayerApp />
               )

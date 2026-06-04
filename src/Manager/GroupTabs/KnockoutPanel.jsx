@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FiFlag, FiEdit2, FiCheck, FiPlus, FiTable } from "react-icons/fi";
 import { FaMedal } from "react-icons/fa";
+import { assetUrl } from "../../shared/lib/assetUrl";
 import { useGroupTabs } from "./GroupTabsContext";
 import CourtPicker from "../components/CourtPicker";
 
@@ -228,7 +229,7 @@ function PlayerAvatar({ player, isWinner, isCompleted }) {
       <div className="relative">
         {player.playerId?.profileImage ? (
           <img
-            src={`/uploads/profiles/${player.playerId.profileImage}`}
+            src={assetUrl(player.playerId.profileImage)}
             alt={player.playerName}
             className={`w-16 h-16 rounded-full object-cover border-4 ${isWinner ? "border-green-400 shadow-xl" : "border-gray-100"}`}
           />

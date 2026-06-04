@@ -14,6 +14,35 @@ import CourtPoolPreview from "./components/CourtPoolPreview";
 import KnockoutFormatPanel, { hasFormatPanelErrors } from "./components/KnockoutFormatPanel";
 import { buildRequestRounds, isSetBasedSport } from "./utils/knockoutDefaults";
 import { getSportName, getCategories, getCurrentStage } from "../utils/sportTrack";
+import { TabBar, SubTabs, Skeleton } from "../shared/ui";
+import { TournamentShell, Round2Banner } from "../shared/layout";
+
+// currentStage → pipeline-step index. Stages we don't know map to 0 (early).
+const STAGE_TO_STEP_IDX = {
+  registration: 0,
+  group_stage: 1,
+  qualifier_knockout: 3,
+  knockout: 4,
+  completed: 5, // all done
+};
+
+// URL-sync helpers — keep deep links + refresh working. Two query keys:
+//   ?tab=players|groups       — top tab
+//   ?sub=registered|top|super — sub-toggle inside Players
+const TAB_TO_LEGACY = {
+  players: { tab: "Registered Players", sub: "Registered Players" },
+  groups:  { tab: "Groups",              sub: "" },
+};
+const SUB_TO_LEGACY = {
+  registered: "Registered Players",
+  top:        "Top Players",
+  super:      "Super Players",
+};
+const LEGACY_TO_SUB = {
+  "Registered Players": "registered",
+  "Top Players":        "top",
+  "Super Players":      "super",
+};
 
 // Valid knockout bracket sizes (powers of 2, cap at 128).
 const VALID_KO_DRAW_SIZES = [4, 8, 16, 32, 64, 128];
@@ -25,7 +54,7 @@ const defaultDrawFor = (n) => VALID_KO_DRAW_SIZES.find((s) => s >= n) || 128;
 // previous random `pravatar.cc?img=${Math.random()}` which changed on every
 // render and visually thrashed the table.
 const AVATAR_PALETTE = [
-  "bg-orange-500", "bg-emerald-500", "bg-blue-500", "bg-purple-500",
+  "bg-orange-500/100", "bg-emerald-500/100", "bg-blue-500", "bg-purple-500",
   "bg-pink-500", "bg-amber-500", "bg-teal-500", "bg-indigo-500",
 ];
 const _hashName = (s) => {
@@ -46,7 +75,7 @@ function PlayerAvatar({ player, locked = false }) {
       <img
         src={url}
         alt={name}
-        className={`w-9 h-9 rounded-full object-cover ring-1 ring-gray-200 ${opacityClass}`}
+        className={`w-9 h-9 rounded-full object-cover ring-1 ring-white/[0.08] ${opacityClass}`}
       />
     );
   }
@@ -63,8 +92,19 @@ function PlayerAvatar({ player, locked = false }) {
 
 const GroupStageManagement = () => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const tournamentId = searchParams.get('tournamentId');
+
+  // Push the current tab/sub to the URL alongside a state setter. Internal
+  // actions (Direct-Knockout creation, Round-2 init, post-Round-2 redirect)
+  // flip tab state directly; without this helper the URL drifts out of sync
+  // and a refresh would land the manager somewhere unexpected.
+  const syncTabToUrl = (tab, sub) => {
+    const next = new URLSearchParams(searchParams);
+    if (tab) next.set("tab", tab);
+    if (sub) next.set("sub", sub);
+    setSearchParams(next, { replace: true });
+  };
 
   // Tournament and tab states
   const [tournament, setTournament] = useState(null);
@@ -339,21 +379,29 @@ const GroupStageManagement = () => {
       ])
   ];
 
-  // Show error if no tournamentId
-  if (!tournamentId) {
-    return (
-      <div className="p-4 text-center text-red-500">
-        <h2>Error: No Tournament Selected</h2>
-        <p>Please select a tournament to view its details.</p>
-        <button
-          onClick={() => navigate('/mtournament-management')}
-          className="mt-4 bg-orange-500 text-white px-4 py-2 rounded"
-        >
-          Back to Tournament Management
-        </button>
-      </div>
-    );
-  }
+  // NOTE: the "no tournamentId" guard was moved BELOW all hooks (search for
+  // "Early-return guard"). Returning here violated the Rules of Hooks because
+  // many useState/useEffect/useMemo calls are declared further down.
+
+  // URL → legacy tab state. Runs whenever the ?tab/?sub query params change
+  // (which happens on TabBar/SubTabs clicks and on browser navigation). One
+  // direction only — legacy `setSelectedTab(...)` call sites elsewhere don't
+  // push to the URL; they just flip state and the next user click reconciles.
+  useEffect(() => {
+    const t = searchParams.get("tab");
+    const s = searchParams.get("sub");
+    if (t && TAB_TO_LEGACY[t]) {
+      const mapped = TAB_TO_LEGACY[t];
+      setSelectedTab(mapped.tab);
+      // For Players, prefer the explicit ?sub= over the default registered.
+      if (t === "players") {
+        setSelectedSubTab(SUB_TO_LEGACY[s] || mapped.sub);
+      } else {
+        setSelectedSubTab(mapped.sub);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   // Fetch tournament data
   useEffect(() => {
@@ -1144,6 +1192,9 @@ const GroupStageManagement = () => {
         }
       }
     } catch (error) {
+      // Non-critical: Round 2 status may not exist yet (not initialized).
+      // Leave round2Progress as-is; the UI handles a null/empty status.
+      console.warn("[Round2] status fetch failed:", error?.message || error);
     }
   };
 
@@ -1174,6 +1225,25 @@ const GroupStageManagement = () => {
   // Reset Round 2 progress
   const [showResetModal, setShowResetModal] = useState(false);
   const [resetting, setResetting] = useState(false);
+
+  // ── Early-return guard (moved here from above all the hooks) ──
+  // Every hook above this line now runs unconditionally on every render, so the
+  // Rules of Hooks are satisfied. Only after all hooks have been called do we
+  // short-circuit the render when there is no tournament selected.
+  if (!tournamentId) {
+    return (
+      <div className="p-4 text-center text-red-500">
+        <h2>Error: No Tournament Selected</h2>
+        <p>Please select a tournament to view its details.</p>
+        <button
+          onClick={() => navigate('/mtournament-management')}
+          className="mt-4 bg-orange-500/100 text-white px-4 py-2 rounded"
+        >
+          Back to Tournament Management
+        </button>
+      </div>
+    );
+  }
 
   const confirmResetRound2 = async () => {
     setResetting(true);
@@ -1377,6 +1447,7 @@ const GroupStageManagement = () => {
         // the League sub-tab (default) and have to click "Knockout" manually.
         setGroupsDefaultSubTab("Knockout");
         setSelectedTab("Groups");
+        syncTabToUrl("groups");
       } else {
         toast.error("Failed to create knockout matches");
       }
@@ -1419,6 +1490,7 @@ const GroupStageManagement = () => {
           setIsRound2Mode(true);
           setSelectedTab("Registered Players");
           setSelectedSubTab("Registered Players");
+          syncTabToUrl("players", "registered");
         }
       }
     } catch (error) {
@@ -1541,9 +1613,13 @@ const GroupStageManagement = () => {
         setIsRound2Mode(false);
         setRound2Progress({ option: 'group_stage', status: 'groups_created' });
 
-        // Navigate to MGrouptabs after Round 2 groups are created
+        // Navigate to MGrouptabs after Round 2 groups are created.
+        // `setActiveTab` was a typo for `setSelectedTab` — there is no
+        // `activeTab` state in this file. The original call would have thrown
+        // "setActiveTab is not a function" had the user reached this branch.
         setTimeout(() => {
-          setActiveTab("Groups"); // Switch to Groups tab to see the Round 2 groups
+          setSelectedTab("Groups");
+          syncTabToUrl("groups");
         }, 2000);
       } else {
         setSelectedPlayers([]); // Clear selection for Round 1
@@ -1578,22 +1654,22 @@ const GroupStageManagement = () => {
 
   const positionMedalColor = (n) =>
     n === 1 ? 'text-yellow-500' :
-    n === 2 ? 'text-gray-400' :
-    n === 3 ? 'text-orange-700' :
-    'text-gray-400';
+    n === 2 ? 'text-gray-500' :
+    n === 3 ? 'text-orange-300' :
+    'text-gray-500';
 
   // Stable, lightweight initials avatar — no more random pravatar URLs that
   // re-shuffle on every render. Tone is derived from a hash of the player ID
   // so each player keeps a consistent color across renders.
   const AVATAR_TONES = [
-    'bg-blue-100 text-blue-700',
-    'bg-rose-100 text-rose-700',
-    'bg-emerald-100 text-emerald-700',
-    'bg-amber-100 text-amber-700',
-    'bg-purple-100 text-purple-700',
+    'bg-blue-500/15 text-blue-300',
+    'bg-rose-500/15 text-rose-300',
+    'bg-emerald-500/15 text-emerald-300',
+    'bg-amber-500/15 text-amber-300',
+    'bg-purple-500/15 text-purple-300',
     'bg-cyan-100 text-cyan-700',
-    'bg-orange-100 text-orange-700',
-    'bg-teal-100 text-teal-700',
+    'bg-orange-500/15 text-orange-300',
+    'bg-teal-500/15 text-teal-300',
   ];
   const avatarTone = (id) => {
     const s = String(id || '');
@@ -1612,13 +1688,13 @@ const GroupStageManagement = () => {
   // Pick a rank-badge style based on position / seeded state.
   const rankBadgeFor = (player) => {
     const isSeeded = player.isSeeded || String(player.groupId || '').startsWith('seeded');
-    if (isSeeded) return { label: 'S', cls: 'bg-orange-100 text-orange-700 ring-orange-200' };
+    if (isSeeded) return { label: 'S', cls: 'bg-orange-500/15 text-orange-300 ring-orange-200' };
     const r = player.position;
-    if (r === 1) return { label: '1', cls: 'bg-yellow-100 text-yellow-800 ring-yellow-300' };
-    if (r === 2) return { label: '2', cls: 'bg-gray-200 text-gray-700 ring-gray-300' };
-    if (r === 3) return { label: '3', cls: 'bg-orange-200 text-orange-900 ring-orange-300' };
-    if (r) return { label: String(r), cls: 'bg-gray-100 text-gray-600 ring-gray-200' };
-    return { label: '–', cls: 'bg-gray-100 text-gray-400 ring-gray-200' };
+    if (r === 1) return { label: '1', cls: 'bg-amber-500/15 text-amber-300 ring-yellow-300' };
+    if (r === 2) return { label: '2', cls: 'bg-white/[0.08] text-gray-300 ring-white/[0.10]' };
+    if (r === 3) return { label: '3', cls: 'bg-orange-500/20 text-orange-300 ring-orange-300' };
+    if (r) return { label: String(r), cls: 'bg-white/[0.06] text-gray-300 ring-white/[0.08]' };
+    return { label: '–', cls: 'bg-white/[0.06] text-gray-500 ring-white/[0.08]' };
   };
 
   const renderTopPlayerRow = (player, idx) => {
@@ -1630,7 +1706,7 @@ const GroupStageManagement = () => {
     return (
       <div
         key={player._id || `${player.playerId || ''}-${idx}`}
-        className={`flex items-center gap-3 px-4 py-3 transition-colors ${skipping ? 'bg-yellow-50/40 hover:bg-yellow-50/70' : 'hover:bg-gray-50'}`}
+        className={`flex items-center gap-3 px-4 py-3 transition-colors ${skipping ? 'bg-amber-500/10/40 hover:bg-amber-500/10/70' : 'hover:bg-white/5'}`}
       >
         {/* Rank badge */}
         <div className={`w-8 h-8 rounded-full ring-2 flex items-center justify-center text-sm font-bold flex-shrink-0 ${badge.cls}`}>
@@ -1643,34 +1719,34 @@ const GroupStageManagement = () => {
         {/* Name + skip badge + meta line */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-semibold text-gray-900 truncate">
+            <span className="font-semibold text-white truncate">
               {player.playerName || player.userName || 'Unknown Player'}
             </span>
             {skipping && (
-              <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold bg-yellow-100 text-yellow-800 px-1.5 py-0.5 rounded">
+              <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold bg-amber-500/15 text-amber-300 px-1.5 py-0.5 rounded">
                 <FaStar className="w-2.5 h-2.5" /> Skip R2
               </span>
             )}
           </div>
-          <div className="text-xs text-gray-500 truncate">
-            <span className={isSeeded ? 'text-orange-600 font-medium' : ''}>
+          <div className="text-xs text-gray-400 truncate">
+            <span className={isSeeded ? 'text-orange-400 font-medium' : ''}>
               {isSeeded ? 'Seeded' : (player.groupName || '—')}
             </span>
-            <span className="text-gray-300 mx-1.5">·</span>
+            <span className="text-gray-600 mx-1.5">·</span>
             <span>{player.category || 'Open'}</span>
           </div>
         </div>
         {/* Points */}
-        <div className="text-sm font-bold text-gray-700 tabular-nums whitespace-nowrap">
+        <div className="text-sm font-bold text-gray-300 tabular-nums whitespace-nowrap">
           {player.points ?? 0}
-          <span className="text-gray-400 font-normal text-xs ml-1">pts</span>
+          <span className="text-gray-500 font-normal text-xs ml-1">pts</span>
         </div>
         {/* Star action */}
         <button
           onClick={() => showSkipR2Confirmation(player)}
           className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors flex-shrink-0 ${skipping
-            ? 'text-yellow-500 bg-yellow-50 hover:bg-yellow-100'
-            : 'text-gray-400 hover:text-yellow-500 hover:bg-yellow-50'
+            ? 'text-yellow-500 bg-amber-500/10 hover:bg-amber-500/15'
+            : 'text-gray-500 hover:text-yellow-500 hover:bg-amber-500/10'
             }`}
           title={skipping
             ? 'Un-seed — player will play Round 2'
@@ -1690,19 +1766,19 @@ const GroupStageManagement = () => {
   const renderSectionHeader = (icon, title, subtitle, players, accent) => {
     const skips = skipR2InSection(players);
     return (
-      <div className={`flex items-center justify-between px-4 py-2.5 border-t border-b border-gray-200 first:border-t-0 ${accent?.bg || 'bg-gray-50'}`}>
+      <div className={`flex items-center justify-between px-4 py-2.5 border-t border-b border-white/[0.06] first:border-t-0 ${accent?.bg || 'bg-gray-50'}`}>
         <div className="flex items-center gap-2 min-w-0">
           {icon}
-          <h4 className={`font-bold text-sm ${accent?.text || 'text-gray-800'} truncate`}>{title}</h4>
-          {subtitle && <span className="text-[11px] text-gray-500 hidden sm:inline">· {subtitle}</span>}
+          <h4 className={`font-bold text-sm ${accent?.text || 'text-gray-100'} truncate`}>{title}</h4>
+          {subtitle && <span className="text-[11px] text-gray-400 hidden sm:inline">· {subtitle}</span>}
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           {skips > 0 && (
-            <span className="text-[10px] font-bold bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full flex items-center gap-1 uppercase tracking-wider">
+            <span className="text-[10px] font-bold bg-amber-500/15 text-amber-300 px-2 py-0.5 rounded-full flex items-center gap-1 uppercase tracking-wider">
               <FaStar className="w-2.5 h-2.5" /> {skips} skip R2
             </span>
           )}
-          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${accent?.count || 'bg-white text-gray-700 ring-1 ring-gray-200'}`}>
+          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${accent?.count || 'bg-[#181A22] text-gray-300 ring-1 ring-white/[0.08]'}`}>
             {players.length}
           </span>
         </div>
@@ -1718,7 +1794,7 @@ const GroupStageManagement = () => {
         `Position ${rank}`,
         players
       )}
-      <div className="divide-y divide-gray-100">
+      <div className="divide-y divide-white/[0.05]">
         {players.map(renderTopPlayerRow)}
       </div>
     </div>
@@ -1731,9 +1807,9 @@ const GroupStageManagement = () => {
         'Seeded Players',
         'Did not play group stage',
         players,
-        { bg: 'bg-orange-50', text: 'text-orange-900', count: 'bg-orange-200 text-orange-900' }
+        { bg: 'bg-orange-500/10', text: 'text-orange-300', count: 'bg-orange-500/20 text-orange-300' }
       )}
-      <div className="divide-y divide-gray-100">
+      <div className="divide-y divide-white/[0.05]">
         {players.map(renderTopPlayerRow)}
       </div>
     </div>
@@ -1742,43 +1818,119 @@ const GroupStageManagement = () => {
   const renderUnrankedSection = (players) => (
     <div key="unranked">
       {renderSectionHeader(
-        <FiInfo className="text-yellow-600 w-4 h-4" />,
+        <FiInfo className="text-amber-400 w-4 h-4" />,
         'Unranked',
         'Standings not yet computed',
         players,
-        { bg: 'bg-yellow-50', text: 'text-yellow-900', count: 'bg-yellow-200 text-yellow-900' }
+        { bg: 'bg-amber-500/10', text: 'text-amber-300', count: 'bg-amber-500/20 text-amber-300' }
       )}
-      <div className="divide-y divide-gray-100">
+      <div className="divide-y divide-white/[0.05]">
         {players.map(renderTopPlayerRow)}
       </div>
     </div>
   );
 
-  return (
-    <div className="p-4 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => navigate('/mtournament-management')}
-            className="p-2 rounded-xl hover:bg-gray-100 transition w-auto"
-          >
-            <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
-          </button>
-          <div>
-            <h1 className="text-xl font-bold text-gray-900">{tournament?.title || "Tournament Management"}</h1>
-            <p className="text-xs text-gray-400 mt-0.5">Group Stage · {getSportName(tournament, activeSportId) || "Sport"}</p>
-          </div>
-        </div>
-      </div>
+  // Compute shell props — tournament header, pipeline steps, breadcrumbs.
+  // Done above the early-return so the loading skeleton can render the same
+  // shell chrome. currentStage is per-sport — read via getCurrentStage,
+  // not a local variable.
+  const _currentStage = getCurrentStage(tournament, activeSportId);
 
+  // Pipeline active step follows the user's current TAB (what they're looking
+  // at), not the tournament's overall stage. Falls back to currentStage when
+  // we can't infer a step from the tab — e.g. on initial load.
+  let _activeStepIdx;
+  if (selectedTab === "Groups") {
+    _activeStepIdx = 2; // "groups"
+  } else if (isRound2Mode) {
+    _activeStepIdx = 3; // "qualifiers"
+  } else if (selectedSubTab === "Super Players") {
+    _activeStepIdx = 4; // "knockout"
+  } else if (selectedSubTab === "Top Players") {
+    _activeStepIdx = 1; // "players"
+  } else {
+    // Registered Players sub — default to "players" if the tournament has
+    // moved past registration, otherwise step 0.
+    _activeStepIdx = (STAGE_TO_STEP_IDX[_currentStage] ?? 0) >= 1 ? 1 : 0;
+  }
+  const _steps = [
+    { key: "registrations", label: "Registrations", sublabel: `${registeredPlayers.length} players` },
+    { key: "players",       label: "Players",       sublabel: topPlayers.length ? `${topPlayers.length} promoted` : "Pending" },
+    { key: "groups",        label: "Groups",        sublabel: "—" },
+    { key: "qualifiers",    label: "Qualifiers",    sublabel: isRound2Mode ? "In progress" : "—" },
+    { key: "knockout",      label: "Knockout",      sublabel: superPlayers.length ? `${superPlayers.length} ready` : "Not started" },
+  ];
+  const _shellTournament = tournament ? {
+    title: tournament.title,
+    sportName: getSportName(tournament, activeSportId),
+    currentStage: _currentStage,
+  } : null;
+  const _currentTabLabel = selectedTab === "Groups" ? "Groups" : (isRound2Mode ? "Round 2 Selection" : "Players");
+  const _breadcrumbs = [
+    { label: "Tournaments", to: "/mtournament-management" },
+    { label: tournament?.title || "Tournament", to: `/tournament-management/group-stage?tournamentId=${tournamentId}` },
+    { label: _currentTabLabel },
+  ];
+
+  // Initial-load skeleton — render inside the same shell chrome so the topbar
+  // and sidebar stay anchored while the tournament data resolves.
+  if (!tournament && tournamentId) {
+    return (
+      <TournamentShell
+        tournament={null}
+        steps={[]}
+        breadcrumbs={[{ label: "Tournaments", to: "/mtournament-management" }, { label: "Loading…" }]}
+      >
+        <Skeleton className="h-6 w-64 mb-2" />
+        <Skeleton className="h-3 w-32 mb-5" />
+        <Skeleton className="h-20 rounded-lg mb-5" />
+        <Skeleton className="h-8 w-64 mb-4" />
+        <Skeleton className="h-[420px] rounded-lg" />
+      </TournamentShell>
+    );
+  }
+
+  return (
+    <TournamentShell
+      tournament={_shellTournament}
+      steps={_steps}
+      activeStep={_steps[_activeStepIdx]?.key}
+      breadcrumbs={_breadcrumbs}
+      activeTabKey={`${selectedTab}|${selectedSubTab}`}
+      banner={isRound2Mode ? <Round2Banner onCancel={() => setIsRound2Mode(false)} /> : null}
+      tabBar={(
+        <TabBar
+          urlKey="tab"
+          defaultKey="players"
+          tabs={[
+            {
+              key: "players",
+              label: isRound2Mode ? "Round 2 Selection" : "Players",
+              count: registeredPlayers.length || undefined,
+            },
+            { key: "groups", label: "Groups" },
+          ]}
+        />
+      )}
+      subTabBar={selectedTab === "Registered Players" ? (
+        <SubTabs
+          urlKey="sub"
+          defaultKey="registered"
+          tabs={[
+            { key: "registered", label: isRound2Mode ? "Round 2 Selection" : "Registered" },
+            { key: "top",        label: "Top players" },
+            { key: "super",      label: "Super players", hidden: isRound2Mode },
+          ]}
+        />
+      ) : null}
+    >
       {/* STEP 11b — Sport switcher (multi-sport tournaments only). Hidden
           for single-sport / legacy tournaments. Pills are disabled while a
           Round 2 reset is in flight to prevent mid-reset sport switching
           from targeting the wrong sport's data (approval note #2). */}
       {Array.isArray(tournament?.sports) && tournament.sports.length > 1 && (
-        <div className="bg-gray-50 rounded-2xl border border-gray-200 p-3 flex items-center gap-2 overflow-x-auto">
-          <span className="text-[11px] uppercase tracking-wider font-bold text-gray-500 mr-2 whitespace-nowrap flex-shrink-0">
+        <div className="bg-white/[0.04] rounded-2xl border border-white/[0.06] p-3 flex items-center gap-2 overflow-x-auto">
+          <span className="text-[11px] uppercase tracking-wider font-bold text-gray-400 mr-2 whitespace-nowrap flex-shrink-0">
             Sport
           </span>
           {tournament.sports.map((s) => {
@@ -1790,8 +1942,8 @@ const GroupStageManagement = () => {
                 disabled={resetting}
                 className={`px-4 py-2 rounded-xl text-sm font-bold transition-all whitespace-nowrap flex-shrink-0 ${
                   isActive
-                    ? "bg-emerald-500 text-white shadow-sm shadow-emerald-200"
-                    : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-100"
+                    ? "bg-emerald-500/100 text-white shadow-sm shadow-emerald-200"
+                    : "bg-[#181A22] text-gray-300 border border-white/[0.06] hover:bg-white/[0.06]"
                 } ${resetting ? "opacity-50 cursor-not-allowed" : ""}`}
                 title={resetting ? "Reset in progress — please wait" : undefined}
               >
@@ -1800,50 +1952,20 @@ const GroupStageManagement = () => {
             );
           })}
           {resetting && (
-            <span className="text-[11px] text-gray-500 italic ml-2 flex-shrink-0">
+            <span className="text-[11px] text-gray-400 italic ml-2 flex-shrink-0">
               Resetting…
             </span>
           )}
         </div>
       )}
 
-      {/* Navigation Tabs */}
-      <div className="bg-white shadow-sm rounded-2xl border border-gray-100 p-4">
-        <div className="flex flex-wrap gap-2 mb-5">
-          {[
-            // Label flips to "Round 2 Selection" while isRound2Mode is on so
-            // the manager understands they're picking from Top Players, not
-            // raw registered players.
-            { key: "Players", tab: "Registered Players", sub: "Registered Players", label: isRound2Mode ? "Round 2 Selection" : "All Players" },
-            { key: "Top", tab: "Registered Players", sub: "Top Players", label: "Stage 2" },
-            // Super Players tab is only meaningful AFTER Round 2 winners are
-            // determined — hide it during Round 2 setup to avoid confusion.
-            ...(isRound2Mode ? [] : [{ key: "Super", tab: "Registered Players", sub: "Super Players", label: "Super Players" }]),
-            { key: "Groups", tab: "Groups", sub: "", label: "Groups" },
-          ].map((item) => {
-            const isActive = (selectedTab === item.tab && selectedSubTab === item.sub) || (item.tab === "Groups" && selectedTab === "Groups");
-            // While in Round 2 mode, highlight the active selection tab in
-            // emerald to differentiate from the normal orange and reinforce
-            // "you're in a Round 2 sub-flow" visually.
-            const activeColor = isRound2Mode && item.key === "Players"
-              ? "bg-emerald-500 text-white shadow-sm shadow-emerald-200"
-              : "bg-orange-500 text-white shadow-sm shadow-orange-200";
-            return (
-              <button
-                key={item.key}
-                onClick={() => { setSelectedTab(item.tab); setSelectedSubTab(item.sub); }}
-                className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all w-auto ${
-                  isActive
-                    ? activeColor
-                    : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-                }`}
-              >
-                {item.label}
-              </button>
-            );
-          })}
-        </div>
+      {/* Round-2 banner is now provided by TournamentShell via the `banner`
+          slot — see <TournamentShell banner={…}> above. */}
 
+      {/* Tab content area. Tab bar + sub-tab bar live in shell slots; this
+          block only renders the active tab's body. Outer card preserved for
+          visual consistency with the rest of the legacy content. */}
+      <div className="bg-[#181A22] rounded-lg border border-white/[0.06] p-4">
         {/* Players Tab Content */}
         {selectedTab === "Registered Players" && (
           <>
@@ -1860,14 +1982,14 @@ const GroupStageManagement = () => {
                     {/* Skip-R2 banner — surfaces players who are seeded for the
                         final knockout and aren't eligible for Round 2. */}
                     {isRound2Mode && round2FilterCounts.skipR2 > 0 && round2Filter !== 'skip_r2' && (
-                      <div className="bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-3 mb-4 flex items-center gap-3">
+                      <div className="bg-amber-500/10 border border-yellow-500/30 rounded-xl px-4 py-3 mb-4 flex items-center gap-3">
                         <FaStar className="w-4 h-4 text-yellow-500 flex-shrink-0" />
-                        <p className="text-sm text-yellow-800 flex-1">
+                        <p className="text-sm text-amber-300 flex-1">
                           <strong>{round2FilterCounts.skipR2}</strong> player{round2FilterCounts.skipR2 === 1 ? ' is' : 's are'} seeded for the final knockout — they skip Round 2 and won't appear in the selection list.
                         </p>
                         <button
                           onClick={() => setRound2Filter('skip_r2')}
-                          className="text-xs font-semibold text-yellow-800 hover:underline whitespace-nowrap"
+                          className="text-xs font-semibold text-amber-300 hover:underline whitespace-nowrap"
                         >
                           View →
                         </button>
@@ -1899,14 +2021,14 @@ const GroupStageManagement = () => {
                             const active = round2Filter === c.key;
                             const isSkipR2 = c.key === 'skip_r2';
                             const activeColor = isSkipR2
-                              ? 'bg-yellow-500 text-white border-yellow-500 shadow-sm'
-                              : 'bg-orange-500 text-white border-orange-500 shadow-sm';
+                              ? 'bg-amber-500/100 text-white border-yellow-500 shadow-sm'
+                              : 'bg-orange-500/100 text-white border-orange-500 shadow-sm';
                             const idleColor = isSkipR2
-                              ? 'bg-yellow-50 text-yellow-700 border-yellow-200 hover:border-yellow-400'
-                              : 'bg-white text-gray-700 border-gray-300 hover:border-orange-300 hover:text-orange-600';
+                              ? 'bg-amber-500/10 text-amber-300 border-yellow-500/30 hover:border-yellow-400'
+                              : 'bg-[#181A22] text-gray-300 border-white/[0.08] hover:border-orange-500/40 hover:text-orange-400';
                             const countTone = active
                               ? (isSkipR2 ? 'text-yellow-100' : 'text-orange-100')
-                              : 'text-gray-400';
+                              : 'text-gray-500';
                             return (
                               <button
                                 key={c.key}
@@ -1923,7 +2045,7 @@ const GroupStageManagement = () => {
                           {round2Filter !== 'skip_r2' && (
                             <button
                               onClick={() => handleSelectAll(true)}
-                              className="px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-all"
+                              className="px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/15 transition-all"
                             >
                               <FiCheck className="inline w-3 h-3 mr-1" />
                               Select All Visible
@@ -1942,24 +2064,24 @@ const GroupStageManagement = () => {
                           placeholder={isRound2Mode ? "Search Top Players…" : "Search players by name…"}
                           value={searchTerm}
                           onChange={(e) => setSearchTerm(e.target.value)}
-                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:bg-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 transition"
+                          className="w-full bg-white/[0.04] border border-white/[0.06] rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:bg-[#181A22] focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 transition"
                         />
                       </div>
 
                       <div className="relative w-full lg:w-56">
                         <button
                           onClick={() => setIsOpen(!isOpen)}
-                          className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-left focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 hover:border-gray-300 transition"
+                          className="w-full bg-[#181A22] border border-white/[0.06] rounded-xl px-4 py-2.5 text-sm text-left focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 hover:border-white/[0.08] transition"
                         >
                           <span className="block truncate">
                             {categories.find(cat => cat.value === selectedRegisterPlayerCategory)?.label || 'Select Category'}
                           </span>
                           <span className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                            <ChevronDown className="h-4 w-4 text-gray-400" />
+                            <ChevronDown className="h-4 w-4 text-gray-500" />
                           </span>
                         </button>
                         {isOpen && (
-                          <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+                          <div className="absolute z-10 mt-1 w-full bg-[#181A22] border border-white/[0.06] rounded-xl shadow-lg overflow-hidden">
                             <ul className="py-1">
                               {categories.map((category) => (
                                 <li key={category.value}>
@@ -1968,7 +2090,7 @@ const GroupStageManagement = () => {
                                       setSelectedRegisterPlayerCategory(category.value);
                                       setIsOpen(false);
                                     }}
-                                    className="w-full px-4 py-2 text-left text-sm hover:bg-emerald-50 flex items-center justify-between transition-colors"
+                                    className="w-full px-4 py-2 text-left text-sm hover:bg-emerald-500/10 flex items-center justify-between transition-colors"
                                   >
                                     <span>{category.label}</span>
                                     {selectedRegisterPlayerCategory === category.value && (
@@ -1984,7 +2106,7 @@ const GroupStageManagement = () => {
 
                       <button
                         onClick={handleCreateGroupClick}
-                        className="bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2 whitespace-nowrap shadow-sm w-auto"
+                        className="bg-emerald-500/100 hover:bg-emerald-600 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2 whitespace-nowrap shadow-sm w-auto"
                       >
                         <FiPlus className="w-4 h-4" /> Create Groups
                       </button>
@@ -1993,7 +2115,7 @@ const GroupStageManagement = () => {
                     {/* Status row + demoted Clear Groups link.
                         Hidden when bulk-selection bar is showing (below). */}
                     {((isRound2Mode ? selectedRound2Players.length : selectedPlayers.length) === 0) && (
-                      <div className="flex justify-between items-center mb-3 text-xs text-gray-500">
+                      <div className="flex justify-between items-center mb-3 text-xs text-gray-400">
                         <div>
                           {isRound2Mode ? (
                             <>Showing {round2FilteredPlayers.length} of {topPlayers.length} Top Players{(round2Filter !== 'all' || searchTerm) && ' · filtered'}</>
@@ -2002,16 +2124,16 @@ const GroupStageManagement = () => {
                           )}
                           {!isRound2Mode && (
                             <>
-                              <span className="mx-2 text-gray-300">·</span>
+                              <span className="mx-2 text-gray-600">·</span>
                               {Object.values(playerGroups).filter(g => g && g[selectedRegisterPlayerCategory]).length} in groups
-                              <span className="mx-2 text-gray-300">·</span>
+                              <span className="mx-2 text-gray-600">·</span>
                               {seededPlayers.length} seeded
                             </>
                           )}
                         </div>
                         <button
                           onClick={showDeleteGroupsWarning}
-                          className="text-[11px] font-semibold text-red-500 hover:text-red-700 hover:underline w-auto bg-transparent"
+                          className="text-[11px] font-semibold text-red-500 hover:text-red-300 hover:underline w-auto bg-transparent"
                           title="Delete all groups (testing utility)"
                         >
                           Clear all groups
@@ -2022,14 +2144,14 @@ const GroupStageManagement = () => {
                     {/* Sticky bulk-action bar — appears only when ≥1 selected.
                         Replaces the status row above. */}
                     {(isRound2Mode ? selectedRound2Players.length : selectedPlayers.length) > 0 && (
-                      <div className="sticky top-0 z-20 mb-3 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 flex items-center justify-between gap-2 flex-wrap">
-                        <span className="text-xs font-bold text-emerald-800">
+                      <div className="sticky top-0 z-20 mb-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-3 py-2 flex items-center justify-between gap-2 flex-wrap">
+                        <span className="text-xs font-bold text-emerald-300">
                           {isRound2Mode ? selectedRound2Players.length : selectedPlayers.length} selected
                         </span>
                         <div className="flex items-center gap-2">
                           <button
                             onClick={handleCreateGroupClick}
-                            className="px-3 py-1 rounded-md text-[11px] font-bold text-white bg-emerald-500 hover:bg-emerald-600 w-auto"
+                            className="px-3 py-1 rounded-md text-[11px] font-bold text-white bg-emerald-500/100 hover:bg-emerald-600 w-auto"
                           >
                             Create Groups with {isRound2Mode ? selectedRound2Players.length : selectedPlayers.length}
                           </button>
@@ -2038,7 +2160,7 @@ const GroupStageManagement = () => {
                               if (isRound2Mode) setSelectedRound2Players([]);
                               else setSelectedPlayers([]);
                             }}
-                            className="px-3 py-1 rounded-md text-[11px] font-semibold text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 w-auto"
+                            className="px-3 py-1 rounded-md text-[11px] font-semibold text-gray-300 bg-[#181A22] border border-white/[0.06] hover:bg-white/[0.04] w-auto"
                           >
                             Clear
                           </button>
@@ -2067,9 +2189,9 @@ const GroupStageManagement = () => {
                           const showSecondaryColumn = isRound2Mode || !uniformCategories;
                           const secondaryHeader = isRound2Mode ? "Points" : "Categories";
                           return (
-                        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
+                        <div className="bg-[#181A22] rounded-2xl border border-white/[0.06] overflow-hidden shadow-sm">
                           <table className="w-full">
-                            <thead className="bg-gray-50/70 border-b border-gray-200">
+                            <thead className="bg-gray-50/70 border-b border-white/[0.06]">
                               <tr>
                                 <th className="px-4 py-2.5 text-left w-10">
                                   <input
@@ -2090,60 +2212,60 @@ const GroupStageManagement = () => {
                                             return !(uGroups && uGroups[selectedRegisterPlayerCategory]) && !(nGroups && nGroups[selectedRegisterPlayerCategory]);
                                           }).every(player => selectedPlayers.includes(player.id)))
                                     }
-                                    className="rounded text-emerald-500 focus:ring-emerald-400 border-gray-300"
+                                    className="rounded text-emerald-500 focus:ring-emerald-400 border-white/[0.08]"
                                   />
                                 </th>
-                                <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-gray-500">Player</th>
+                                <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-gray-400">Player</th>
                                 {showSecondaryColumn && (
-                                  <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-gray-500">{secondaryHeader}</th>
+                                  <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-gray-400">{secondaryHeader}</th>
                                 )}
-                                <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-gray-500">Status</th>
-                                <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-gray-500 w-24">
+                                <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-gray-400">Status</th>
+                                <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-gray-400 w-24">
                                   {isRound2Mode ? "Type" : "Seed"}
                                 </th>
                               </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-100">
+                            <tbody className="divide-y divide-white/[0.05]">
                               {currentPlayers.map((player, index) => {
                                 if (isRound2Mode) {
                                   const isSelected = selectedRound2Players.find(p => p.playerId === player.playerId);
                                   const isSeeded = player.groupId?.includes('seeded');
                                   const isSkipR2 = !!player.skipRound2;
                                   return (
-                                    <tr key={player._id || index} className={`hover:bg-gray-50/60 transition-colors ${isSkipR2 ? 'bg-yellow-50/30' : ''}`}>
+                                    <tr key={player._id || index} className={`hover:bg-white/5/60 transition-colors ${isSkipR2 ? 'bg-amber-500/10/30' : ''}`}>
                                       <td className="px-4 py-2.5">
                                         <input
                                           type="checkbox"
                                           checked={!!isSelected && !isSkipR2}
                                           disabled={isSkipR2}
                                           onChange={() => { if (!isSkipR2) togglePlayerSelection(player.playerId); }}
-                                          className={`rounded text-emerald-500 focus:ring-emerald-400 border-gray-300 ${isSkipR2 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                          className={`rounded text-emerald-500 focus:ring-emerald-400 border-white/[0.08] ${isSkipR2 ? 'opacity-50 cursor-not-allowed' : ''}`}
                                           title={isSkipR2 ? 'Seeded for final knockout — not eligible for Round 2' : undefined}
                                         />
                                       </td>
                                       <td className="px-4 py-2.5">
                                         <div className="flex items-center gap-3">
                                           <PlayerAvatar player={player} locked={isSkipR2} />
-                                          <div className={`text-sm font-semibold ${isSkipR2 ? 'text-gray-500' : 'text-gray-900'}`}>
+                                          <div className={`text-sm font-semibold ${isSkipR2 ? 'text-gray-400' : 'text-white'}`}>
                                             {player.playerName || 'Unknown Player'}
                                           </div>
                                         </div>
                                       </td>
                                       {showSecondaryColumn && (
-                                        <td className="px-4 py-2.5 text-sm text-gray-600">
+                                        <td className="px-4 py-2.5 text-sm text-gray-300">
                                           {player.points || 0} pts
                                         </td>
                                       )}
                                       <td className="px-4 py-2.5">
-                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-orange-50 text-orange-700 border border-orange-100">
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-orange-500/10 text-orange-300 border border-orange-500/20">
                                           <FaStar className="w-2.5 h-2.5 mr-1" /> Top Player
                                         </span>
                                       </td>
                                       <td className="px-4 py-2.5">
-                                        <div className="text-xs text-gray-600 flex items-center gap-1.5">
+                                        <div className="text-xs text-gray-300 flex items-center gap-1.5">
                                           {isSeeded ? 'Seeded' : 'Round 1'}
                                           {isSkipR2 && (
-                                            <span className="text-[9px] uppercase tracking-wider font-bold bg-yellow-100 text-yellow-800 px-1.5 py-0.5 rounded">
+                                            <span className="text-[9px] uppercase tracking-wider font-bold bg-amber-500/15 text-amber-300 px-1.5 py-0.5 rounded">
                                               Skip R2
                                             </span>
                                           )}
@@ -2161,21 +2283,21 @@ const GroupStageManagement = () => {
                                   const isSeeded = seededPlayers.includes(player.id);
                                   const isLocked = !!isInGroup;
                                   return (
-                                    <tr key={player.id || index} className={`transition-colors ${isLocked ? 'bg-gray-50/40 opacity-60' : 'hover:bg-emerald-50/40'}`}>
+                                    <tr key={player.id || index} className={`transition-colors ${isLocked ? 'bg-gray-50/40 opacity-60' : 'hover:bg-emerald-500/10/40'}`}>
                                       <td className="px-4 py-2.5">
                                         <input
                                           type="checkbox"
                                           checked={selectedPlayers.includes(player.id)}
                                           onChange={() => togglePlayerSelection(player.id)}
                                           disabled={isLocked}
-                                          className={`rounded text-emerald-500 focus:ring-emerald-400 border-gray-300 ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                          className={`rounded text-emerald-500 focus:ring-emerald-400 border-white/[0.08] ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
                                         />
                                       </td>
                                       <td className="px-4 py-2.5">
                                         <div className="flex items-center gap-3">
                                           <PlayerAvatar player={player} locked={isLocked} />
                                           <div className="min-w-0">
-                                            <div className={`text-sm font-semibold truncate ${isLocked ? 'text-gray-500' : 'text-gray-900'}`}>
+                                            <div className={`text-sm font-semibold truncate ${isLocked ? 'text-gray-400' : 'text-white'}`}>
                                               {player.name || 'Unknown Player'}
                                             </div>
                                             {/* Categories shown inline as a subtitle ONLY when the
@@ -2183,7 +2305,7 @@ const GroupStageManagement = () => {
                                                 actually a category to show. Otherwise they live in
                                                 the dedicated column. */}
                                             {!showSecondaryColumn && player.categories?.length > 0 && (
-                                              <div className="text-[11px] text-gray-400 truncate">
+                                              <div className="text-[11px] text-gray-500 truncate">
                                                 {player.categories.map((c) => c.name).join(", ")}
                                               </div>
                                             )}
@@ -2191,7 +2313,7 @@ const GroupStageManagement = () => {
                                         </div>
                                       </td>
                                       {showSecondaryColumn && (
-                                        <td className="px-4 py-2.5 text-sm text-gray-600">
+                                        <td className="px-4 py-2.5 text-sm text-gray-300">
                                           {player.categories && player.categories.length > 0
                                             ? player.categories.map(cat => cat.name).join(", ")
                                             : '—'
@@ -2200,11 +2322,11 @@ const GroupStageManagement = () => {
                                       )}
                                       <td className="px-4 py-2.5">
                                         {isInGroup ? (
-                                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-gray-100 text-gray-700 border border-gray-200">
+                                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-white/[0.06] text-gray-300 border border-white/[0.06]">
                                             <FiLock className="w-2.5 h-2.5 mr-1" /> {isInGroup}
                                           </span>
                                         ) : (
-                                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">
+                                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
                                             <FiCheck className="w-2.5 h-2.5 mr-1" /> Available
                                           </span>
                                         )}
@@ -2214,10 +2336,10 @@ const GroupStageManagement = () => {
                                           onClick={() => showSeedingConfirmation(player)}
                                           disabled={isLocked}
                                           className={`p-1.5 rounded-lg transition-colors w-auto ${isLocked
-                                            ? 'text-gray-300 cursor-not-allowed bg-transparent'
+                                            ? 'text-gray-600 cursor-not-allowed bg-transparent'
                                             : isSeeded
-                                              ? 'text-yellow-500 hover:bg-yellow-50 bg-transparent'
-                                              : 'text-gray-300 hover:text-yellow-500 hover:bg-yellow-50 bg-transparent'
+                                              ? 'text-yellow-500 hover:bg-amber-500/10 bg-transparent'
+                                              : 'text-gray-600 hover:text-yellow-500 hover:bg-amber-500/10 bg-transparent'
                                           }`}
                                           title={
                                             isLocked
@@ -2244,7 +2366,7 @@ const GroupStageManagement = () => {
                             Plan A: dropped page-numbers in favour of "Show 25/50/All"
                             since most rosters are <100 players and one click to "All"
                             often beats clicking through 4 pages. */}
-                        <div className="flex items-center justify-between mt-3 px-1 text-xs text-gray-500 flex-wrap gap-2">
+                        <div className="flex items-center justify-between mt-3 px-1 text-xs text-gray-400 flex-wrap gap-2">
                           <div className="flex items-center gap-2">
                             <span>Show</span>
                             {[10, 25, 50, "all"].map((size) => {
@@ -2258,15 +2380,15 @@ const GroupStageManagement = () => {
                                   }}
                                   className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors w-auto ${
                                     active
-                                      ? "bg-emerald-500 text-white"
-                                      : "bg-white text-gray-600 border border-gray-200 hover:border-emerald-300 hover:text-emerald-600"
+                                      ? "bg-emerald-500/100 text-white"
+                                      : "bg-[#181A22] text-gray-300 border border-white/[0.06] hover:border-emerald-500/40 hover:text-emerald-400"
                                   }`}
                                 >
                                   {size === "all" ? "All" : size}
                                 </button>
                               );
                             })}
-                            <span className="ml-2 text-gray-400">
+                            <span className="ml-2 text-gray-500">
                               {_showAll
                                 ? `${_sourceList.length} total`
                                 : `${(currentPage - 1) * playersPerPage + 1}–${Math.min(currentPage * playersPerPage, _sourceList.length)} of ${_sourceList.length}`}
@@ -2277,17 +2399,17 @@ const GroupStageManagement = () => {
                               <button
                                 onClick={() => handlePageChange(currentPage - 1)}
                                 disabled={currentPage === 1}
-                                className="px-3 py-1 text-[11px] font-semibold border border-gray-200 rounded-md text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed w-auto"
+                                className="px-3 py-1 text-[11px] font-semibold border border-white/[0.06] rounded-md text-gray-300 hover:bg-white/[0.04] disabled:opacity-40 disabled:cursor-not-allowed w-auto"
                               >
                                 Previous
                               </button>
-                              <span className="text-[11px] text-gray-500 self-center">
+                              <span className="text-[11px] text-gray-400 self-center">
                                 Page {currentPage} of {totalPages}
                               </span>
                               <button
                                 onClick={() => handlePageChange(currentPage + 1)}
                                 disabled={currentPage === totalPages}
-                                className="px-3 py-1 text-[11px] font-semibold border border-gray-200 rounded-md text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed w-auto"
+                                className="px-3 py-1 text-[11px] font-semibold border border-white/[0.06] rounded-md text-gray-300 hover:bg-white/[0.04] disabled:opacity-40 disabled:cursor-not-allowed w-auto"
                               >
                                 Next
                               </button>
@@ -2296,8 +2418,8 @@ const GroupStageManagement = () => {
                         </div>
                       </>
                     ) : (
-                      <div className="text-center py-12 bg-white border border-gray-300 rounded-lg">
-                        <div className="text-gray-500">
+                      <div className="text-center py-12 bg-[#181A22] border border-white/[0.08] rounded-lg">
+                        <div className="text-gray-400">
                           {isRound2Mode ? (
                             (searchTerm || round2Filter !== 'all') ? (
                               <>
@@ -2340,18 +2462,18 @@ const GroupStageManagement = () => {
                         <div className="relative">
                           <button
                             onClick={() => setIsOpen(!isOpen)}
-                            className="w-full bg-white border border-gray-300 rounded-lg px-4 py-3 text-left focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200 hover:border-gray-400"
+                            className="w-full bg-[#181A22] border border-white/[0.08] rounded-lg px-4 py-3 text-left focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200 hover:border-white/[0.10]"
                           >
                             <span className="block truncate">
                               {categories.find(cat => cat.value === selectedTopPlayerCategory.toLowerCase())?.label || 'Select Category'}
                             </span>
                             <span className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                              <ChevronDown className="h-4 w-4 text-gray-600" />
+                              <ChevronDown className="h-4 w-4 text-gray-300" />
                             </span>
                           </button>
 
                           {isOpen && (
-                            <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg">
+                            <div className="absolute z-10 mt-1 w-full bg-[#181A22] border border-white/[0.08] rounded-lg shadow-lg">
                               <ul className="py-1">
                                 {categories.map((category) => (
                                   <li key={category.value}>
@@ -2360,7 +2482,7 @@ const GroupStageManagement = () => {
                                         setSelectedTopPlayerCategory(category.label);
                                         setIsOpen(false);
                                       }}
-                                      className="w-full px-4 py-2 text-left hover:bg-orange-50 flex items-center justify-between transition-colors duration-150"
+                                      className="w-full px-4 py-2 text-left hover:bg-orange-500/10 flex items-center justify-between transition-colors duration-150"
                                     >
                                       <span>{category.label}</span>
                                       {selectedTopPlayerCategory === category.label && (
@@ -2378,10 +2500,10 @@ const GroupStageManagement = () => {
 
                     {/* Top Players Info and Round 2 Controls */}
                     <div className="flex justify-between items-center mb-4">
-                      <div className="text-sm text-gray-600">
+                      <div className="text-sm text-gray-300">
                         Total Top Players: {topPlayers.length}
                         {selectedTopPlayerCategory && selectedTopPlayerCategory !== 'All Categories' && selectedTopPlayerCategory !== 'all' && (
-                          <span className="text-gray-400"> · Showing {topPlayersByPosition.total} in {selectedTopPlayerCategory}</span>
+                          <span className="text-gray-500"> · Showing {topPlayersByPosition.total} in {selectedTopPlayerCategory}</span>
                         )}
                       </div>
                       <div className="flex items-center gap-4">
@@ -2392,19 +2514,19 @@ const GroupStageManagement = () => {
                         {!round2Progress && topPlayers.length >= 2 && (
                           <button
                             onClick={initiateRound2}
-                            className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors flex items-center gap-2 text-sm font-semibold"
+                            className="bg-green-500/100 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors flex items-center gap-2 text-sm font-semibold"
                           >
                             <MdRocket className="w-4 h-4" /> Proceed to Round 2
                           </button>
                         )}
                         {round2Progress && (
                           <div className="flex items-center gap-2">
-                            <div className="text-sm font-semibold text-green-600 bg-green-50 px-3 py-1 rounded-full">
+                            <div className="text-sm font-semibold text-green-400 bg-green-500/10 px-3 py-1 rounded-full">
                               Round 2 {round2Progress.option === 'knockout' ? 'Knockout' : 'Group Stage'} - {round2Progress.status}
                             </div>
                             <button
                               onClick={() => setShowResetModal(true)}
-                              className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded hover:bg-red-200"
+                              className="text-xs bg-red-500/15 text-red-300 px-2 py-1 rounded hover:bg-red-500/20"
                               title="Reset Round 2 Progress"
                             >
                               Reset
@@ -2417,9 +2539,9 @@ const GroupStageManagement = () => {
 
                   {/* Top Players — unified card with section dividers */}
                   {topPlayers.length === 0 ? (
-                    <div className="text-center py-12 bg-white border border-gray-300 rounded-2xl">
-                      <div className="text-gray-500">
-                        <FaStar className="mx-auto text-4xl mb-4 text-gray-700" />
+                    <div className="text-center py-12 bg-[#181A22] border border-white/[0.08] rounded-2xl">
+                      <div className="text-gray-400">
+                        <FaStar className="mx-auto text-4xl mb-4 text-gray-300" />
                         <p className="text-lg font-medium">No Top Players Yet</p>
                         <p className="text-sm mt-1">
                           Seed players by clicking the star icon in Registered Players, or complete Round 1 to see qualifiers here.
@@ -2427,15 +2549,15 @@ const GroupStageManagement = () => {
                       </div>
                     </div>
                   ) : topPlayersByPosition.total === 0 ? (
-                    <div className="text-center py-12 bg-white border border-gray-300 rounded-2xl">
-                      <div className="text-gray-500">
-                        <FaStar className="mx-auto text-4xl mb-4 text-gray-700" />
+                    <div className="text-center py-12 bg-[#181A22] border border-white/[0.08] rounded-2xl">
+                      <div className="text-gray-400">
+                        <FaStar className="mx-auto text-4xl mb-4 text-gray-300" />
                         <p className="text-lg font-medium">No Top Players in {selectedTopPlayerCategory}</p>
                         <p className="text-sm mt-1">Switch the category dropdown to see players from another category.</p>
                       </div>
                     </div>
                   ) : (
-                    <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+                    <div className="bg-[#181A22] border border-white/[0.06] rounded-2xl shadow-sm overflow-hidden">
                       {topPlayersByPosition.positionKeys.map((rank) =>
                         renderPositionSection(rank, topPlayersByPosition.buckets[rank])
                       )}
@@ -2454,8 +2576,8 @@ const GroupStageManagement = () => {
                   <div className="mb-6">
                     <div className="flex justify-between items-center mb-4">
                       <div>
-                        <h3 className="text-lg font-semibold text-gray-900">Super Players</h3>
-                        <p className="text-xs text-gray-500 mt-0.5">{superPlayers.length} players qualified for knockout</p>
+                        <h3 className="text-lg font-semibold text-white">Super Players</h3>
+                        <p className="text-xs text-gray-400 mt-0.5">{superPlayers.length} players qualified for knockout</p>
                       </div>
                       {!knockoutGenerated && superPlayers.length > 0 && (
                         <button
@@ -2488,7 +2610,7 @@ const GroupStageManagement = () => {
                             }));
                             setShowKnockoutModal(true);
                           }}
-                          className="bg-orange-500 text-white px-6 py-2.5 rounded-xl hover:bg-orange-600 transition-colors flex items-center gap-2 font-bold text-sm active:scale-[0.97] w-auto"
+                          className="bg-orange-500/100 text-white px-6 py-2.5 rounded-xl hover:bg-orange-600 transition-colors flex items-center gap-2 font-bold text-sm active:scale-[0.97] w-auto"
                         >
                           <MdFlashOn className="w-4 h-4" /> Start Knockout
                         </button>
@@ -2496,20 +2618,20 @@ const GroupStageManagement = () => {
                     </div>
 
                     {knockoutGenerated ? (
-                      <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 mb-6">
-                        <h4 className="text-emerald-700 font-bold mb-1 flex items-center gap-2">
+                      <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 mb-6">
+                        <h4 className="text-emerald-300 font-bold mb-1 flex items-center gap-2">
                           <FaTrophy className="w-4 h-4" /> Knockout Generated
                         </h4>
-                        <p className="text-sm text-emerald-600">
+                        <p className="text-sm text-emerald-400">
                           The knockout bracket has been created. Go to the tournament knockout view to manage matches.
                         </p>
                       </div>
                     ) : (
-                      <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 mb-6">
-                        <h4 className="text-orange-700 font-bold mb-1 flex items-center gap-2">
+                      <div className="bg-orange-500/10 border border-orange-500/30 rounded-xl p-4 mb-6">
+                        <h4 className="text-orange-300 font-bold mb-1 flex items-center gap-2">
                           <FaTrophy className="w-4 h-4" /> Final Phase
                         </h4>
-                        <p className="text-sm text-orange-600 mb-2">
+                        <p className="text-sm text-orange-400 mb-2">
                           Super Players from Round 2 are ready for the final knockout. Requires exactly 16, 32, or 64 players.
                         </p>
                         <ul className="text-xs text-orange-500 list-disc list-inside">
@@ -2525,48 +2647,48 @@ const GroupStageManagement = () => {
                   <div className="overflow-hidden">
                     {superPlayers.length > 0 ? (
                       <div className="overflow-x-auto">
-                        <table className="w-full bg-white border border-gray-300 rounded-lg">
-                          <thead className="bg-gradient-to-r from-orange-50 to-red-50">
+                        <table className="w-full bg-[#181A22] border border-white/[0.08] rounded-lg">
+                          <thead className="bg-gradient-to-r from-orange-500/10 to-red-500/10">
                             <tr>
-                              <th className="px-4 py-3 text-left text-sm font-medium text-emerald-700">Avatar</th>
-                              <th className="px-4 py-3 text-left text-sm font-medium text-emerald-700">Player Name</th>
-                              <th className="px-4 py-3 text-left text-sm font-medium text-emerald-700">Points</th>
-                              <th className="px-4 py-3 text-left text-sm font-medium text-emerald-700">Record</th>
-                              <th className="px-4 py-3 text-left text-sm font-medium text-emerald-700">Status</th>
-                              <th className="px-4 py-3 text-left text-sm font-medium text-emerald-700">Selection</th>
+                              <th className="px-4 py-3 text-left text-sm font-medium text-emerald-300">Avatar</th>
+                              <th className="px-4 py-3 text-left text-sm font-medium text-emerald-300">Player Name</th>
+                              <th className="px-4 py-3 text-left text-sm font-medium text-emerald-300">Points</th>
+                              <th className="px-4 py-3 text-left text-sm font-medium text-emerald-300">Record</th>
+                              <th className="px-4 py-3 text-left text-sm font-medium text-emerald-300">Status</th>
+                              <th className="px-4 py-3 text-left text-sm font-medium text-emerald-300">Selection</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-gray-200">
+                          <tbody className="divide-y divide-white/[0.06]">
                             {superPlayers.map((player, index) => (
-                              <tr key={player._id || index} className="hover:bg-emerald-50">
+                              <tr key={player._id || index} className="hover:bg-emerald-500/10">
                                 <td className="px-4 py-3">
                                   <img
                                     src={player.profileImage || player.playerId?.profileImage || `https://i.pravatar.cc/50?img=${Math.floor(Math.random() * 70)}`}
                                     alt={player.userName || player.playerName || player.playerId?.name || 'Player Avatar'}
-                                    className="w-10 h-10 rounded-full border-2 border-emerald-200"
+                                    className="w-10 h-10 rounded-full border-2 border-emerald-500/30"
                                   />
                                 </td>
                                 <td className="px-4 py-3">
-                                  <div className="font-medium text-gray-900">
+                                  <div className="font-medium text-white">
                                     {player.userName || player.playerName || player.playerId?.name || 'Unknown Player'}
                                   </div>
                                 </td>
-                                <td className="px-4 py-3 text-sm font-semibold text-emerald-600">
+                                <td className="px-4 py-3 text-sm font-semibold text-emerald-400">
                                   {player.points || 0} pts
                                 </td>
-                                <td className="px-4 py-3 text-sm text-gray-600">
+                                <td className="px-4 py-3 text-sm text-gray-300">
                                   <div className="flex flex-col">
                                     <span className="font-medium">{player.won || 0}W - {player.lost || 0}L</span>
-                                    <span className="text-xs text-gray-500">Sets: {player.setsWon || 0} - {player.setsLost || 0}</span>
+                                    <span className="text-xs text-gray-400">Sets: {player.setsWon || 0} - {player.setsLost || 0}</span>
                                   </div>
                                 </td>
                                 <td className="px-4 py-3">
-                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gradient-to-r from-emerald-100 to-red-100 text-emerald-800">
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gradient-to-r from-emerald-500/15 to-red-500/15 text-emerald-300">
                                     <GiLaurelCrown className="mr-1 w-3 h-3" /> Super Player
                                   </span>
                                 </td>
                                 <td className="px-4 py-3">
-                                  <span className="text-sm text-gray-600">
+                                  <span className="text-sm text-gray-300">
                                     Round {player.selectedFromRound || 2} Winner
                                   </span>
                                 </td>
@@ -2576,16 +2698,16 @@ const GroupStageManagement = () => {
                         </table>
                       </div>
                     ) : (
-                      <div className="text-center py-8 bg-white border border-gray-300 rounded-lg">
-                        <div className="text-gray-500">
-                          <div className="text-emerald-600 text-6xl mb-4 flex justify-center">
+                      <div className="text-center py-8 bg-[#181A22] border border-white/[0.08] rounded-lg">
+                        <div className="text-gray-400">
+                          <div className="text-emerald-400 text-6xl mb-4 flex justify-center">
                             <GiLaurelCrown className="w-16 h-16" />
                           </div>
-                          <p className="text-lg font-medium text-gray-700 mb-2">No Super Players Yet</p>
-                          <p className="text-sm text-gray-600 mb-4">
+                          <p className="text-lg font-medium text-gray-300 mb-2">No Super Players Yet</p>
+                          <p className="text-sm text-gray-300 mb-4">
                             Super Players will appear here after Top Players are selected from Round 2.
                           </p>
-                          <div className="text-sm text-gray-500">
+                          <div className="text-sm text-gray-400">
                             Complete Round 2 and select Top Players to populate this section.
                           </div>
                         </div>
@@ -2613,7 +2735,7 @@ const GroupStageManagement = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
           <div className="bg-[#F0F4F9] p-[52px] rounded-[24px] relative min-w-[395px] shadow-lg min-h-[291px]">
             <button
-              className="absolute top-0 right-6 text-xl text-gray-600 bg-transparent hover:bg-transparent w-0"
+              className="absolute top-0 right-6 text-xl text-gray-300 bg-transparent hover:bg-transparent w-0"
               onClick={resetModal}
             >
               <FiX />
@@ -2621,12 +2743,12 @@ const GroupStageManagement = () => {
             <h2 className="text-[16px] md:text-[18px] font-[600] text-center text-black mb-[10px]">
               {isRound2Mode ? "Create Round 2 Groups" : "Create Number of Groups"}
             </h2>
-            <p className="text-center text-gray-600 mb-6">
+            <p className="text-center text-gray-300 mb-6">
               {isRound2Mode ? `Selected Top Players for Round 2: ${selectedRound2Players.length}` : `Selected Players: ${selectedPlayers.length}`}
             </p>
 
             <div className="text-center">
-              <label className="block text-sm font-medium mb-2 text-gray-700">Number of Groups:</label>
+              <label className="block text-sm font-medium mb-2 text-gray-300">Number of Groups:</label>
               <input
                 type="number"
                 min="2"
@@ -2641,13 +2763,13 @@ const GroupStageManagement = () => {
             <div className="flex justify-center gap-4">
               <button
                 onClick={resetModal}
-                className="px-6 py-2 text-gray-600 border rounded-lg hover:bg-gray-50"
+                className="px-6 py-2 text-gray-300 border rounded-lg hover:bg-white/[0.04]"
               >
                 Cancel
               </button>
               <button
                 onClick={handleNextStep}
-                className="px-6 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600"
+                className="px-6 py-2 bg-orange-500/100 text-white rounded-lg hover:bg-orange-600"
                 disabled={numGroups <= 1}
               >
                 Next
@@ -2662,7 +2784,7 @@ const GroupStageManagement = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
           <div className="bg-[#F0F4F9] p-[52px] rounded-[24px] relative min-w-[395px] max-h-[453px] shadow-lg overflow-y-auto">
             <button
-              className="absolute top-0 right-6 text-xl text-gray-600 bg-transparent hover:bg-transparent w-0"
+              className="absolute top-0 right-6 text-xl text-gray-300 bg-transparent hover:bg-transparent w-0"
               onClick={resetModal}
             >
               <FiX />
@@ -2674,7 +2796,7 @@ const GroupStageManagement = () => {
             <div className="space-y-4 mb-6">
               {groupNames.map((name, index) => (
                 <div key={index}>
-                  <label className="block text-sm font-medium mb-1 text-gray-700">
+                  <label className="block text-sm font-medium mb-1 text-gray-300">
                     Group {index + 1}:
                   </label>
                   <input
@@ -2695,13 +2817,13 @@ const GroupStageManagement = () => {
             <div className="flex justify-center gap-4">
               <button
                 onClick={() => setModalStep(1)}
-                className="px-6 py-2 text-gray-600 border rounded-lg hover:bg-gray-50"
+                className="px-6 py-2 text-gray-300 border rounded-lg hover:bg-white/[0.04]"
               >
                 Back
               </button>
               <button
                 onClick={handleNextStep}
-                className="px-6 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600"
+                className="px-6 py-2 bg-orange-500/100 text-white rounded-lg hover:bg-orange-600"
               >
                 Next
               </button>
@@ -2715,22 +2837,22 @@ const GroupStageManagement = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
           <div className="bg-[#F0F4F9] p-[52px] rounded-[24px] relative min-w-[395px] max-h-[515px] shadow-lg overflow-y-auto">
             <button
-              className="absolute top-0 right-6 text-xl text-gray-600 bg-transparent hover:bg-transparent w-0"
+              className="absolute top-0 right-6 text-xl text-gray-300 bg-transparent hover:bg-transparent w-0"
               onClick={resetModal}
             >
               <FiX />
             </button>
-            <h2 className="md:text-[18px] font-[600] text-center text-gray-800 mb-4">
+            <h2 className="md:text-[18px] font-[600] text-center text-gray-100 mb-4">
               Distribute Players in Groups
             </h2>
-            <p className="text-center text-gray-600 mb-6">
+            <p className="text-center text-gray-300 mb-6">
               Total Selected Players: {isRound2Mode ? selectedRound2Players.length : selectedPlayers.length}
             </p>
 
             <div className="space-y-4 mb-6">
               {groupNames.map((name, index) => (
-                <div key={index} className="flex items-center justify-between bg-white p-3 rounded-lg">
-                  <label className="font-medium text-gray-700">{name}:</label>
+                <div key={index} className="flex items-center justify-between bg-[#181A22] p-3 rounded-lg">
+                  <label className="font-medium text-gray-300">{name}:</label>
                   <input
                     type="number"
                     min="0"
@@ -2750,7 +2872,7 @@ const GroupStageManagement = () => {
             </div>
 
             <div className="text-center mb-6">
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-gray-300">
                 Assigned: {groupNames.reduce((sum, name) => sum + (parseInt(groupPlayers[name]) || 0), 0)} / {isRound2Mode ? selectedRound2Players.length : selectedPlayers.length}
               </p>
             </div>
@@ -2758,13 +2880,13 @@ const GroupStageManagement = () => {
             <div className="flex justify-center gap-4">
               <button
                 onClick={() => setModalStep(2)}
-                className="px-6 py-2 text-gray-600 border rounded-lg hover:bg-gray-50"
+                className="px-6 py-2 text-gray-300 border rounded-lg hover:bg-white/[0.04]"
               >
                 Back
               </button>
               <button
                 onClick={handleNextStep}
-                className="px-6 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600"
+                className="px-6 py-2 bg-orange-500/100 text-white rounded-lg hover:bg-orange-600"
               >
                 Review
               </button>
@@ -2778,39 +2900,39 @@ const GroupStageManagement = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
           <div className="bg-[#F0F4F9] p-[52px] rounded-[24px] relative min-w-[381px] min-h-[294px] shadow-lg">
             <button
-              className="absolute top-0 right-6 text-xl text-gray-600 bg-transparent hover:bg-transparent w-0"
+              className="absolute top-0 right-6 text-xl text-gray-300 bg-transparent hover:bg-transparent w-0"
               onClick={resetModal}
             >
               <FiX />
             </button>
-            <h2 className="md:text-[18px] text-gray-900 font-[600] text-center mb-4">
+            <h2 className="md:text-[18px] text-white font-[600] text-center mb-4">
               Confirm Group Creation
             </h2>
 
             <div className="space-y-3 mb-6">
-              <p className="text-center text-gray-600 mb-4">Distribution of Players:</p>
+              <p className="text-center text-gray-300 mb-4">Distribution of Players:</p>
               {groupNames.map((name, index) => (
-                <div key={index} className="flex justify-between bg-white p-2 rounded">
+                <div key={index} className="flex justify-between bg-[#181A22] p-2 rounded">
                   <span className="font-medium">{name}:</span>
                   <span>{groupPlayers[name]} players</span>
                 </div>
               ))}
             </div>
 
-            <p className="text-center text-gray-600 mb-6">
+            <p className="text-center text-gray-300 mb-6">
               Are you sure you want to create these groups?
             </p>
 
             <div className="flex justify-center gap-4">
               <button
                 onClick={() => setModalStep(3)}
-                className="px-6 py-2 text-gray-600 border rounded-lg hover:bg-gray-50"
+                className="px-6 py-2 text-gray-300 border rounded-lg hover:bg-white/[0.04]"
               >
                 Back
               </button>
               <button
                 onClick={handleNextStep}
-                className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
+                className="px-6 py-2 bg-green-500/100 text-white rounded-lg hover:bg-green-600"
               >
                 <FiPlus /> Create Groups
               </button>
@@ -2824,12 +2946,12 @@ const GroupStageManagement = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
           <div className="bg-[#F0F4F9] p-[52px] rounded-2xl relative min-w-[404px] min-h-[265px] shadow-lg">
             <button
-              className="absolute top-0 right-6 text-xl text-gray-600 bg-transparent hover:bg-transparent w-0"
+              className="absolute top-0 right-6 text-xl text-gray-300 bg-transparent hover:bg-transparent w-0"
               onClick={resetModal}
             >
               <FiX />
             </button>
-            <h2 className="text-lg font-semibold text-center text-gray-800 mb-4">
+            <h2 className="text-lg font-semibold text-center text-gray-100 mb-4">
               {isRound2Mode ? `Round 2 Groups Created Successfully!` : `Created ${numGroups} Groups Successfully`}
             </h2>
 
@@ -2837,13 +2959,13 @@ const GroupStageManagement = () => {
               <div className="text-green-500 text-6xl mb-4">
                 <FiCheck className="mx-auto" />
               </div>
-              <p className="text-gray-600">
+              <p className="text-gray-300">
                 {isRound2Mode
                   ? "Round 2 groups have been created with Top Players. You can now generate matches and proceed with Round 2!"
                   : "All groups have been created and players have been distributed."
                 }
               </p>
-              <p className="text-sm text-gray-500 mt-2">
+              <p className="text-sm text-gray-400 mt-2">
                 Page will refresh in 2 seconds...
               </p>
             </div>
@@ -2851,7 +2973,7 @@ const GroupStageManagement = () => {
             <div className="flex justify-center">
               <button
                 onClick={resetModal}
-                className="px-6 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600"
+                className="px-6 py-2 bg-orange-500/100 text-white rounded-lg hover:bg-orange-600"
               >
                 Close
               </button>
@@ -2863,9 +2985,9 @@ const GroupStageManagement = () => {
       {/* Delete Warning Modal */}
       {showDeleteWarning && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-          <div className="bg-white p-8 rounded-lg relative max-w-md mx-4 shadow-lg">
+          <div className="bg-[#181A22] p-8 rounded-lg relative max-w-md mx-4 shadow-lg">
             <button
-              className="absolute top-4 right-4 text-xl text-gray-600 hover:text-gray-800"
+              className="absolute top-4 right-4 text-xl text-gray-300 hover:text-gray-100"
               onClick={() => setShowDeleteWarning(false)}
             >
               <FiX />
@@ -2876,11 +2998,11 @@ const GroupStageManagement = () => {
                 <FiAlertTriangle />
               </div>
 
-              <h2 className="text-xl font-semibold text-gray-800 mb-4">
+              <h2 className="text-xl font-semibold text-gray-100 mb-4">
                 Delete All Groups?
               </h2>
 
-              <p className="text-gray-600 mb-6 text-left">
+              <p className="text-gray-300 mb-6 text-left">
                 <strong>Warning:</strong> This will permanently delete all groups and remove all player assignments for this tournament.
                 <br /><br />
                 This action cannot be undone. All players will be available for new group creation.
@@ -2889,13 +3011,13 @@ const GroupStageManagement = () => {
               <div className="flex justify-center gap-4">
                 <button
                   onClick={() => setShowDeleteWarning(false)}
-                  className="px-6 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  className="px-6 py-2 text-gray-300 border border-white/[0.08] rounded-lg hover:bg-white/[0.04]"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={confirmDeleteAllGroups}
-                  className="px-6 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 flex items-center gap-2"
+                  className="px-6 py-2 bg-red-500/100 text-white rounded-lg hover:bg-red-600 flex items-center gap-2"
                 >
                   <FiTrash /> Delete All Groups
                 </button>
@@ -2908,9 +3030,9 @@ const GroupStageManagement = () => {
       {/* Seeding Confirmation Modal */}
       {showSeedingModal && playerToSeed && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-          <div className="bg-white p-8 rounded-lg relative max-w-md mx-4 shadow-lg">
+          <div className="bg-[#181A22] p-8 rounded-lg relative max-w-md mx-4 shadow-lg">
             <button
-              className="absolute top-4 right-4 text-xl text-gray-600 hover:text-gray-800"
+              className="absolute top-4 right-4 text-xl text-gray-300 hover:text-gray-100"
               onClick={() => {
                 setShowSeedingModal(false);
                 setPlayerToSeed(null);
@@ -2924,25 +3046,25 @@ const GroupStageManagement = () => {
                 <FaStar />
               </div>
 
-              <h2 className="text-xl font-semibold text-gray-800 mb-4">
+              <h2 className="text-xl font-semibold text-gray-100 mb-4">
                 {seededPlayers.includes(playerToSeed.id) ? 'Remove Seeded Player?' : 'Add Seeded Player?'}
               </h2>
 
               <div className="text-left mb-6">
-                <p className="text-gray-600 mb-4">
+                <p className="text-gray-300 mb-4">
                   <strong>Player:</strong> {playerToSeed.name}
                 </p>
 
                 {seededPlayers.includes(playerToSeed.id) ? (
-                  <div className="bg-red-50 border border-red-200 rounded p-3">
-                    <p className="text-red-700">
+                  <div className="bg-red-500/10 border border-red-500/30 rounded p-3">
+                    <p className="text-red-300">
                       <FiInfo className="inline mr-2" />
                       This will remove the player from seeded status and Top Players list.
                     </p>
                   </div>
                 ) : (
-                  <div className="bg-orange-50 border border-orange-200 rounded p-3">
-                    <p className="text-orange-600">
+                  <div className="bg-orange-500/10 border border-orange-500/30 rounded p-3">
+                    <p className="text-orange-400">
                       <FiInfo className="inline mr-2" />
                       This player will be marked as seeded and will:
                     </p>
@@ -2961,15 +3083,15 @@ const GroupStageManagement = () => {
                     setShowSeedingModal(false);
                     setPlayerToSeed(null);
                   }}
-                  className="px-6 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  className="px-6 py-2 text-gray-300 border border-white/[0.08] rounded-lg hover:bg-white/[0.04]"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={confirmSeedPlayer}
                   className={`px-6 py-2 rounded-lg text-white flex items-center gap-2 ${seededPlayers.includes(playerToSeed.id)
-                    ? 'bg-red-500 hover:bg-red-600'
-                    : 'bg-yellow-500 hover:bg-yellow-600'
+                    ? 'bg-red-500/100 hover:bg-red-600'
+                    : 'bg-amber-500/100 hover:bg-yellow-600'
                     }`}
                 >
                   <FaStar />
@@ -2984,9 +3106,9 @@ const GroupStageManagement = () => {
       {/* Skip-Round-2 Confirmation Modal */}
       {showSkipR2Modal && playerToSkipR2 && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-          <div className="bg-white p-8 rounded-lg relative max-w-md mx-4 shadow-lg">
+          <div className="bg-[#181A22] p-8 rounded-lg relative max-w-md mx-4 shadow-lg">
             <button
-              className="absolute top-4 right-4 text-xl text-gray-600 hover:text-gray-800"
+              className="absolute top-4 right-4 text-xl text-gray-300 hover:text-gray-100"
               onClick={() => {
                 setShowSkipR2Modal(false);
                 setPlayerToSkipR2(null);
@@ -3000,29 +3122,29 @@ const GroupStageManagement = () => {
                 <FaStar />
               </div>
 
-              <h2 className="text-xl font-semibold text-gray-800 mb-4">
+              <h2 className="text-xl font-semibold text-gray-100 mb-4">
                 {playerToSkipR2.currentlySkipping ? 'Un-seed for Round 2?' : 'Seed for Final Knockout?'}
               </h2>
 
               <div className="text-left mb-6">
-                <p className="text-gray-600 mb-4">
+                <p className="text-gray-300 mb-4">
                   <strong>Player:</strong> {playerToSkipR2.playerName}
                 </p>
 
                 {playerToSkipR2.currentlySkipping ? (
-                  <div className="bg-red-50 border border-red-200 rounded p-3">
-                    <p className="text-red-700">
+                  <div className="bg-red-500/10 border border-red-500/30 rounded p-3">
+                    <p className="text-red-300">
                       <FiInfo className="inline mr-2" />
                       This player will play Round 2 again. They will be eligible for Round 2 group/knockout selection.
                     </p>
                   </div>
                 ) : (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded p-3">
-                    <p className="text-yellow-700">
+                  <div className="bg-amber-500/10 border border-yellow-500/30 rounded p-3">
+                    <p className="text-amber-300">
                       <FiInfo className="inline mr-2" />
                       This player will be seeded for the final knockout (Round 3) and will:
                     </p>
-                    <ul className="list-disc list-inside mt-2 text-yellow-700 text-sm">
+                    <ul className="list-disc list-inside mt-2 text-amber-300 text-sm">
                       <li>Skip Round 2 entirely</li>
                       <li>Be placed directly in the final knockout bracket</li>
                       <li>Show a "Skip R2" badge in the qualifiers list</li>
@@ -3037,15 +3159,15 @@ const GroupStageManagement = () => {
                     setShowSkipR2Modal(false);
                     setPlayerToSkipR2(null);
                   }}
-                  className="px-6 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  className="px-6 py-2 text-gray-300 border border-white/[0.08] rounded-lg hover:bg-white/[0.04]"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={confirmSkipR2}
                   className={`px-6 py-2 rounded-lg text-white flex items-center gap-2 ${playerToSkipR2.currentlySkipping
-                    ? 'bg-red-500 hover:bg-red-600'
-                    : 'bg-yellow-500 hover:bg-yellow-600'
+                    ? 'bg-red-500/100 hover:bg-red-600'
+                    : 'bg-amber-500/100 hover:bg-yellow-600'
                     }`}
                 >
                   <FaStar />
@@ -3060,9 +3182,9 @@ const GroupStageManagement = () => {
       {/* Reset Round 2 Confirmation Modal */}
       {showResetModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50">
-          <div className="bg-white rounded-2xl max-w-md mx-4 overflow-hidden shadow-2xl">
+          <div className="bg-[#181A22] rounded-2xl max-w-md mx-4 overflow-hidden shadow-2xl">
             {/* Header */}
-            <div className="bg-red-500 px-6 py-5">
+            <div className="bg-red-500/100 px-6 py-5">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
                   <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -3078,24 +3200,24 @@ const GroupStageManagement = () => {
 
             {/* Body */}
             <div className="px-6 py-5">
-              <p className="text-gray-700 text-sm leading-relaxed mb-4">
+              <p className="text-gray-300 text-sm leading-relaxed mb-4">
                 Are you sure you want to reset Round 2? This will permanently delete:
               </p>
-              <div className="bg-red-50 rounded-xl p-4 space-y-2 mb-4">
-                <div className="flex items-center gap-2 text-sm text-red-700">
-                  <span className="w-1.5 h-1.5 bg-red-500 rounded-full" />
+              <div className="bg-red-500/10 rounded-xl p-4 space-y-2 mb-4">
+                <div className="flex items-center gap-2 text-sm text-red-300">
+                  <span className="w-1.5 h-1.5 bg-red-500/100 rounded-full" />
                   All Round 2 <strong>groups</strong> and their player assignments
                 </div>
-                <div className="flex items-center gap-2 text-sm text-red-700">
-                  <span className="w-1.5 h-1.5 bg-red-500 rounded-full" />
+                <div className="flex items-center gap-2 text-sm text-red-300">
+                  <span className="w-1.5 h-1.5 bg-red-500/100 rounded-full" />
                   All Round 2 <strong>matches</strong> and their scores
                 </div>
-                <div className="flex items-center gap-2 text-sm text-red-700">
-                  <span className="w-1.5 h-1.5 bg-red-500 rounded-full" />
+                <div className="flex items-center gap-2 text-sm text-red-300">
+                  <span className="w-1.5 h-1.5 bg-red-500/100 rounded-full" />
                   All <strong>knockout bracket</strong> matches (if any)
                 </div>
               </div>
-              <p className="text-gray-500 text-xs">
+              <p className="text-gray-400 text-xs">
                 You will be able to create new Round 2 groups and matches from scratch after resetting.
               </p>
             </div>
@@ -3105,14 +3227,14 @@ const GroupStageManagement = () => {
               <button
                 onClick={() => setShowResetModal(false)}
                 disabled={resetting}
-                className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-600 font-semibold text-sm hover:bg-gray-50 transition"
+                className="flex-1 py-3 rounded-xl border border-white/[0.06] text-gray-300 font-semibold text-sm hover:bg-white/[0.04] transition"
               >
                 Cancel
               </button>
               <button
                 onClick={confirmResetRound2}
                 disabled={resetting}
-                className="flex-1 py-3 rounded-xl bg-red-500 text-white font-semibold text-sm hover:bg-red-600 transition flex items-center justify-center gap-2 disabled:opacity-50"
+                className="flex-1 py-3 rounded-xl bg-red-500/100 text-white font-semibold text-sm hover:bg-red-600 transition flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 {resetting ? (
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -3133,27 +3255,27 @@ const GroupStageManagement = () => {
       {/* Round 2 Option Selection Modal */}
       {showRound2Modal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50">
-          <div className="bg-white p-8 rounded-[24px] relative max-w-2xl w-full mx-4 shadow-2xl animate-fadeIn">
+          <div className="bg-[#181A22] p-8 rounded-[24px] relative max-w-2xl w-full mx-4 shadow-2xl animate-fadeIn">
             <button
-              className="absolute top-6 right-6 p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-full transition-colors"
+              className="absolute top-6 right-6 p-2 text-gray-300 hover:text-gray-100 hover:bg-white/[0.06] rounded-full transition-colors"
               onClick={() => setShowRound2Modal(false)}
             >
               <FiX className="w-6 h-6" />
             </button>
 
             <div className="text-center">
-              <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-6">
+              <div className="w-20 h-20 bg-green-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
                 <MdRocket className="w-10 h-10 text-green-500" />
               </div>
 
-              <h2 className="text-3xl font-bold text-gray-800 mb-3">
+              <h2 className="text-3xl font-bold text-gray-100 mb-3">
                 Choose Round 2 Format
               </h2>
 
-              <p className="text-gray-600 mb-8 max-w-md mx-auto">
-                You have <strong className="text-gray-900">{topPlayers.length} Top Players</strong> ready
+              <p className="text-gray-300 mb-8 max-w-md mx-auto">
+                You have <strong className="text-white">{topPlayers.length} Top Players</strong> ready
                 {skipR2Count > 0 && (
-                  <> (<strong className="text-yellow-700">{skipR2Count}</strong> seeded for final knockout — will skip Round 2)</>
+                  <> (<strong className="text-amber-300">{skipR2Count}</strong> seeded for final knockout — will skip Round 2)</>
                 )}.
                 Pick a format — you'll choose which players to include on the next screen.
               </p>
@@ -3163,19 +3285,19 @@ const GroupStageManagement = () => {
                 <div
                   onClick={() => setRound2Option('group_stage')}
                   className={`group relative text-left flex flex-col p-6 rounded-2xl border-2 cursor-pointer transition-all duration-200 ${round2Option === 'group_stage'
-                    ? 'border-orange-500 bg-orange-50/40 shadow-lg ring-4 ring-orange-100'
-                    : 'border-gray-200 hover:border-orange-300 hover:shadow-md'
+                    ? 'border-orange-500 bg-orange-500/10/40 shadow-lg ring-4 ring-orange-100'
+                    : 'border-white/[0.06] hover:border-orange-500/40 hover:shadow-md'
                     }`}
                 >
-                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-4 transition-colors ${round2Option === 'group_stage' ? 'bg-orange-500 text-white' : 'bg-orange-100 text-orange-500'}`}>
+                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-4 transition-colors ${round2Option === 'group_stage' ? 'bg-orange-500/100 text-white' : 'bg-orange-500/15 text-orange-500'}`}>
                     <GiTrophyCup className="w-7 h-7" />
                   </div>
-                  <h3 className="font-bold text-xl mb-2 text-gray-900">Group Stage 2</h3>
-                  <p className="text-sm text-gray-600 leading-relaxed">
+                  <h3 className="font-bold text-xl mb-2 text-white">Group Stage 2</h3>
+                  <p className="text-sm text-gray-300 leading-relaxed">
                     Selected players play another round-robin group stage. Winners become Super Players for the final knockout.
                   </p>
                   {round2Option === 'group_stage' && (
-                    <div className="absolute top-4 right-4 w-7 h-7 rounded-full bg-orange-500 text-white flex items-center justify-center shadow-md">
+                    <div className="absolute top-4 right-4 w-7 h-7 rounded-full bg-orange-500/100 text-white flex items-center justify-center shadow-md">
                       <FiCheck className="w-4 h-4" />
                     </div>
                   )}
@@ -3185,19 +3307,19 @@ const GroupStageManagement = () => {
                 <div
                   onClick={() => setRound2Option('knockout')}
                   className={`group relative text-left flex flex-col p-6 rounded-2xl border-2 cursor-pointer transition-all duration-200 ${round2Option === 'knockout'
-                    ? 'border-red-500 bg-red-50/40 shadow-lg ring-4 ring-red-100'
-                    : 'border-gray-200 hover:border-red-300 hover:shadow-md'
+                    ? 'border-red-500 bg-red-500/10/40 shadow-lg ring-4 ring-red-100'
+                    : 'border-white/[0.06] hover:border-red-500/40 hover:shadow-md'
                     }`}
                 >
-                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-4 transition-colors ${round2Option === 'knockout' ? 'bg-red-500 text-white' : 'bg-red-100 text-red-500'}`}>
+                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-4 transition-colors ${round2Option === 'knockout' ? 'bg-red-500/100 text-white' : 'bg-red-500/15 text-red-500'}`}>
                     <MdFlashOn className="w-7 h-7" />
                   </div>
-                  <h3 className="font-bold text-xl mb-2 text-gray-900">Direct Knockout</h3>
-                  <p className="text-sm text-gray-600 leading-relaxed">
+                  <h3 className="font-bold text-xl mb-2 text-white">Direct Knockout</h3>
+                  <p className="text-sm text-gray-300 leading-relaxed">
                     Selected players go straight into a single-elimination bracket. Winner takes all.
                   </p>
                   {round2Option === 'knockout' && (
-                    <div className="absolute top-4 right-4 w-7 h-7 rounded-full bg-red-500 text-white flex items-center justify-center shadow-md">
+                    <div className="absolute top-4 right-4 w-7 h-7 rounded-full bg-red-500/100 text-white flex items-center justify-center shadow-md">
                       <FiCheck className="w-4 h-4" />
                     </div>
                   )}
@@ -3207,7 +3329,7 @@ const GroupStageManagement = () => {
               <div className="flex justify-center gap-4">
                 <button
                   onClick={() => setShowRound2Modal(false)}
-                  className="px-8 py-3 text-gray-600 font-medium hover:bg-gray-100 rounded-xl transition-colors"
+                  className="px-8 py-3 text-gray-300 font-medium hover:bg-white/[0.06] rounded-xl transition-colors"
                 >
                   Cancel
                 </button>
@@ -3216,7 +3338,7 @@ const GroupStageManagement = () => {
                   disabled={!round2Option}
                   className={`px-8 py-3 rounded-xl font-bold text-white shadow-lg transition-all transform flex items-center gap-3 ${round2Option
                     ? 'bg-gray-900 hover:bg-black hover:scale-105 active:scale-95'
-                    : 'bg-gray-300 cursor-not-allowed'
+                    : 'bg-white/[0.10] cursor-not-allowed'
                     }`}
                 >
                   Next: Pick Players <MdRocket className="w-5 h-5" />
@@ -3230,7 +3352,7 @@ const GroupStageManagement = () => {
       {/* Knockout Scheduling Modal */}
       {showKnockoutModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-xl my-8">
+          <div className="bg-[#181A22] rounded-lg shadow-xl p-6 w-full max-w-xl my-8">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold flex items-center gap-2">
                 <MdFlashOn className="w-5 h-5 text-red-500" />
@@ -3238,7 +3360,7 @@ const GroupStageManagement = () => {
               </h3>
               <button
                 onClick={() => setShowKnockoutModal(false)}
-                className="text-gray-600 hover:text-gray-600"
+                className="text-gray-300 hover:text-gray-300"
               >
                 ×
               </button>
@@ -3258,7 +3380,7 @@ const GroupStageManagement = () => {
                 />
               ) : (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-300 mb-1">
                     Court Number
                   </label>
                   <input
@@ -3269,14 +3391,14 @@ const GroupStageManagement = () => {
                       ...prev,
                       courtNumber: parseInt(e.target.value)
                     }))}
-                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    className="w-full p-2 border border-white/[0.08] rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
                     placeholder="Enter court number"
                   />
                 </div>
               )}
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-300 mb-1">
                   Match Start Time
                 </label>
                 <input
@@ -3286,7 +3408,7 @@ const GroupStageManagement = () => {
                     ...prev,
                     matchStartTime: e.target.value
                   }))}
-                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                  className="w-full p-2 border border-white/[0.08] rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
                 />
               </div>
 
@@ -3313,7 +3435,7 @@ const GroupStageManagement = () => {
 
               {/* Draw Size */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-300 mb-1">
                   Draw Size
                 </label>
                 <div className="flex flex-wrap gap-2">
@@ -3332,10 +3454,10 @@ const GroupStageManagement = () => {
                         }))}
                         className={`px-4 py-1.5 rounded-lg text-sm font-bold w-auto transition-all ${
                           tooSmall
-                            ? "bg-red-50 text-red-300 border border-red-200 cursor-not-allowed"
+                            ? "bg-red-500/10 text-red-300 border border-red-500/30 cursor-not-allowed"
                             : active
-                              ? "bg-orange-500 text-white shadow-sm"
-                              : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                              ? "bg-orange-500/100 text-white shadow-sm"
+                              : "bg-white/[0.06] text-gray-300 hover:bg-white/[0.08]"
                         }`}
                       >
                         {size}
@@ -3343,14 +3465,14 @@ const GroupStageManagement = () => {
                     );
                   })}
                 </div>
-                <p className="text-[11px] text-gray-500 mt-1">
+                <p className="text-[11px] text-gray-400 mt-1">
                   {superPlayers.length}/{knockoutSettings.drawSize} players — {Math.max(0, knockoutSettings.drawSize - superPlayers.length)} BYEs
                 </p>
               </div>
 
               {/* Number of Seeded Players */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-300 mb-1">
                   Number of Seeded Players
                 </label>
                 <div className="flex flex-wrap gap-2">
@@ -3362,7 +3484,7 @@ const GroupStageManagement = () => {
                         type="button"
                         onClick={() => setKnockoutSettings((p) => ({ ...p, numberOfSeeds: n }))}
                         className={`px-3 py-1.5 rounded-lg text-sm font-bold w-auto transition-all ${
-                          active ? "bg-orange-500 text-white shadow-sm" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                          active ? "bg-orange-500/100 text-white shadow-sm" : "bg-white/[0.06] text-gray-300 hover:bg-white/[0.08]"
                         }`}
                       >
                         {n === 0 ? "None" : n}
@@ -3370,7 +3492,7 @@ const GroupStageManagement = () => {
                     );
                   })}
                 </div>
-                <p className="text-[11px] text-gray-500 mt-1">
+                <p className="text-[11px] text-gray-400 mt-1">
                   {knockoutSettings.numberOfSeeds === 0
                     ? "No seeding — players placed in rank order (legacy sequential pairing)."
                     : `Top ${knockoutSettings.numberOfSeeds} ranked players get fixed Mirror & Flip positions. Remaining placed into unseeded slots.`}
@@ -3384,10 +3506,10 @@ const GroupStageManagement = () => {
                 players={knockoutPlayerList}
               />
 
-              <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+              <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-3">
                 <div className="flex items-start gap-2">
                   <div className="text-orange-500 mt-0.5">ℹ️</div>
-                  <div className="text-sm text-orange-600">
+                  <div className="text-sm text-orange-400">
                     <p className="font-medium mb-1">Tournament Info:</p>
                     <p>• {superPlayers.length} Super Players qualified from groups</p>
                     <p>• Draw size {knockoutSettings.drawSize}, {knockoutSettings.numberOfSeeds} seeded</p>
@@ -3400,13 +3522,13 @@ const GroupStageManagement = () => {
             <div className="flex justify-end gap-3 mt-6">
               <button
                 onClick={() => setShowKnockoutModal(false)}
-                className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+                className="px-4 py-2 text-gray-300 border border-white/[0.08] rounded-lg hover:bg-white/[0.04]"
               >
                 Cancel
               </button>
               <button
                 onClick={generateKnockoutMatches}
-                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 flex items-center gap-2"
+                className="px-4 py-2 bg-red-500/100 text-white rounded-lg hover:bg-red-600 flex items-center gap-2"
               >
                 <MdFlashOn className="w-4 h-4" />
                 Generate Knockout
@@ -3419,20 +3541,20 @@ const GroupStageManagement = () => {
       {/* 🔥 DIRECT KNOCKOUT PLAYER SELECTION MODAL (ENHANCED FOR SIZE SELECTION) */}
       {showDirectKnockoutPlayerModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50">
-          <div className="bg-white p-8 rounded-[24px] relative max-w-5xl mx-4 shadow-2xl max-h-[90vh] overflow-y-auto animate-fadeIn">
+          <div className="bg-[#181A22] p-8 rounded-[24px] relative max-w-5xl mx-4 shadow-2xl max-h-[90vh] overflow-y-auto animate-fadeIn">
             <div className="flex justify-between items-center mb-8">
               <div>
-                <h2 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-                  <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center">
+                <h2 className="text-3xl font-bold text-white flex items-center gap-3">
+                  <div className="w-10 h-10 bg-red-500/15 rounded-xl flex items-center justify-center">
                     <MdFlashOn className="w-6 h-6 text-red-500" />
                   </div>
                   Knockout Setup
                 </h2>
-                <p className="text-gray-500 mt-1 ml-14">Select the tournament structure based on available players.</p>
+                <p className="text-gray-400 mt-1 ml-14">Select the tournament structure based on available players.</p>
               </div>
               <button
                 onClick={() => setShowDirectKnockoutPlayerModal(false)}
-                className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-full transition-colors"
+                className="p-2 text-gray-300 hover:text-gray-100 hover:bg-white/[0.06] rounded-full transition-colors"
                 title="Close"
               >
                 <FiX className="w-6 h-6" />
@@ -3441,9 +3563,9 @@ const GroupStageManagement = () => {
 
             {/* Skip-R2 banner (final-KO seeds excluded from the picker pool) */}
             {round2FilterCounts.skipR2 > 0 && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-3 mb-4 flex items-center gap-3">
+              <div className="bg-amber-500/10 border border-yellow-500/30 rounded-xl px-4 py-3 mb-4 flex items-center gap-3">
                 <FaStar className="w-4 h-4 text-yellow-500 flex-shrink-0" />
-                <p className="text-sm text-yellow-800">
+                <p className="text-sm text-amber-300">
                   <strong>{round2FilterCounts.skipR2}</strong> player{round2FilterCounts.skipR2 === 1 ? ' is' : 's are'} seeded for the final knockout and excluded from this bracket. They'll join Round 3 directly.
                 </p>
               </div>
@@ -3463,7 +3585,7 @@ const GroupStageManagement = () => {
               ];
               return (
                 <div className="flex items-center gap-2 flex-wrap mb-6">
-                  <span className="text-xs font-bold text-gray-500 uppercase tracking-wider mr-2">Filter pool:</span>
+                  <span className="text-xs font-bold text-gray-400 uppercase tracking-wider mr-2">Filter pool:</span>
                   {chips.map((c) => {
                     const active = round2Filter === c.key;
                     return (
@@ -3471,12 +3593,12 @@ const GroupStageManagement = () => {
                         key={c.key}
                         onClick={() => setRound2Filter(c.key)}
                         className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all border ${active
-                          ? 'bg-red-500 text-white border-red-500 shadow-sm'
-                          : 'bg-white text-gray-700 border-gray-300 hover:border-red-300 hover:text-red-600'
+                          ? 'bg-red-500/100 text-white border-red-500 shadow-sm'
+                          : 'bg-[#181A22] text-gray-300 border-white/[0.08] hover:border-red-500/40 hover:text-red-400'
                           }`}
                       >
                         {c.label}
-                        <span className={`ml-1.5 ${active ? 'text-red-100' : 'text-gray-400'}`}>({c.count})</span>
+                        <span className={`ml-1.5 ${active ? 'text-red-100' : 'text-gray-500'}`}>({c.count})</span>
                       </button>
                     );
                   })}
@@ -3485,15 +3607,15 @@ const GroupStageManagement = () => {
             })()}
 
             <div className="mb-10">
-              <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-2xl p-6 mb-8 border border-gray-200">
+              <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-2xl p-6 mb-8 border border-white/[0.06]">
                 <div className="flex items-center gap-4 mb-2">
-                  <div className="bg-white p-2 rounded-lg shadow-sm">
-                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Available Pool</span>
+                  <div className="bg-[#181A22] p-2 rounded-lg shadow-sm">
+                    <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Available Pool</span>
                   </div>
-                  <div className="h-px bg-gray-300 flex-1"></div>
+                  <div className="h-px bg-white/[0.10] flex-1"></div>
                 </div>
-                <p className="text-lg text-gray-700">
-                  You have <span className="text-3xl font-bold text-gray-900 mx-1">{round2FilteredPlayers.length}</span>
+                <p className="text-lg text-gray-300">
+                  You have <span className="text-3xl font-bold text-white mx-1">{round2FilteredPlayers.length}</span>
                   {round2Filter === 'all' ? ' Top Players' : ` ${round2Filter === 'seeded' ? 'Seeded' : `Top ${round2Filter.replace('pos_', '')}`} players`} in the pool.
                 </p>
               </div>
@@ -3517,31 +3639,31 @@ const GroupStageManagement = () => {
                       }}
                       disabled={!isAvailable}
                       className={`group relative overflow-hidden p-8 rounded-[20px] border-2 transition-all duration-300 flex flex-col items-center justify-center gap-4 h-64 ${isAvailable
-                        ? 'border-gray-200 bg-white hover:border-red-500 hover:shadow-xl cursor-pointer'
-                        : 'border-gray-200 bg-gray-50/50 opacity-60 cursor-not-allowed grayscale'
+                        ? 'border-white/[0.06] bg-[#181A22] hover:border-red-500 hover:shadow-xl cursor-pointer'
+                        : 'border-white/[0.06] bg-gray-50/50 opacity-60 cursor-not-allowed grayscale'
                         }`}
                     >
                       {/* Decorative Background Element */}
-                      <div className={`absolute -right-6 -top-6 w-24 h-24 rounded-full opacity-10 transition-transform group-hover:scale-150 ${isAvailable ? 'bg-red-500' : 'bg-gray-400'}`}></div>
+                      <div className={`absolute -right-6 -top-6 w-24 h-24 rounded-full opacity-10 transition-transform group-hover:scale-150 ${isAvailable ? 'bg-red-500/100' : 'bg-white/[0.12]'}`}></div>
 
-                      <div className={`text-6xl font-black tracking-tighter transition-transform group-hover:scale-110 ${isAvailable ? 'text-gray-900 group-hover:text-red-500' : 'text-gray-700'}`}>
+                      <div className={`text-6xl font-black tracking-tighter transition-transform group-hover:scale-110 ${isAvailable ? 'text-white group-hover:text-red-500' : 'text-gray-300'}`}>
                         {size}
                       </div>
 
                       <div className="text-center z-10 relative">
-                        <div className={`text-lg font-bold mb-1 ${isAvailable ? 'text-gray-700' : 'text-gray-600'}`}>
+                        <div className={`text-lg font-bold mb-1 ${isAvailable ? 'text-gray-300' : 'text-gray-300'}`}>
                           Round of {size}
                         </div>
                         <div className={`text-sm font-medium px-3 py-1 rounded-full inline-block ${isAvailable
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-red-50 text-red-500'
+                          ? 'bg-green-500/15 text-green-300'
+                          : 'bg-red-500/10 text-red-500'
                           }`}>
                           {isAvailable ? '✅ Ready to Start' : `Need ${size - topPlayers.length} more`}
                         </div>
                       </div>
 
                       {isAvailable && (
-                        <div className="absolute bottom-6 opacity-0 group-hover:opacity-100 transition-opacity text-red-600 font-semibold text-sm flex items-center gap-1">
+                        <div className="absolute bottom-6 opacity-0 group-hover:opacity-100 transition-opacity text-red-400 font-semibold text-sm flex items-center gap-1">
                           Select & Proceed <MdRocket />
                         </div>
                       )}
@@ -3552,17 +3674,17 @@ const GroupStageManagement = () => {
             </div>
 
             {/* Manual Selection Toggle */}
-            <div className="border-t border-gray-200 pt-8">
+            <div className="border-t border-white/[0.06] pt-8">
               <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6">
                 <div>
-                  <h3 className="text-lg font-bold text-gray-800">Manual Selection</h3>
-                  <p className="text-sm text-gray-500">Custom bracket sizes or specific player selection</p>
+                  <h3 className="text-lg font-bold text-gray-100">Manual Selection</h3>
+                  <p className="text-sm text-gray-400">Custom bracket sizes or specific player selection</p>
                 </div>
 
                 <div className="flex gap-2">
                   <button
                     onClick={() => setSelectedDirectKnockoutPlayers([])}
-                    className="text-xs font-medium text-red-500 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors"
+                    className="text-xs font-medium text-red-500 bg-red-500/10 hover:bg-red-500/15 px-3 py-1.5 rounded-lg transition-colors"
                   >
                     Reset Checkboxes
                   </button>
@@ -3574,7 +3696,7 @@ const GroupStageManagement = () => {
                         setSelectedDirectKnockoutPlayers(newSelection);
                       }}
                       disabled={topPlayers.length < count}
-                      className="text-xs font-medium bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+                      className="text-xs font-medium bg-white/[0.06] hover:bg-white/[0.08] text-gray-300 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
                     >
                       Pick Top {count}
                     </button>
@@ -3600,15 +3722,15 @@ const GroupStageManagement = () => {
                         }
                       }}
                       className={`p-3 rounded-xl border-2 cursor-pointer transition-all duration-200 flex items-center gap-3 group ${isSelected
-                        ? 'border-red-500 bg-red-50 shadow-sm'
-                        : 'border-gray-200 bg-white hover:border-gray-300'
+                        ? 'border-red-500 bg-red-500/10 shadow-sm'
+                        : 'border-white/[0.06] bg-[#181A22] hover:border-white/[0.08]'
                         }`}
                     >
-                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors ${isSelected ? 'bg-red-500 border-red-500' : 'bg-transparent border-gray-300 group-hover:border-gray-400'
+                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors ${isSelected ? 'bg-red-500/100 border-red-500' : 'bg-transparent border-white/[0.08] group-hover:border-white/[0.10]'
                         }`}>
                         {isSelected && <FiCheck className="w-3 h-3 text-white" />}
                       </div>
-                      <span className={`text-sm truncate font-medium ${isSelected ? 'text-red-900' : 'text-gray-600'}`}>
+                      <span className={`text-sm truncate font-medium ${isSelected ? 'text-red-300' : 'text-gray-300'}`}>
                         {player.playerName || player.name}
                       </span>
                     </div>
@@ -3616,15 +3738,15 @@ const GroupStageManagement = () => {
                 })}
               </div>
 
-              <div className="flex justify-between items-center mt-8 pt-6 border-t border-gray-200">
+              <div className="flex justify-between items-center mt-8 pt-6 border-t border-white/[0.06]">
                 <div className="text-sm">
-                  <span className="text-gray-500">Selected Count: </span>
-                  <span className={`font-bold text-lg ${selectedDirectKnockoutPlayers.length >= 4 ? 'text-green-600' : 'text-gray-900'}`}>{selectedDirectKnockoutPlayers.length}</span>
+                  <span className="text-gray-400">Selected Count: </span>
+                  <span className={`font-bold text-lg ${selectedDirectKnockoutPlayers.length >= 4 ? 'text-green-400' : 'text-white'}`}>{selectedDirectKnockoutPlayers.length}</span>
                 </div>
                 <div className="flex gap-4">
                   <button
                     onClick={() => setShowDirectKnockoutPlayerModal(false)}
-                    className="px-6 py-2.5 text-gray-600 font-medium hover:bg-gray-100 rounded-lg transition-colors"
+                    className="px-6 py-2.5 text-gray-300 font-medium hover:bg-white/[0.06] rounded-lg transition-colors"
                   >
                     Cancel
                   </button>
@@ -3633,7 +3755,7 @@ const GroupStageManagement = () => {
                     disabled={selectedDirectKnockoutPlayers.length < 4}
                     className={`px-6 py-2.5 rounded-lg text-white font-bold flex items-center gap-2 shadow-lg transition-all ${selectedDirectKnockoutPlayers.length >= 4
                       ? 'bg-gray-900 hover:bg-black hover:-translate-y-0.5'
-                      : 'bg-gray-300 cursor-not-allowed'
+                      : 'bg-white/[0.10] cursor-not-allowed'
                       }`}
                   >
                     Confirm Selection <MdRocket />
@@ -3648,21 +3770,21 @@ const GroupStageManagement = () => {
       {/* 🔥 DIRECT KNOCKOUT SCHEDULE MODAL (ENHANCED) */}
       {showDirectKnockoutScheduleModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] shadow-2xl animate-fadeIn flex flex-col overflow-hidden">
+          <div className="bg-[#181A22] rounded-2xl max-w-2xl w-full max-h-[90vh] shadow-2xl animate-fadeIn flex flex-col overflow-hidden">
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.05] flex-shrink-0">
               <div className="flex items-center gap-3 min-w-0">
-                <div className="w-9 h-9 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center flex-shrink-0">
+                <div className="w-9 h-9 rounded-lg bg-orange-500/15 text-orange-400 flex items-center justify-center flex-shrink-0">
                   <BiTrophy className="w-5 h-5" />
                 </div>
                 <div className="min-w-0">
-                  <h2 className="text-base font-bold text-gray-900 truncate">Schedule Knockout Matches</h2>
-                  <p className="text-[11px] text-gray-500 truncate">Review settings, then create the bracket</p>
+                  <h2 className="text-base font-bold text-white truncate">Schedule Knockout Matches</h2>
+                  <p className="text-[11px] text-gray-400 truncate">Review settings, then create the bracket</p>
                 </div>
               </div>
               <button
                 onClick={() => setShowDirectKnockoutScheduleModal(false)}
-                className="p-1.5 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 bg-transparent w-auto"
+                className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/[0.06] bg-transparent w-auto"
                 aria-label="Close"
               >
                 <FiX className="w-5 h-5" />
@@ -3673,53 +3795,53 @@ const GroupStageManagement = () => {
             <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
               {/* Stats strip — uses drawSize so math is always accurate */}
               <div className="grid grid-cols-3 gap-3">
-                <div className="rounded-lg border border-gray-200 px-3 py-2">
-                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Players</p>
-                  <p className="text-lg font-bold text-gray-900 mt-0.5">
+                <div className="rounded-lg border border-white/[0.06] px-3 py-2">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Players</p>
+                  <p className="text-lg font-bold text-white mt-0.5">
                     {selectedDirectKnockoutPlayers.length}
-                    <span className="text-sm text-gray-400 font-normal"> / {knockoutSchedule.drawSize}</span>
+                    <span className="text-sm text-gray-500 font-normal"> / {knockoutSchedule.drawSize}</span>
                   </p>
                 </div>
-                <div className="rounded-lg border border-gray-200 px-3 py-2">
-                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Matches</p>
-                  <p className="text-lg font-bold text-gray-900 mt-0.5">{knockoutSchedule.drawSize - 1}</p>
+                <div className="rounded-lg border border-white/[0.06] px-3 py-2">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Matches</p>
+                  <p className="text-lg font-bold text-white mt-0.5">{knockoutSchedule.drawSize - 1}</p>
                 </div>
-                <div className="rounded-lg border border-gray-200 px-3 py-2">
-                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Rounds</p>
-                  <p className="text-lg font-bold text-gray-900 mt-0.5">{Math.log2(knockoutSchedule.drawSize)}</p>
+                <div className="rounded-lg border border-white/[0.06] px-3 py-2">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Rounds</p>
+                  <p className="text-lg font-bold text-white mt-0.5">{Math.log2(knockoutSchedule.drawSize)}</p>
                 </div>
               </div>
 
               {/* Schedule fields — single 4-column row */}
               <div>
-                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Schedule</p>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Schedule</p>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   <div>
-                    <label className="block text-[11px] font-semibold text-gray-600 mb-1">Start Date</label>
+                    <label className="block text-[11px] font-semibold text-gray-300 mb-1">Start Date</label>
                     <input
                       type="date"
                       value={knockoutSchedule.startDate}
                       onChange={(e) => setKnockoutSchedule((prev) => ({ ...prev, startDate: e.target.value }))}
-                      className="w-full px-2.5 py-2 text-sm bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400 outline-none"
+                      className="w-full px-2.5 py-2 text-sm bg-[#181A22] border border-white/[0.08] rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400 outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-semibold text-gray-600 mb-1">Start Time</label>
+                    <label className="block text-[11px] font-semibold text-gray-300 mb-1">Start Time</label>
                     <input
                       type="time"
                       value={knockoutSchedule.startTime}
                       onChange={(e) => setKnockoutSchedule((prev) => ({ ...prev, startTime: e.target.value }))}
-                      className="w-full px-2.5 py-2 text-sm bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400 outline-none"
+                      className="w-full px-2.5 py-2 text-sm bg-[#181A22] border border-white/[0.08] rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400 outline-none"
                     />
                   </div>
                   {tournamentCourts.length === 0 && (
                     <div>
-                      <label className="block text-[11px] font-semibold text-gray-600 mb-1">Court</label>
+                      <label className="block text-[11px] font-semibold text-gray-300 mb-1">Court</label>
                       <input
                         type="number" min="1" max="10" placeholder="1"
                         value={knockoutSchedule.courtNumber}
                         onChange={(e) => setKnockoutSchedule((prev) => ({ ...prev, courtNumber: parseInt(e.target.value) }))}
-                        className="w-full px-2.5 py-2 text-sm bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400 outline-none"
+                        className="w-full px-2.5 py-2 text-sm bg-[#181A22] border border-white/[0.08] rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400 outline-none"
                       />
                     </div>
                   )}
@@ -3760,8 +3882,8 @@ const GroupStageManagement = () => {
 
               {/* Draw Method — segmented control */}
               <div>
-                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Bracket Draw Method</p>
-                <div className="inline-flex items-center gap-1 p-1 bg-gray-100 rounded-lg">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Bracket Draw Method</p>
+                <div className="inline-flex items-center gap-1 p-1 bg-white/[0.06] rounded-lg">
                   {[
                     { value: 'global', label: 'Global Rules', hint: '1 vs Last, balanced' },
                     { value: 'local', label: 'Local Rules', hint: 'Custom templates' },
@@ -3771,8 +3893,8 @@ const GroupStageManagement = () => {
                       onClick={() => setDrawMethod(opt.value)}
                       className={`px-4 py-1.5 rounded-md text-sm font-semibold w-auto transition-all ${
                         drawMethod === opt.value
-                          ? 'bg-white text-orange-600 shadow-sm'
-                          : 'bg-transparent text-gray-600 hover:text-gray-900'
+                          ? 'bg-[#181A22] text-orange-400 shadow-sm'
+                          : 'bg-transparent text-gray-300 hover:text-white'
                       }`}
                       title={opt.hint}
                     >
@@ -3785,7 +3907,7 @@ const GroupStageManagement = () => {
               {/* Draw Size + Number of Seeded Players — side-by-side */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
-                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Draw Size</p>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Draw Size</p>
                   <div className="flex flex-wrap gap-1.5">
                     {VALID_KO_DRAW_SIZES.map((size) => {
                       const tooSmall = selectedDirectKnockoutPlayers.length > size;
@@ -3802,10 +3924,10 @@ const GroupStageManagement = () => {
                           }))}
                           className={`px-3 py-1 rounded-md text-xs font-bold w-auto transition-all ${
                             tooSmall
-                              ? 'bg-red-50 text-red-300 border border-red-200 cursor-not-allowed'
+                              ? 'bg-red-500/10 text-red-300 border border-red-500/30 cursor-not-allowed'
                               : active
-                                ? 'bg-orange-500 text-white'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                ? 'bg-orange-500/100 text-white'
+                                : 'bg-white/[0.06] text-gray-300 hover:bg-white/[0.08]'
                           }`}
                         >
                           {size}
@@ -3813,13 +3935,13 @@ const GroupStageManagement = () => {
                       );
                     })}
                   </div>
-                  <p className="text-[11px] text-gray-500 mt-1.5">
+                  <p className="text-[11px] text-gray-400 mt-1.5">
                     {Math.max(0, knockoutSchedule.drawSize - selectedDirectKnockoutPlayers.length)} BYEs
                   </p>
                 </div>
 
                 <div>
-                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Seeded Players</p>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Seeded Players</p>
                   <div className="flex flex-wrap gap-1.5">
                     {[0, 2, 4, 8, 16, 32].filter((n) => n <= Math.floor(knockoutSchedule.drawSize / 2)).map((n) => {
                       const active = knockoutSchedule.numberOfSeeds === n;
@@ -3829,7 +3951,7 @@ const GroupStageManagement = () => {
                           type="button"
                           onClick={() => setKnockoutSchedule((p) => ({ ...p, numberOfSeeds: n }))}
                           className={`px-3 py-1 rounded-md text-xs font-bold w-auto transition-all ${
-                            active ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            active ? 'bg-orange-500/100 text-white' : 'bg-white/[0.06] text-gray-300 hover:bg-white/[0.08]'
                           }`}
                         >
                           {n === 0 ? 'None' : n}
@@ -3837,7 +3959,7 @@ const GroupStageManagement = () => {
                       );
                     })}
                   </div>
-                  <p className="text-[11px] text-gray-500 mt-1.5">
+                  <p className="text-[11px] text-gray-400 mt-1.5">
                     {knockoutSchedule.numberOfSeeds === 0
                       ? 'Sequential pairing.'
                       : `Top ${knockoutSchedule.numberOfSeeds} at fixed Mirror & Flip positions.`}
@@ -3854,10 +3976,10 @@ const GroupStageManagement = () => {
             </div>
 
             {/* Footer */}
-            <div className="px-6 py-3 border-t border-gray-100 flex items-center justify-end gap-2 flex-shrink-0">
+            <div className="px-6 py-3 border-t border-white/[0.05] flex items-center justify-end gap-2 flex-shrink-0">
               <button
                 onClick={() => setShowDirectKnockoutScheduleModal(false)}
-                className="px-4 py-2 rounded-lg text-sm font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 w-auto"
+                className="px-4 py-2 rounded-lg text-sm font-semibold text-gray-300 bg-white/[0.06] hover:bg-white/[0.08] w-auto"
               >
                 Cancel
               </button>
@@ -3866,8 +3988,8 @@ const GroupStageManagement = () => {
                 disabled={!knockoutSchedule.startDate || !knockoutSchedule.startTime || isSubmittingKnockout}
                 className={`px-5 py-2 rounded-lg text-sm font-bold text-white flex items-center gap-2 w-auto transition-colors ${
                   knockoutSchedule.startDate && knockoutSchedule.startTime && !isSubmittingKnockout
-                    ? 'bg-orange-500 hover:bg-orange-600'
-                    : 'bg-gray-300 cursor-not-allowed'
+                    ? 'bg-orange-500/100 hover:bg-orange-600'
+                    : 'bg-white/[0.10] cursor-not-allowed'
                 }`}
               >
                 <MdFlashOn className="w-4 h-4" />
@@ -3878,7 +4000,7 @@ const GroupStageManagement = () => {
         </div>
       )}
 
-    </div>
+    </TournamentShell>
   );
 };
 

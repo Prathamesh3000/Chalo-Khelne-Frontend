@@ -1,21 +1,22 @@
 import { useState, useEffect } from "react";
+import { toast } from "react-toastify";
 import axios from "axios";
 import {
-  PlusIcon,
-  PencilSquareIcon,
-  XMarkIcon,
-  CheckCircleIcon,
-  XCircleIcon,
-  ArrowPathIcon,
-  MagnifyingGlassIcon,
-  FunnelIcon,
-  Cog6ToothIcon,
-  SparklesIcon,
-} from "@heroicons/react/24/outline";
-import { toast, ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+  Plus,
+  Pencil,
+  X,
+  CheckCircle2,
+  XCircle,
+  RotateCw,
+  Search,
+  Filter,
+  Settings2,
+  Sparkles,
+  Trophy,
+} from "lucide-react";
+import { SuperAdminShell } from "../shared/layout";
 
-const API = import.meta.env.VITE_API_BASE_URL;
+const API_URL = `${import.meta.env.VITE_API_BASE_URL}/sports`;
 
 const CATEGORIES = ["Racquet", "Team", "Board", "Individual", "Custom"];
 const SCORING_TYPES = [
@@ -28,11 +29,11 @@ const SCORING_TYPES = [
 ];
 
 const categoryColors = {
-  Racquet: "bg-green-100 text-green-700",
-  Team: "bg-blue-100 text-blue-700",
-  Board: "bg-purple-100 text-purple-700",
-  Individual: "bg-orange-100 text-orange-700",
-  Custom: "bg-gray-100 text-gray-700",
+  Racquet: "bg-blue-500/15 text-blue-300 border-blue-400/20",
+  Team: "bg-emerald-500/15 text-emerald-300 border-emerald-400/20",
+  Board: "bg-purple-500/15 text-purple-300 border-purple-400/20",
+  Individual: "bg-amber-500/15 text-amber-300 border-amber-400/20",
+  Custom: "bg-gray-500/15 text-gray-300 border-gray-400/20",
 };
 
 const defaultFormData = {
@@ -40,58 +41,125 @@ const defaultFormData = {
   category: "Racquet",
   scoringType: "sets-games-points",
   matchFormat: {
-    totalSets: null,
+    totalSets: 3,
+    pointsPerSet: 21,
     gamesPerSet: null,
-    pointsPerSet: null,
-    pointsPerGame: null,
-    winByMargin: null,
-    maxPointsCap: null,
-    deuceEnabled: false,
-    deuceMinPoints: null,
+    deuceEnabled: true,
     tiebreakEnabled: false,
-    tiebreakPoints: null,
-    decidingSetPoints: null,
-    serviceRules: null,
+    serviceRules: "rally",
+    oversCount: null,
+    inningsCount: null,
     halvesCount: null,
     halvesDuration: null,
     quartersCount: null,
     quartersDuration: null,
-    oversCount: null,
-    inningsCount: null,
   },
   displayConfig: {
-    icon: "default-sport",
-    color: "#4CAF50",
-    scoreLabel: "Score",
+    icon: "Trophy",
+    color: "#f97316",
+    scoreLabel: "Points",
     setLabel: "Set",
     pointLabel: "Point",
   },
 };
 
+// Hoisted helpers (module-scope so they don't remount each keystroke)
+const DarkInput = (props) => (
+  <input
+    {...props}
+    className={
+      "w-full h-9 px-3 bg-[#0F1117] border border-white/[0.08] rounded-md text-[13px] text-white placeholder:text-gray-600 focus:outline-none focus:border-orange-400/40 transition " +
+      (props.className || "")
+    }
+  />
+);
+
+const DarkSelect = ({ children, ...props }) => (
+  <select
+    {...props}
+    className={
+      "w-full h-9 px-3 bg-[#0F1117] border border-white/[0.08] rounded-md text-[13px] text-white focus:outline-none focus:border-orange-400/40 transition appearance-none " +
+      (props.className || "")
+    }
+  >
+    {children}
+  </select>
+);
+
+const FieldLabel = ({ children }) => (
+  <label className="block text-[10px] font-bold uppercase tracking-[0.1em] text-gray-500 mb-1.5">
+    {children}
+  </label>
+);
+
+const SectionTitle = ({ children }) => (
+  <h4 className="text-[11px] font-bold uppercase tracking-[0.1em] text-gray-500 mb-3">
+    {children}
+  </h4>
+);
+
+const StatTile = ({ label, value, accent }) => (
+  <div className="bg-[#181A22] border border-white/[0.06] rounded-lg px-4 py-3">
+    <p className="text-[11px] uppercase tracking-[0.08em] text-gray-500">
+      {label}
+    </p>
+    <p className={`mt-1 text-[22px] font-medium ${accent || "text-white"}`}>
+      {value}
+    </p>
+  </div>
+);
+
+function FormatSummary({ sport }) {
+  const f = sport.matchFormat;
+  const st = sport.scoringType;
+  let summary = "";
+  if (st === "sets-games-points") {
+    if (f?.totalSets && f?.pointsPerSet)
+      summary = `Best of ${f.totalSets}, ${f.pointsPerSet} pts`;
+    else if (f?.totalSets && f?.gamesPerSet)
+      summary = `Best of ${f.totalSets}, ${f.gamesPerSet} games`;
+    else if (f?.totalSets) summary = `Best of ${f.totalSets}`;
+    else summary = "—";
+  } else if (st === "innings-overs") {
+    summary = f?.oversCount
+      ? `${f.oversCount} overs, ${f.inningsCount || 2} innings`
+      : "—";
+  } else if (st === "halves-goals") {
+    summary = f?.halvesCount
+      ? `${f.halvesCount} halves, ${f.halvesDuration}min`
+      : "—";
+  } else if (st === "quarters-points") {
+    summary = f?.quartersCount
+      ? `${f.quartersCount} quarters, ${f.quartersDuration}min`
+      : "—";
+  } else {
+    summary = "Custom";
+  }
+  return <span className="text-[12px] text-gray-400">{summary}</span>;
+}
+
 export default function SportsManagement() {
   const [sports, setSports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [filterCategory, setFilterCategory] = useState("");
+  const [filterCategory, setFilterCategory] = useState("All");
   const [showModal, setShowModal] = useState(false);
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [editingSport, setEditingSport] = useState(null);
   const [configSport, setConfigSport] = useState(null);
-  const [formData, setFormData] = useState({ ...defaultFormData });
+  const [formData, setFormData] = useState(defaultFormData);
   const [seeding, setSeeding] = useState(false);
 
   useEffect(() => {
     fetchSports();
-  }, [filterCategory]);
+  }, []);
 
   const fetchSports = async () => {
     setLoading(true);
     try {
-      const params = filterCategory ? `?category=${filterCategory}` : "";
-      const res = await axios.get(`${API}/sports${params}`);
-      setSports(res.data.data || []);
-    } catch (err) {
-      console.error("Error fetching sports:", err);
+      const { data } = await axios.get(API_URL);
+      setSports(Array.isArray(data) ? data : data?.data || []);
+    } catch {
       toast.error("Failed to load sports");
     } finally {
       setLoading(false);
@@ -99,14 +167,14 @@ export default function SportsManagement() {
   };
 
   const handleSeed = async () => {
+    if (!window.confirm("Seed the 5 default sport presets?")) return;
     setSeeding(true);
     try {
-      const res = await axios.post(`${API}/sports/seed`);
-      toast.success(res.data.message || "Sports seeded successfully!");
-      fetchSports();
+      const { data } = await axios.post(`${API_URL}/seed`);
+      toast.success(`Seeded ${data.count || 0} sports`);
+      await fetchSports();
     } catch (err) {
-      console.error("Seed error:", err);
-      toast.error("Failed to seed sports");
+      toast.error(err.response?.data?.error || "Seed failed");
     } finally {
       setSeeding(false);
     }
@@ -114,22 +182,20 @@ export default function SportsManagement() {
 
   const handleToggleActive = async (sport) => {
     try {
-      await axios.put(`${API}/sports/${sport._id}`, {
+      await axios.put(`${API_URL}/${sport._id}`, {
+        ...sport,
         isActive: !sport.isActive,
       });
-      toast.success(
-        `${sport.name} ${sport.isActive ? "deactivated" : "activated"}`
-      );
+      toast.success(sport.isActive ? "Deactivated" : "Activated");
       fetchSports();
-    } catch (err) {
-      console.error("Toggle error:", err);
-      toast.error("Failed to update status");
+    } catch {
+      toast.error("Failed to update");
     }
   };
 
   const openCreateModal = () => {
     setEditingSport(null);
-    setFormData({ ...defaultFormData });
+    setFormData(defaultFormData);
     setShowModal(true);
   };
 
@@ -140,10 +206,7 @@ export default function SportsManagement() {
       category: sport.category,
       scoringType: sport.scoringType,
       matchFormat: { ...defaultFormData.matchFormat, ...sport.matchFormat },
-      displayConfig: {
-        ...defaultFormData.displayConfig,
-        ...sport.displayConfig,
-      },
+      displayConfig: { ...defaultFormData.displayConfig, ...sport.displayConfig },
     });
     setShowModal(true);
   };
@@ -151,12 +214,9 @@ export default function SportsManagement() {
   const openConfigModal = (sport) => {
     setConfigSport(sport);
     setFormData({
-      ...formData,
+      ...sport,
       matchFormat: { ...defaultFormData.matchFormat, ...sport.matchFormat },
-      displayConfig: {
-        ...defaultFormData.displayConfig,
-        ...sport.displayConfig,
-      },
+      displayConfig: { ...defaultFormData.displayConfig, ...sport.displayConfig },
     });
     setShowConfigModal(true);
   };
@@ -165,83 +225,79 @@ export default function SportsManagement() {
     e.preventDefault();
     try {
       if (editingSport) {
-        await axios.put(`${API}/sports/${editingSport._id}`, {
-          name: formData.name,
-          category: formData.category,
-          scoringType: formData.scoringType,
-          isActive: editingSport.isActive,
-        });
-        toast.success("Sport updated successfully!");
+        await axios.put(`${API_URL}/${editingSport._id}`, formData);
+        toast.success("Sport updated");
       } else {
-        await axios.post(`${API}/sports`, {
-          name: formData.name,
-          category: formData.category,
-          scoringType: formData.scoringType,
-          matchFormat: formData.matchFormat,
-          displayConfig: formData.displayConfig,
-        });
-        toast.success("Sport created successfully!");
+        await axios.post(API_URL, formData);
+        toast.success("Sport created");
       }
       setShowModal(false);
       fetchSports();
     } catch (err) {
-      console.error("Submit error:", err);
-      toast.error(
-        err.response?.data?.message || "Failed to save sport"
-      );
+      toast.error(err.response?.data?.error || "Save failed");
     }
   };
 
   const handleConfigSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.put(`${API}/sports/${configSport._id}/config`, {
+      await axios.put(`${API_URL}/${configSport._id}/config`, {
         matchFormat: formData.matchFormat,
         displayConfig: formData.displayConfig,
       });
-      toast.success("Config updated successfully!");
+      toast.success("Config saved");
       setShowConfigModal(false);
       fetchSports();
     } catch (err) {
-      console.error("Config error:", err);
-      toast.error("Failed to update config");
+      toast.error(err.response?.data?.error || "Save failed");
     }
   };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
+    setFormData((p) => ({ ...p, [name]: value }));
   };
 
   const handleFormatChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData({
-      ...formData,
+    setFormData((p) => ({
+      ...p,
       matchFormat: {
-        ...formData.matchFormat,
-        [name]:
-          type === "checkbox"
-            ? checked
-            : value === ""
-            ? null
-            : isNaN(value)
-            ? value
-            : Number(value),
+        ...p.matchFormat,
+        [name]: type === "checkbox" ? checked : value === "" ? null : value,
       },
-    });
+    }));
   };
 
   const handleDisplayChange = (e) => {
     const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      displayConfig: { ...formData.displayConfig, [name]: value },
-    });
+    setFormData((p) => ({
+      ...p,
+      displayConfig: { ...p.displayConfig, [name]: value },
+    }));
   };
 
-  const filteredSports = sports.filter((s) =>
-    s.name.toLowerCase().includes(search.toLowerCase())
-  );
+  const getFormatFields = () => {
+    switch (formData.scoringType) {
+      case "sets-games-points":
+        return [
+          "totalSets",
+          "pointsPerSet",
+          "gamesPerSet",
+          "deuceEnabled",
+          "tiebreakEnabled",
+          "serviceRules",
+        ];
+      case "innings-overs":
+        return ["oversCount", "inningsCount"];
+      case "halves-goals":
+        return ["halvesCount", "halvesDuration"];
+      case "quarters-points":
+        return ["quartersCount", "quartersDuration"];
+      default:
+        return [];
+    }
+  };
 
   const stats = {
     total: sports.length,
@@ -250,233 +306,210 @@ export default function SportsManagement() {
     presets: sports.filter((s) => s.isPreset).length,
   };
 
-  const getFormatFields = () => {
-    const st = formData.scoringType;
-    if (st === "sets-games-points")
-      return [
-        "totalSets",
-        "gamesPerSet",
-        "pointsPerSet",
-        "pointsPerGame",
-        "winByMargin",
-        "maxPointsCap",
-        "deuceEnabled",
-        "deuceMinPoints",
-        "tiebreakEnabled",
-        "tiebreakPoints",
-        "decidingSetPoints",
-        "serviceRules",
-      ];
-    if (st === "innings-overs") return ["inningsCount", "oversCount"];
-    if (st === "halves-goals") return ["halvesCount", "halvesDuration"];
-    if (st === "quarters-points")
-      return ["quartersCount", "quartersDuration"];
-    return [];
-  };
+  const filteredSports = sports.filter((s) => {
+    const matchSearch = s.name?.toLowerCase().includes(search.toLowerCase());
+    const matchCategory =
+      filterCategory === "All" || s.category === filterCategory;
+    return matchSearch && matchCategory;
+  });
 
   return (
-    <>
-      <ToastContainer position="top-right" autoClose={3000} />
-
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-        <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
+    <SuperAdminShell searchPlaceholder="Search sports…">
+      <header className="flex items-start justify-between gap-4 mb-6">
+        <div className="min-w-0">
+          <p className="inline-flex items-center gap-1.5 text-[12px] text-gray-400">
+            <Trophy className="w-3.5 h-3.5" />
+            Content · Sports engine
+          </p>
+          <h1 className="mt-2 text-[26px] font-medium text-white leading-tight">
             Sports Management
           </h1>
-          <p className="text-gray-500 mt-1">
-            Manage sports types, scoring rules, and match formats
+          <p className="mt-1 text-[13px] text-gray-400">
+            Configure scoring engines, match formats and display rules for each
+            sport.
           </p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={handleSeed}
             disabled={seeding}
-            className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-xl font-semibold text-sm hover:bg-amber-100 transition-all active:scale-95 disabled:opacity-50"
+            className="h-9 px-3 inline-flex items-center gap-1.5 bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] rounded-md text-[12px] text-gray-200 disabled:opacity-50"
           >
-            <SparklesIcon className={`h-4 w-4 ${seeding ? "animate-spin" : ""}`} />
-            {seeding ? "Seeding..." : "Seed Presets"}
+            {seeding ? (
+              <RotateCw className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Sparkles className="w-3.5 h-3.5" />
+            )}
+            Seed presets
           </button>
           <button
             onClick={openCreateModal}
-            className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-xl font-semibold text-sm hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 active:scale-95"
+            className="h-9 px-3 inline-flex items-center gap-1.5 bg-orange-500 hover:bg-orange-600 rounded-md text-[12px] font-medium text-white"
           >
-            <PlusIcon className="h-4 w-4" />
-            Add Sport
+            <Plus className="w-3.5 h-3.5" />
+            New sport
           </button>
         </div>
+      </header>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        <StatTile label="Total sports" value={stats.total} />
+        <StatTile label="Active" value={stats.active} accent="text-emerald-300" />
+        <StatTile label="Inactive" value={stats.inactive} accent="text-gray-400" />
+        <StatTile label="Presets" value={stats.presets} accent="text-orange-300" />
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
-        {[
-          { label: "Total Sports", value: stats.total, color: "blue" },
-          { label: "Active", value: stats.active, color: "green" },
-          { label: "Inactive", value: stats.inactive, color: "red" },
-          { label: "Presets", value: stats.presets, color: "purple" },
-        ].map((stat) => (
-          <div
-            key={stat.label}
-            className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100"
-          >
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-              {stat.label}
-            </p>
-            <p className={`text-2xl font-bold text-${stat.color}-600 mt-1`}>
-              {stat.value}
-            </p>
-          </div>
-        ))}
-      </div>
-
-      {/* Search & Filter */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-6">
+      <div className="bg-[#181A22] border border-white/[0.06] rounded-lg p-3 mb-4 flex flex-col sm:flex-row gap-2">
         <div className="relative flex-1">
-          <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500" />
           <input
             type="text"
-            placeholder="Search sports..."
+            placeholder="Search sports…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+            className="w-full h-9 pl-9 pr-3 bg-[#0F1117] border border-white/[0.08] rounded-md text-[13px] text-white placeholder:text-gray-600 focus:outline-none focus:border-orange-400/40"
           />
         </div>
-        <div className="relative">
-          <FunnelIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+        <div className="relative sm:w-56">
+          <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500 pointer-events-none" />
           <select
             value={filterCategory}
             onChange={(e) => setFilterCategory(e.target.value)}
-            className="pl-9 pr-8 py-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none transition-all"
+            className="w-full h-9 pl-9 pr-3 bg-[#0F1117] border border-white/[0.08] rounded-md text-[13px] text-white focus:outline-none focus:border-orange-400/40 appearance-none"
           >
-            <option value="">All Categories</option>
+            <option value="All">All categories</option>
             {CATEGORIES.map((c) => (
-              <option key={c} value={c}>{c}</option>
+              <option key={c} value={c}>
+                {c}
+              </option>
             ))}
           </select>
         </div>
-        <button
-          onClick={fetchSports}
-          className="p-3 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all active:scale-95"
-        >
-          <ArrowPathIcon className="h-5 w-5 text-gray-500" />
-        </button>
       </div>
 
-      {/* Sports Table */}
       {loading ? (
-        <div className="flex justify-center items-center py-20">
-          <div className="h-12 w-12 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+        <div className="bg-[#181A22] border border-white/[0.06] rounded-lg px-6 py-16 text-center">
+          <RotateCw className="w-5 h-5 text-gray-500 animate-spin mx-auto" />
+          <p className="text-[13px] text-gray-400 mt-2">Loading sports…</p>
         </div>
       ) : filteredSports.length === 0 ? (
-        <div className="text-center py-20 bg-white rounded-2xl border border-gray-100">
-          <p className="text-gray-400 text-lg font-semibold">No sports found</p>
-          <p className="text-gray-300 text-sm mt-1">
-            Click "Seed Presets" to add 15 default sports
+        <div className="bg-[#181A22] border border-white/[0.06] rounded-lg px-6 py-16 text-center">
+          <div className="w-10 h-10 rounded-md bg-white/[0.06] inline-flex items-center justify-center mb-3">
+            <Trophy className="w-5 h-5 text-gray-500" />
+          </div>
+          <h3 className="text-[14px] font-medium text-white">No sports found</h3>
+          <p className="text-[13px] text-gray-400 mt-1">
+            Try a different filter, or seed the presets to start.
           </p>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="bg-[#181A22] border border-white/[0.06] rounded-lg overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="bg-gray-50 text-gray-500">
-                <tr>
-                  <th className="px-6 py-4 text-left font-semibold uppercase tracking-wider text-xs">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-white/[0.06]">
+                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-[0.08em] text-gray-500">
                     Sport
                   </th>
-                  <th className="px-6 py-4 text-left font-semibold uppercase tracking-wider text-xs">
+                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-[0.08em] text-gray-500">
                     Category
                   </th>
-                  <th className="px-6 py-4 text-left font-semibold uppercase tracking-wider text-xs">
-                    Scoring Type
+                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-[0.08em] text-gray-500">
+                    Scoring
                   </th>
-                  <th className="px-6 py-4 text-left font-semibold uppercase tracking-wider text-xs">
+                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-[0.08em] text-gray-500">
                     Format
                   </th>
-                  <th className="px-6 py-4 text-left font-semibold uppercase tracking-wider text-xs">
+                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-[0.08em] text-gray-500">
                     Status
                   </th>
-                  <th className="px-6 py-4 text-right font-semibold uppercase tracking-wider text-xs">
+                  <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-[0.08em] text-gray-500">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-50">
+              <tbody>
                 {filteredSports.map((sport) => (
                   <tr
                     key={sport._id}
-                    className="hover:bg-gray-50/50 transition-colors"
+                    className="border-b border-white/[0.04] hover:bg-white/[0.02] transition"
                   >
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2.5">
                         <div
-                          className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-sm"
+                          className="w-8 h-8 rounded-md inline-flex items-center justify-center text-[12px] font-bold"
                           style={{
-                            backgroundColor:
-                              sport.displayConfig?.color || "#4CAF50",
+                            backgroundColor: `${
+                              sport.displayConfig?.color || "#f97316"
+                            }22`,
+                            color: sport.displayConfig?.color || "#f97316",
                           }}
                         >
-                          {sport.name.charAt(0)}
+                          {sport.name?.[0]?.toUpperCase() || "?"}
                         </div>
-                        <div>
-                          <p className="font-semibold text-gray-900">
+                        <div className="min-w-0">
+                          <p className="text-[13px] font-medium text-white truncate">
                             {sport.name}
                           </p>
-                          <p className="text-xs text-gray-400">{sport.slug}</p>
+                          {sport.isPreset && (
+                            <p className="text-[10px] uppercase tracking-wider text-orange-300/80 font-bold">
+                              Preset
+                            </p>
+                          )}
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-3">
                       <span
-                        className={`inline-flex px-3 py-1 text-xs font-bold rounded-full ${
-                          categoryColors[sport.category] || categoryColors.Custom
+                        className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border ${
+                          categoryColors[sport.category] ||
+                          categoryColors.Custom
                         }`}
                       >
                         {sport.category}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
-                      <span className="text-gray-600 font-medium">
-                        {sport.scoringType}
-                      </span>
+                    <td className="px-4 py-3 text-[12px] text-gray-400 font-mono">
+                      {sport.scoringType}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-3">
                       <FormatSummary sport={sport} />
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-3">
                       <button
                         onClick={() => handleToggleActive(sport)}
-                        className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold rounded-full transition-all active:scale-95 ${
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition ${
                           sport.isActive
-                            ? "bg-green-100 text-green-700 hover:bg-red-100 hover:text-red-700"
-                            : "bg-red-100 text-red-700 hover:bg-green-100 hover:text-green-700"
+                            ? "bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25"
+                            : "bg-gray-500/15 text-gray-400 hover:bg-gray-500/25"
                         }`}
                       >
                         {sport.isActive ? (
                           <>
-                            <CheckCircleIcon className="h-3.5 w-3.5" /> Active
+                            <CheckCircle2 className="h-3 w-3" /> Active
                           </>
                         ) : (
                           <>
-                            <XCircleIcon className="h-3.5 w-3.5" /> Inactive
+                            <XCircle className="h-3 w-3" /> Inactive
                           </>
                         )}
                       </button>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center justify-end gap-2">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-1">
                         <button
                           onClick={() => openEditModal(sport)}
-                          className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                          className="w-7 h-7 inline-flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/[0.08] rounded-md transition"
                           title="Edit Sport"
                         >
-                          <PencilSquareIcon className="h-4 w-4" />
+                          <Pencil className="h-3.5 w-3.5" />
                         </button>
                         <button
                           onClick={() => openConfigModal(sport)}
-                          className="p-2 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all"
+                          className="w-7 h-7 inline-flex items-center justify-center text-gray-400 hover:text-orange-300 hover:bg-orange-500/10 rounded-md transition"
                           title="Edit Config"
                         >
-                          <Cog6ToothIcon className="h-4 w-4" />
+                          <Settings2 className="h-3.5 w-3.5" />
                         </button>
                       </div>
                     </td>
@@ -488,77 +521,78 @@ export default function SportsManagement() {
         </div>
       )}
 
-      {/* Create/Edit Sport Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-[2rem] w-full max-w-lg shadow-2xl overflow-hidden">
-            <div className="bg-gray-50 border-b border-gray-100 p-6 flex items-center justify-between">
-              <h3 className="text-xl font-black italic uppercase tracking-tighter text-gray-900">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-[#181A22] border border-white/[0.08] rounded-xl w-full max-w-lg overflow-hidden shadow-2xl">
+            <div className="border-b border-white/[0.06] px-6 py-4 flex items-center justify-between">
+              <h3 className="text-[15px] font-medium text-white">
                 {editingSport ? "Edit Sport" : "Create Sport"}
               </h3>
               <button
                 onClick={() => setShowModal(false)}
-                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-all"
+                className="w-7 h-7 inline-flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/[0.08] rounded-md transition"
               >
-                <XMarkIcon className="h-6 w-6" />
+                <X className="h-4 w-4" />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-8 space-y-5">
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-2 italic">
-                  Sport Name
-                </label>
-                <input
+            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              <div>
+                <FieldLabel>Sport name</FieldLabel>
+                <DarkInput
                   type="text"
                   name="name"
                   required
                   value={formData.name}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-bold italic focus:border-blue-300 outline-none transition-all"
                   placeholder="e.g. Badminton"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-2 italic">
-                    Category
-                  </label>
-                  <select
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <FieldLabel>Category</FieldLabel>
+                  <DarkSelect
                     name="category"
                     value={formData.category}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-bold italic focus:border-blue-300 outline-none transition-all appearance-none"
                   >
                     {CATEGORIES.map((c) => (
-                      <option key={c} value={c}>{c}</option>
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
                     ))}
-                  </select>
+                  </DarkSelect>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-2 italic">
-                    Scoring Type
-                  </label>
-                  <select
+                <div>
+                  <FieldLabel>Scoring type</FieldLabel>
+                  <DarkSelect
                     name="scoringType"
                     value={formData.scoringType}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-bold italic focus:border-blue-300 outline-none transition-all appearance-none"
                   >
                     {SCORING_TYPES.map((s) => (
-                      <option key={s} value={s}>{s}</option>
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
                     ))}
-                  </select>
+                  </DarkSelect>
                 </div>
               </div>
 
-              <div className="pt-4">
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="h-9 px-3 bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] rounded-md text-[12px] text-gray-200"
+                >
+                  Cancel
+                </button>
                 <button
                   type="submit"
-                  className="w-full bg-blue-600 text-white py-4 px-6 rounded-2xl font-black italic uppercase tracking-widest text-sm hover:bg-blue-700 transition-all shadow-xl shadow-blue-500/20 active:scale-95"
+                  className="h-9 px-4 bg-orange-500 hover:bg-orange-600 rounded-md text-[12px] font-medium text-white"
                 >
-                  {editingSport ? "Update Sport" : "Create Sport"}
+                  {editingSport ? "Update sport" : "Create sport"}
                 </button>
               </div>
             </form>
@@ -566,64 +600,58 @@ export default function SportsManagement() {
         </div>
       )}
 
-      {/* Config Modal */}
       {showConfigModal && configSport && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-[2rem] w-full max-w-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
-            <div className="bg-gray-50 border-b border-gray-100 p-6 flex items-center justify-between shrink-0">
-              <div>
-                <h3 className="text-xl font-black italic uppercase tracking-tighter text-gray-900">
-                  {configSport.name} — Config
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-[#181A22] border border-white/[0.08] rounded-xl w-full max-w-2xl overflow-hidden shadow-2xl max-h-[90vh] flex flex-col">
+            <div className="border-b border-white/[0.06] px-6 py-4 flex items-center justify-between shrink-0">
+              <div className="min-w-0">
+                <h3 className="text-[15px] font-medium text-white">
+                  {configSport.name}{" "}
+                  <span className="text-gray-500">— Config</span>
                 </h3>
-                <p className="text-xs text-gray-400 mt-1">
+                <p className="text-[12px] text-gray-400 mt-0.5">
                   Match format and display settings
                 </p>
               </div>
               <button
                 onClick={() => setShowConfigModal(false)}
-                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-all"
+                className="w-7 h-7 inline-flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/[0.08] rounded-md transition"
               >
-                <XMarkIcon className="h-6 w-6" />
+                <X className="h-4 w-4" />
               </button>
             </div>
 
             <form
               onSubmit={handleConfigSubmit}
-              className="p-8 space-y-6 overflow-y-auto"
+              className="p-6 space-y-6 overflow-y-auto"
             >
-              {/* Match Format */}
               <div>
-                <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest italic mb-4">
-                  Match Format
-                </h4>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                <SectionTitle>Match format</SectionTitle>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {getFormatFields().map((field) =>
                     field === "deuceEnabled" || field === "tiebreakEnabled" ? (
                       <label
                         key={field}
-                        className="flex items-center gap-3 px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl cursor-pointer hover:bg-blue-50 transition-all"
+                        className="flex items-center gap-2 h-9 px-3 bg-[#0F1117] border border-white/[0.08] rounded-md cursor-pointer hover:border-orange-400/40 transition"
                       >
                         <input
                           type="checkbox"
                           name={field}
                           checked={formData.matchFormat[field] || false}
                           onChange={handleFormatChange}
-                          className="h-4 w-4 text-blue-600 rounded"
+                          className="h-3.5 w-3.5 accent-orange-500"
                         />
-                        <span className="text-xs font-bold italic text-gray-600">
+                        <span className="text-[12px] text-gray-200 capitalize">
                           {field.replace(/([A-Z])/g, " $1").trim()}
                         </span>
                       </label>
                     ) : field === "serviceRules" ? (
-                      <div key={field} className="space-y-1">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-2 italic">
-                          Service Rules
-                        </label>
-                        <select
+                      <div key={field}>
+                        <FieldLabel>Service rules</FieldLabel>
+                        <DarkSelect
                           name={field}
                           value={formData.matchFormat[field] || ""}
                           onChange={handleFormatChange}
-                          className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold italic focus:border-blue-300 outline-none transition-all appearance-none"
                         >
                           <option value="">None</option>
                           <option value="rally">Rally</option>
@@ -631,19 +659,18 @@ export default function SportsManagement() {
                           <option value="alternate-game">Alternate Game</option>
                           <option value="side-out">Side Out</option>
                           <option value="rotate">Rotate</option>
-                        </select>
+                        </DarkSelect>
                       </div>
                     ) : (
-                      <div key={field} className="space-y-1">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-2 italic">
+                      <div key={field}>
+                        <FieldLabel>
                           {field.replace(/([A-Z])/g, " $1").trim()}
-                        </label>
-                        <input
+                        </FieldLabel>
+                        <DarkInput
                           type="number"
                           name={field}
                           value={formData.matchFormat[field] ?? ""}
                           onChange={handleFormatChange}
-                          className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-bold italic focus:border-blue-300 outline-none transition-all"
                           placeholder="—"
                         />
                       </div>
@@ -652,101 +679,71 @@ export default function SportsManagement() {
                 </div>
               </div>
 
-              {/* Display Config */}
               <div>
-                <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest italic mb-4">
-                  Display Config
-                </h4>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-2 italic">
-                      Icon Name
-                    </label>
-                    <input
+                <SectionTitle>Display config</SectionTitle>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  <div>
+                    <FieldLabel>Icon name</FieldLabel>
+                    <DarkInput
                       type="text"
                       name="icon"
                       value={formData.displayConfig.icon}
                       onChange={handleDisplayChange}
-                      className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-bold italic focus:border-blue-300 outline-none transition-all"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-2 italic">
-                      Color
-                    </label>
+                  <div>
+                    <FieldLabel>Color</FieldLabel>
                     <div className="flex items-center gap-2">
                       <input
                         type="color"
                         name="color"
                         value={formData.displayConfig.color}
                         onChange={handleDisplayChange}
-                        className="w-10 h-10 rounded-lg border border-gray-100 cursor-pointer"
+                        className="w-9 h-9 rounded-md border border-white/[0.08] bg-[#0F1117] cursor-pointer"
                       />
-                      <input
+                      <DarkInput
                         type="text"
                         name="color"
                         value={formData.displayConfig.color}
                         onChange={handleDisplayChange}
-                        className="flex-1 px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-bold italic focus:border-blue-300 outline-none transition-all"
                       />
                     </div>
                   </div>
                   {["scoreLabel", "setLabel", "pointLabel"].map((field) => (
-                    <div key={field} className="space-y-1">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-2 italic">
+                    <div key={field}>
+                      <FieldLabel>
                         {field.replace(/([A-Z])/g, " $1").trim()}
-                      </label>
-                      <input
+                      </FieldLabel>
+                      <DarkInput
                         type="text"
                         name={field}
                         value={formData.displayConfig[field]}
                         onChange={handleDisplayChange}
-                        className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-bold italic focus:border-blue-300 outline-none transition-all"
                       />
                     </div>
                   ))}
                 </div>
               </div>
 
-              <div className="pt-4">
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowConfigModal(false)}
+                  className="h-9 px-3 bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] rounded-md text-[12px] text-gray-200"
+                >
+                  Cancel
+                </button>
                 <button
                   type="submit"
-                  className="w-full bg-purple-600 text-white py-4 px-6 rounded-2xl font-black italic uppercase tracking-widest text-sm hover:bg-purple-700 transition-all shadow-xl shadow-purple-500/20 active:scale-95"
+                  className="h-9 px-4 bg-orange-500 hover:bg-orange-600 rounded-md text-[12px] font-medium text-white"
                 >
-                  Save Configuration
+                  Save configuration
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
-    </>
+    </SuperAdminShell>
   );
-}
-
-function FormatSummary({ sport }) {
-  const f = sport.matchFormat;
-  const st = sport.scoringType;
-
-  let summary = "";
-  if (st === "sets-games-points") {
-    if (f?.totalSets && f?.pointsPerSet)
-      summary = `Best of ${f.totalSets}, ${f.pointsPerSet} pts`;
-    else if (f?.totalSets && f?.gamesPerSet)
-      summary = `Best of ${f.totalSets}, ${f.gamesPerSet} games`;
-    else if (f?.totalSets) summary = `Best of ${f.totalSets}`;
-    else summary = "—";
-  } else if (st === "innings-overs") {
-    summary = f?.oversCount ? `${f.oversCount} overs, ${f.inningsCount || 2} innings` : "—";
-  } else if (st === "halves-goals") {
-    summary = f?.halvesCount ? `${f.halvesCount} halves, ${f.halvesDuration}min` : "—";
-  } else if (st === "quarters-points") {
-    summary = f?.quartersCount
-      ? `${f.quartersCount} quarters, ${f.quartersDuration}min`
-      : "—";
-  } else {
-    summary = "Custom";
-  }
-
-  return <span className="text-xs text-gray-500">{summary}</span>;
 }

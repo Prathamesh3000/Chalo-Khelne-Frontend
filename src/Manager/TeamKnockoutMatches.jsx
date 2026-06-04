@@ -14,6 +14,8 @@ import {
   SkipForward,
   XCircle,
   AlertCircle,
+  Shield,
+  UserPlus,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -25,6 +27,15 @@ import { getKnockoutFormat } from "../utils/sportTrack";
 import { TextField } from "@mui/material";
 import BulkScoreUploadModal from "./BulkScoreUploadModal";
 import BulkResultUploadModal from "./BulkResultUploadModal";
+import AssignUmpireModal from "./Tournament/AssignUmpireModal";
+
+// Resolves a referee's display name from match.referee (handles nested
+// object and bare ObjectId shapes — same helper as MDirectKnockout).
+const getUmpireName = (referee) => {
+  if (!referee) return null;
+  if (typeof referee === "string") return "Assigned";
+  return referee.name || referee.userName || "Assigned";
+};
 
 const TeamKnockoutMatches = () => {
   const [selectedMatch, setSelectedMatch] = useState(null);
@@ -61,6 +72,7 @@ const TeamKnockoutMatches = () => {
   // Bulk Score Upload state
   const [bulkScoreModal, setBulkScoreModal] = useState({ open: false, matches: [], title: "" });
   const [showCsvUpload, setShowCsvUpload] = useState(false);
+  const [assignModalMatch, setAssignModalMatch] = useState(null);
 
   const navigate = useNavigate();
 
@@ -239,8 +251,14 @@ const TeamKnockoutMatches = () => {
 
   const fetchTournamentStatistics = async () => {
     try {
+      const token = localStorage.getItem("token");
       const response = await fetch(
-        `/api/tournaments/team-knockout/tournaments/${tournamentId}/stats`
+        `/api/tournaments/team-knockout/tournaments/${tournamentId}/stats`,
+        {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        }
       );
       const data = await response.json();
 
@@ -269,11 +287,17 @@ const TeamKnockoutMatches = () => {
 
     try {
       const liveUpdates = new Map();
+      const token = localStorage.getItem("token");
 
       for (const match of inProgressMatches) {
         try {
           const response = await fetch(
-            `/api/tournaments/team-knockout/matches/${match._id}/live-state`
+            `/api/tournaments/team-knockout/matches/${match._id}/live-state`,
+            {
+              headers: {
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+              },
+            }
           );
 
           if (response.ok) {
@@ -304,8 +328,14 @@ const TeamKnockoutMatches = () => {
 
   const fetchTournamentDetails = async () => {
     try {
+      const token = localStorage.getItem("token");
       const response = await fetch(
-        `/api/tournaments/${tournamentId}`
+        `/api/tournaments/${tournamentId}`,
+        {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        }
       );
       const data = await response.json();
 
@@ -333,7 +363,12 @@ const TeamKnockoutMatches = () => {
     try {
       setFetchingMatches(true);
       const url = `/api/tournaments/team-knockout/matches/${tournamentId}`;
-      const response = await fetch(url);
+      const token = localStorage.getItem("token");
+      const response = await fetch(url, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
       const data = await response.json();
 
       if (data.success) {
@@ -407,7 +442,12 @@ const TeamKnockoutMatches = () => {
       // CORRECTED: Use the actual route from your router
       const previousRoundUrl = `/api/tournaments/team-knockout/matches-by-round?tournamentId=${tournamentId}&round=${round - 1}`;
 
-      const response = await fetch(previousRoundUrl);
+      const token = localStorage.getItem("token");
+      const response = await fetch(previousRoundUrl, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
       if (!response.ok) {
         throw new Error(
           `Failed to fetch previous round matches: ${response.status}`
@@ -505,11 +545,15 @@ const TeamKnockoutMatches = () => {
           format, // ✅ now sending correct format string
         };
 
+        const token = localStorage.getItem("token");
         const response = await fetch(
           `/api/tournaments/team-knockout/next-round`,
           {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
             body: JSON.stringify(payload),
           }
         );
@@ -554,11 +598,15 @@ const TeamKnockoutMatches = () => {
     if (!tournamentId || !teamId) return;
 
     try {
+      const token = localStorage.getItem("token");
       const response = await fetch(
         `/api/tournaments/team-knockout/teams/${teamId}/swap-players`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
         }
       );
 
@@ -1419,6 +1467,39 @@ const TeamKnockoutMatches = () => {
                                 <span>Set {match.liveState?.currentSetNumber || 1} • G{match.liveState?.currentGameNumber || 1}</span>
                               </div>
                             )}
+
+                            {/* Umpire status */}
+                            {!isBye && (() => {
+                              const umpireName = getUmpireName(match.referee);
+                              const t1 = getTeamName(match.team1Id);
+                              const t2 = getTeamName(match.team2Id);
+                              const teamsReady = t1 && t1 !== "TBD" && t2 && t2 !== "TBD";
+                              return (
+                                <div className="mt-2 pt-2 border-t border-gray-100 flex items-center justify-between">
+                                  {umpireName ? (
+                                    <span className="flex items-center gap-1 text-[10px] text-gray-600">
+                                      <Shield className="w-3 h-3 text-blue-500" />
+                                      <span className="font-semibold">Umpire:</span>
+                                      <span className="truncate max-w-[80px]">{umpireName}</span>
+                                    </span>
+                                  ) : (
+                                    <span className="flex items-center gap-1 text-[10px] text-gray-400">
+                                      <Shield className="w-3 h-3 text-gray-300" />
+                                      <span>No umpire</span>
+                                    </span>
+                                  )}
+                                  {!umpireName && !isCompleted && teamsReady && (
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); setAssignModalMatch(match); }}
+                                      className="flex items-center gap-0.5 text-[10px] font-bold text-orange-600 hover:text-orange-700 px-1.5 py-0.5 rounded hover:bg-orange-50 w-auto"
+                                    >
+                                      <UserPlus className="w-3 h-3" />
+                                      Assign
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </div>
                         </div>
                       );
@@ -2489,6 +2570,19 @@ const TeamKnockoutMatches = () => {
         tournamentId={tournamentId}
         matchType="team"
         title="Bulk Result Upload — Team Knockout (CSV/Excel)"
+      />
+
+      {/* Assign Umpire Modal */}
+      <AssignUmpireModal
+        isOpen={!!assignModalMatch}
+        onClose={() => setAssignModalMatch(null)}
+        matchId={assignModalMatch?._id}
+        tournamentId={tournamentId}
+        matchLabel={assignModalMatch ? `R${assignModalMatch.round} • ${getTeamName(assignModalMatch.team1Id)} vs ${getTeamName(assignModalMatch.team2Id)}` : ""}
+        onAssigned={() => {
+          toast.success("Umpire assigned. Awaiting their response.");
+          if (typeof window !== 'undefined') window.location.reload();
+        }}
       />
     </div>
   );

@@ -3,43 +3,30 @@ import { useState, useEffect, useContext } from "react";
 import { AuthContext } from "../context/AuthContext";
 import axios from "axios";
 import {
-  Plus,
-  Search,
-  Filter,
-  Trash2,
-  Edit,
-  X,
-  DollarSign,
-  CreditCard,
-  Receipt,
-  TrendingUp,
-  Calendar,
-  Tag,
-  FileText,
-  ChevronDown,
-  ChevronUp,
-  CheckCircle,
-  AlertCircle,
-  Clock,
-  BarChart3,
+  Plus, Search, Trash2, Pencil, CreditCard, Receipt, TrendingUp, Tag,
+  FileText, CheckCircle, AlertCircle, Clock, X, BarChart3, ChevronLeft,
+  ChevronRight, History, Loader2,
 } from "lucide-react";
 
-const EVENT_TYPES = ["Tournament", "Training", "Facility", "Club", "Other"];
-const PAYMENT_MODES = ["Cash", "UPI", "Bank Transfer", "Cheque", "Card"];
+const SIG = "#5E6AD2";
+const SIG_TINT = "rgba(94,106,210,0.12)";
+
+const EVENT_TYPES      = ["Tournament", "Training", "Facility", "Club", "Other"];
+const PAYMENT_MODES    = ["Cash", "UPI", "Bank Transfer", "Cheque", "Card"];
 const PAYMENT_STATUSES = ["Pending", "Partial", "Paid", "Failed"];
 
-const statusColors = {
-  Pending: "bg-yellow-100 text-yellow-700",
-  Partial: "bg-orange-100 text-orange-700",
-  Paid: "bg-green-100 text-green-700",
-  Failed: "bg-red-100 text-red-700",
+const formatCurrency = (n) => `₹${(n || 0).toLocaleString("en-IN")}`;
+const formatDate = (d) =>
+  d ? new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—";
+
+const EMPTY_EXPENSE = {
+  title: "", description: "", amount: "", category: "", eventType: "Club",
+  eventName: "", vendor: "", expenseDate: new Date().toISOString().split("T")[0], notes: "",
 };
 
-const statusIcons = {
-  Pending: <Clock size={14} />,
-  Partial: <AlertCircle size={14} />,
-  Paid: <CheckCircle size={14} />,
-  Failed: <X size={14} />,
+const EMPTY_PAYMENT = {
+  expenseId: "", amount: "", paymentMode: "Cash",
+  paymentDate: new Date().toISOString().split("T")[0], transactionId: "", notes: "",
 };
 
 export default function MExpenses() {
@@ -47,39 +34,31 @@ export default function MExpenses() {
   const token = localStorage.getItem("token");
   const headers = { Authorization: `Bearer ${token}` };
 
-  // Data
   const [expenses, setExpenses] = useState([]);
   const [categories, setCategories] = useState([]);
   const [analytics, setAnalytics] = useState(null);
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
 
-  // Filters
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery]       = useState("");
   const [filterCategory, setFilterCategory] = useState("");
   const [filterEventType, setFilterEventType] = useState("");
-  const [filterStatus, setFilterStatus] = useState("");
+  const [filterStatus, setFilterStatus]     = useState("");
 
-  // UI
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("expenses"); // expenses | analytics
-  const [showExpenseModal, setShowExpenseModal] = useState(false);
+  const [activeTab, setActiveTab] = useState("expenses");
+
+  const [showExpenseModal,  setShowExpenseModal]  = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [editingExpense, setEditingExpense] = useState(null);
+  const [showPaymentModal,  setShowPaymentModal]  = useState(false);
+  const [showHistory,       setShowHistory]       = useState(false);
+
+  const [editingExpense,  setEditingExpense]  = useState(null);
   const [selectedExpense, setSelectedExpense] = useState(null);
   const [expensePayments, setExpensePayments] = useState([]);
-  const [showPaymentHistory, setShowPaymentHistory] = useState(false);
 
-  // Form state
-  const [expenseForm, setExpenseForm] = useState({
-    title: "", description: "", amount: "", category: "", eventType: "Club",
-    eventName: "", vendor: "", expenseDate: new Date().toISOString().split("T")[0], notes: "",
-  });
+  const [expenseForm,  setExpenseForm]  = useState(EMPTY_EXPENSE);
   const [categoryForm, setCategoryForm] = useState({ name: "", description: "" });
-  const [paymentForm, setPaymentForm] = useState({
-    expenseId: "", amount: "", paymentMode: "Cash",
-    paymentDate: new Date().toISOString().split("T")[0], transactionId: "", notes: "",
-  });
+  const [paymentForm,  setPaymentForm]  = useState(EMPTY_PAYMENT);
 
   useEffect(() => {
     fetchExpenses();
@@ -91,16 +70,14 @@ export default function MExpenses() {
     fetchExpenses();
   }, [filterCategory, filterEventType, filterStatus, pagination.page]);
 
-  // ===== API Calls =====
-
   const fetchExpenses = async () => {
     try {
       setLoading(true);
       const params = new URLSearchParams({ page: pagination.page, limit: 20 });
-      if (searchQuery) params.append("search", searchQuery);
-      if (filterCategory) params.append("category", filterCategory);
+      if (searchQuery)     params.append("search", searchQuery);
+      if (filterCategory)  params.append("category", filterCategory);
       if (filterEventType) params.append("eventType", filterEventType);
-      if (filterStatus) params.append("paymentStatus", filterStatus);
+      if (filterStatus)    params.append("paymentStatus", filterStatus);
 
       const res = await axios.get(`/api/expenses?${params}`, { headers });
       setExpenses(res.data.expenses || []);
@@ -116,18 +93,14 @@ export default function MExpenses() {
     try {
       const res = await axios.get("/api/expenses/categories", { headers });
       setCategories(res.data.categories || []);
-    } catch (err) {
-      console.error("Fetch categories error:", err);
-    }
+    } catch (err) { console.error("Fetch categories error:", err); }
   };
 
   const fetchAnalytics = async () => {
     try {
       const res = await axios.get("/api/expenses/analytics", { headers });
       setAnalytics(res.data.analytics || null);
-    } catch (err) {
-      console.error("Fetch analytics error:", err);
-    }
+    } catch (err) { console.error("Fetch analytics error:", err); }
   };
 
   const handleSearch = (e) => {
@@ -136,27 +109,20 @@ export default function MExpenses() {
     fetchExpenses();
   };
 
-  // ===== Expense CRUD =====
-
   const handleSaveExpense = async () => {
+    if (!expenseForm.title || !expenseForm.amount || !expenseForm.category || !expenseForm.expenseDate) {
+      toast.warn("Please fill title, amount, category, and date");
+      return;
+    }
     try {
-      if (!expenseForm.title || !expenseForm.amount || !expenseForm.category || !expenseForm.expenseDate) {
-        toast.warn("Please fill title, amount, category, and date");
-        return;
-      }
-
       const payload = { ...expenseForm, amount: parseFloat(expenseForm.amount) };
-
-      if (editingExpense) {
-        await axios.put(`/api/expenses/update/${editingExpense._id}`, payload, { headers });
-      } else {
-        await axios.post("/api/expenses/add", payload, { headers });
-      }
-
+      if (editingExpense) await axios.put(`/api/expenses/update/${editingExpense._id}`, payload, { headers });
+      else                await axios.post("/api/expenses/add", payload, { headers });
       setShowExpenseModal(false);
       resetExpenseForm();
       fetchExpenses();
       fetchAnalytics();
+      toast.success(editingExpense ? "Expense updated" : "Expense added");
     } catch (err) {
       toast.error(err.response?.data?.message || err.message);
     }
@@ -191,19 +157,13 @@ export default function MExpenses() {
 
   const resetExpenseForm = () => {
     setEditingExpense(null);
-    setExpenseForm({
-      title: "", description: "", amount: "", category: "", eventType: "Club",
-      eventName: "", vendor: "", expenseDate: new Date().toISOString().split("T")[0], notes: "",
-    });
+    setExpenseForm(EMPTY_EXPENSE);
   };
 
-  // ===== Category =====
-
   const handleSaveCategory = async () => {
+    if (!categoryForm.name) { toast.warn("Category name is required"); return; }
     try {
-      if (!categoryForm.name) { toast.warn("Category name is required"); return; }
       await axios.post("/api/expenses/categories/create", categoryForm, { headers });
-      setShowCategoryModal(false);
       setCategoryForm({ name: "", description: "" });
       fetchCategories();
     } catch (err) {
@@ -213,34 +173,25 @@ export default function MExpenses() {
 
   const handleDeleteCategory = async (id) => {
     if (!confirm("Delete this category?")) return;
-    try {
-      await axios.delete(`/api/expenses/categories/${id}`, { headers });
-      fetchCategories();
-    } catch (err) {
-      toast.error(err.response?.data?.message || err.message);
-    }
+    try { await axios.delete(`/api/expenses/categories/${id}`, { headers }); fetchCategories(); }
+    catch (err) { toast.error(err.response?.data?.message || err.message); }
   };
-
-  // ===== Payment =====
 
   const openPaymentModal = (expense) => {
     setPaymentForm({
+      ...EMPTY_PAYMENT,
       expenseId: expense._id,
       amount: (expense.amount - expense.totalPaid).toString(),
-      paymentMode: "Cash",
-      paymentDate: new Date().toISOString().split("T")[0],
-      transactionId: "",
-      notes: "",
     });
     setShowPaymentModal(true);
   };
 
   const handleRecordPayment = async () => {
+    if (!paymentForm.amount || !paymentForm.paymentMode) {
+      toast.warn("Amount and payment mode are required");
+      return;
+    }
     try {
-      if (!paymentForm.amount || !paymentForm.paymentMode) {
-        toast.warn("Amount and payment mode are required");
-        return;
-      }
       await axios.post("/api/expenses/payment", {
         ...paymentForm,
         amount: parseFloat(paymentForm.amount),
@@ -248,6 +199,7 @@ export default function MExpenses() {
       setShowPaymentModal(false);
       fetchExpenses();
       fetchAnalytics();
+      toast.success("Payment recorded");
     } catch (err) {
       toast.error(err.response?.data?.message || err.message);
     }
@@ -258,256 +210,168 @@ export default function MExpenses() {
       setSelectedExpense(expense);
       const res = await axios.get(`/api/expenses/payments/${expense._id}`, { headers });
       setExpensePayments(res.data.payments || []);
-      setShowPaymentHistory(true);
+      setShowHistory(true);
     } catch (err) {
       toast.error("Error fetching payments");
     }
   };
 
-  // ===== Render =====
-
-  const formatCurrency = (n) => `₹${(n || 0).toLocaleString("en-IN")}`;
-  const formatDate = (d) => d ? new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—";
+  const outstanding = analytics
+    ? (analytics.totals.totalAmount || 0) - (analytics.totals.totalPaid || 0)
+    : 0;
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="p-6 max-w-[1320px] mx-auto">
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+      <div className="flex items-end justify-between gap-3 flex-wrap mb-5">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Expense Management</h1>
-          <p className="text-sm text-gray-500 mt-1">Track and manage your event expenses</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500 mb-1.5">
+            Finance · Expenses
+          </p>
+          <h1 className="text-[28px] leading-[1.1] font-semibold tracking-tight text-neutral-950">
+            Expense management
+          </h1>
+          <p className="text-[13px] text-neutral-500 mt-1.5">
+            Track and manage your event expenses.
+          </p>
         </div>
         <div className="flex gap-2">
-          <button
-            onClick={() => setShowCategoryModal(true)}
-            className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2 w-auto"
-          >
-            <Tag size={16} /> Categories
-          </button>
-          <button
-            onClick={() => { resetExpenseForm(); setShowExpenseModal(true); }}
-            className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 flex items-center gap-2 w-auto"
-          >
-            <Plus size={16} /> Add Expense
-          </button>
+          <SigButton variant="outline" onClick={() => setShowCategoryModal(true)}>
+            <Tag className="w-3.5 h-3.5" /> Categories
+          </SigButton>
+          <SigButton onClick={() => { resetExpenseForm(); setShowExpenseModal(true); }}>
+            <Plus className="w-3.5 h-3.5" /> Add expense
+          </SigButton>
         </div>
       </div>
 
-      {/* Analytics Cards */}
+      {/* Analytics summary */}
       {analytics && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center">
-                <Receipt size={20} className="text-orange-500" />
-              </div>
-              <div>
-                <p className="text-xs text-gray-500">Total Expenses</p>
-                <p className="text-lg font-bold text-gray-800">{formatCurrency(analytics.totals.totalAmount)}</p>
-              </div>
-            </div>
-            <p className="text-xs text-gray-400 mt-2">{analytics.totals.count} expense records</p>
-          </div>
-          <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
-                <CheckCircle size={20} className="text-green-600" />
-              </div>
-              <div>
-                <p className="text-xs text-gray-500">Total Paid</p>
-                <p className="text-lg font-bold text-green-700">{formatCurrency(analytics.totals.totalPaid)}</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center">
-                <AlertCircle size={20} className="text-orange-600" />
-              </div>
-              <div>
-                <p className="text-xs text-gray-500">Outstanding</p>
-                <p className="text-lg font-bold text-orange-700">
-                  {formatCurrency((analytics.totals.totalAmount || 0) - (analytics.totals.totalPaid || 0))}
-                </p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center">
-                <BarChart3 size={20} className="text-emerald-600" />
-              </div>
-              <div>
-                <p className="text-xs text-gray-500">Categories</p>
-                <p className="text-lg font-bold text-gray-800">{analytics.byCategory?.length || 0}</p>
-              </div>
-            </div>
-          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+          <StatTile icon={Receipt}     label="Total expenses" value={formatCurrency(analytics.totals.totalAmount)} />
+          <StatTile icon={CheckCircle} label="Total paid"     value={formatCurrency(analytics.totals.totalPaid)} />
+          <StatTile icon={AlertCircle} label="Outstanding"    value={formatCurrency(outstanding)} />
+          <StatTile icon={BarChart3}   label="Categories"     value={analytics.byCategory?.length || 0} />
         </div>
       )}
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit mb-6">
+      <div className="flex items-center gap-1 bg-neutral-100 p-0.5 rounded-lg w-fit mb-4">
         {[
-          { key: "expenses", label: "Expenses", icon: <FileText size={16} /> },
-          { key: "analytics", label: "Analytics", icon: <BarChart3 size={16} /> },
-        ].map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            className={`px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-all w-auto ${
-              activeTab === tab.key ? "bg-white text-orange-500 shadow-sm" : "text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            {tab.icon} {tab.label}
-          </button>
-        ))}
+          { key: "expenses",  label: "Expenses",  icon: FileText  },
+          { key: "analytics", label: "Analytics", icon: BarChart3 },
+        ].map(({ key, label, icon: Icon }) => {
+          const active = activeTab === key;
+          return (
+            <button
+              key={key}
+              onClick={() => setActiveTab(key)}
+              className={`h-7 px-3 inline-flex items-center gap-1.5 rounded-md text-[12px] font-medium transition ${
+                active ? "bg-white text-neutral-900 shadow-[0_1px_2px_rgba(0,0,0,0.04)]" : "text-neutral-500 hover:text-neutral-900"
+              }`}
+            >
+              <Icon className="w-3.5 h-3.5" /> {label}
+            </button>
+          );
+        })}
       </div>
 
-      {/* ===== EXPENSES TAB ===== */}
       {activeTab === "expenses" && (
         <>
           {/* Filters */}
-          <div className="bg-white rounded-xl border border-gray-100 p-4 mb-6 shadow-sm">
-            <div className="flex flex-wrap gap-3 items-center">
-              <form onSubmit={handleSearch} className="flex-1 min-w-[200px]">
-                <div className="relative">
-                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Search expenses..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
-                  />
-                </div>
-              </form>
-              <select
-                value={filterCategory}
-                onChange={(e) => { setFilterCategory(e.target.value); setPagination((p) => ({ ...p, page: 1 })); }}
-                className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white"
-              >
-                <option value="">All Categories</option>
-                {categories.map((c) => (
-                  <option key={c._id} value={c._id}>{c.name}</option>
-                ))}
-              </select>
-              <select
-                value={filterEventType}
-                onChange={(e) => { setFilterEventType(e.target.value); setPagination((p) => ({ ...p, page: 1 })); }}
-                className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white"
-              >
-                <option value="">All Event Types</option>
-                {EVENT_TYPES.map((t) => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
-              <select
-                value={filterStatus}
-                onChange={(e) => { setFilterStatus(e.target.value); setPagination((p) => ({ ...p, page: 1 })); }}
-                className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white"
-              >
-                <option value="">All Statuses</option>
-                {PAYMENT_STATUSES.map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-            </div>
+          <div className="flex flex-wrap gap-2 items-center mb-4">
+            <form onSubmit={handleSearch} className="relative flex-1 min-w-[220px] max-w-sm">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-neutral-400" />
+              <input
+                type="text"
+                placeholder="Search expenses…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full h-8 pl-8 pr-3 border border-neutral-200 rounded-lg text-[12px] bg-white focus:outline-none focus:border-[--sig] focus:ring-2 focus:ring-[--sig-tint]"
+                style={{ "--sig": SIG, "--sig-tint": SIG_TINT }}
+              />
+            </form>
+            <FilterSelect value={filterCategory} onChange={(e) => { setFilterCategory(e.target.value); setPagination((p) => ({ ...p, page: 1 })); }}>
+              <option value="">All categories</option>
+              {categories.map((c) => <option key={c._id} value={c._id}>{c.name}</option>)}
+            </FilterSelect>
+            <FilterSelect value={filterEventType} onChange={(e) => { setFilterEventType(e.target.value); setPagination((p) => ({ ...p, page: 1 })); }}>
+              <option value="">All event types</option>
+              {EVENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+            </FilterSelect>
+            <FilterSelect value={filterStatus} onChange={(e) => { setFilterStatus(e.target.value); setPagination((p) => ({ ...p, page: 1 })); }}>
+              <option value="">All statuses</option>
+              {PAYMENT_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+            </FilterSelect>
           </div>
 
-          {/* Expense Table */}
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+          {/* Table */}
+          <div className="bg-white border border-neutral-200 rounded-2xl overflow-hidden">
             {loading ? (
-              <div className="p-12 text-center text-gray-400">Loading expenses...</div>
-            ) : expenses.length === 0 ? (
-              <div className="p-12 text-center">
-                <Receipt size={48} className="mx-auto text-gray-300 mb-4" />
-                <h3 className="text-lg font-semibold text-gray-500">No expenses found</h3>
-                <p className="text-sm text-gray-400 mt-1">Add your first expense to start tracking</p>
+              <div className="py-16 flex items-center justify-center">
+                <Loader2 className="w-5 h-5 text-neutral-400 animate-spin" />
               </div>
+            ) : expenses.length === 0 ? (
+              <EmptyBlock
+                icon={Receipt}
+                title="No expenses found"
+                desc="Add your first expense to start tracking."
+                ctaLabel="Add expense"
+                onCta={() => { resetExpenseForm(); setShowExpenseModal(true); }}
+              />
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
-                    <tr className="bg-gray-50 border-b border-gray-100">
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Expense</th>
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Category</th>
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Event</th>
-                      <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Amount</th>
-                      <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Paid</th>
-                      <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Status</th>
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Date</th>
-                      <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Actions</th>
+                    <tr className="border-b border-neutral-100">
+                      <Th>Expense</Th>
+                      <Th>Category</Th>
+                      <Th>Event</Th>
+                      <Th align="right">Amount</Th>
+                      <Th align="right">Paid</Th>
+                      <Th align="center">Status</Th>
+                      <Th>Date</Th>
+                      <Th align="center">Actions</Th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {expenses.map((expense) => (
-                      <tr key={expense._id} className="hover:bg-gray-50/50 transition-colors">
-                        <td className="px-4 py-3">
-                          <div className="font-medium text-gray-800 text-sm">{expense.title}</div>
-                          {expense.vendor && (
-                            <div className="text-xs text-gray-400 mt-0.5">{expense.vendor}</div>
-                          )}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="inline-flex items-center gap-1 bg-orange-50 text-orange-600 px-2 py-0.5 rounded-full text-xs font-medium">
-                            <Tag size={12} /> {expense.category?.name || "—"}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="text-sm text-gray-700">{expense.eventType}</div>
-                          {expense.eventName && (
-                            <div className="text-xs text-gray-400">{expense.eventName}</div>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-right font-semibold text-gray-800 text-sm">
-                          {formatCurrency(expense.amount)}
-                        </td>
-                        <td className="px-4 py-3 text-right text-sm text-green-600 font-medium">
-                          {formatCurrency(expense.totalPaid)}
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[expense.paymentStatus]}`}>
-                            {statusIcons[expense.paymentStatus]} {expense.paymentStatus}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-500">
-                          {formatDate(expense.expenseDate)}
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center justify-center gap-1">
-                            {expense.paymentStatus !== "Paid" && (
-                              <button
-                                onClick={() => openPaymentModal(expense)}
-                                title="Record Payment"
-                                className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors w-auto"
-                              >
-                                <CreditCard size={16} />
-                              </button>
+                  <tbody>
+                    {expenses.map((row) => (
+                      <tr key={row._id} className="border-b border-neutral-50 last:border-b-0 hover:bg-neutral-50/40 transition">
+                        <Td>
+                          <p className="text-[13px] font-semibold text-neutral-900">{row.title}</p>
+                          {row.vendor && <p className="text-[11px] text-neutral-500">{row.vendor}</p>}
+                        </Td>
+                        <Td>
+                          <Pill className="bg-neutral-100 text-neutral-700">
+                            <Tag className="w-2.5 h-2.5" /> {row.category?.name || "—"}
+                          </Pill>
+                        </Td>
+                        <Td>
+                          <p className="text-[12px] text-neutral-700">{row.eventType}</p>
+                          {row.eventName && <p className="text-[11px] text-neutral-500">{row.eventName}</p>}
+                        </Td>
+                        <Td align="right"><span className="text-[13px] font-semibold text-neutral-950 tabular-nums">{formatCurrency(row.amount)}</span></Td>
+                        <Td align="right"><span className="text-[13px] font-semibold text-emerald-700 tabular-nums">{formatCurrency(row.totalPaid)}</span></Td>
+                        <Td align="center"><ExpenseStatusPill status={row.paymentStatus} /></Td>
+                        <Td><span className="text-[12px] text-neutral-500 font-mono tabular-nums">{formatDate(row.expenseDate)}</span></Td>
+                        <Td align="center">
+                          <div className="flex items-center justify-center gap-0.5">
+                            {row.paymentStatus !== "Paid" && (
+                              <IconBtn title="Record payment" onClick={() => openPaymentModal(row)}>
+                                <CreditCard className="w-3.5 h-3.5" />
+                              </IconBtn>
                             )}
-                            <button
-                              onClick={() => viewPaymentHistory(expense)}
-                              title="Payment History"
-                              className="p-1.5 text-orange-500 hover:bg-orange-50 rounded-lg transition-colors w-auto"
-                            >
-                              <DollarSign size={16} />
-                            </button>
-                            <button
-                              onClick={() => openEditExpense(expense)}
-                              title="Edit"
-                              className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors w-auto"
-                            >
-                              <Edit size={16} />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteExpense(expense._id)}
-                              title="Delete"
-                              className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors w-auto"
-                            >
-                              <Trash2 size={16} />
-                            </button>
+                            <IconBtn title="Payment history" onClick={() => viewPaymentHistory(row)}>
+                              <History className="w-3.5 h-3.5" />
+                            </IconBtn>
+                            <IconBtn title="Edit" onClick={() => openEditExpense(row)}>
+                              <Pencil className="w-3.5 h-3.5" />
+                            </IconBtn>
+                            <IconBtn title="Delete" onClick={() => handleDeleteExpense(row._id)} danger>
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </IconBtn>
                           </div>
-                        </td>
+                        </Td>
                       </tr>
                     ))}
                   </tbody>
@@ -515,27 +379,18 @@ export default function MExpenses() {
               </div>
             )}
 
-            {/* Pagination */}
             {pagination.pages > 1 && (
-              <div className="px-4 py-3 border-t border-gray-100 flex justify-between items-center">
-                <span className="text-sm text-gray-500">
+              <div className="px-4 py-3 border-t border-neutral-100 flex justify-between items-center bg-neutral-50/60">
+                <span className="text-[12px] text-neutral-500">
                   Page {pagination.page} of {pagination.pages} ({pagination.total} total)
                 </span>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setPagination((p) => ({ ...p, page: p.page - 1 }))}
-                    disabled={pagination.page <= 1}
-                    className="px-3 py-1 text-sm border border-gray-200 rounded-lg disabled:opacity-50 hover:bg-gray-50 w-auto"
-                  >
-                    Previous
-                  </button>
-                  <button
-                    onClick={() => setPagination((p) => ({ ...p, page: p.page + 1 }))}
-                    disabled={pagination.page >= pagination.pages}
-                    className="px-3 py-1 text-sm border border-gray-200 rounded-lg disabled:opacity-50 hover:bg-gray-50 w-auto"
-                  >
-                    Next
-                  </button>
+                <div className="flex gap-1.5">
+                  <SigButton variant="outline" onClick={() => setPagination((p) => ({ ...p, page: p.page - 1 }))} disabled={pagination.page <= 1} className="!h-8 !px-2.5 !text-[12px]">
+                    <ChevronLeft className="w-3.5 h-3.5" /> Previous
+                  </SigButton>
+                  <SigButton variant="outline" onClick={() => setPagination((p) => ({ ...p, page: p.page + 1 }))} disabled={pagination.page >= pagination.pages} className="!h-8 !px-2.5 !text-[12px]">
+                    Next <ChevronRight className="w-3.5 h-3.5" />
+                  </SigButton>
                 </div>
               </div>
             )}
@@ -543,377 +398,399 @@ export default function MExpenses() {
         </>
       )}
 
-      {/* ===== ANALYTICS TAB ===== */}
       {activeTab === "analytics" && analytics && (
-        <div className="space-y-6">
-          {/* By Category */}
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <Tag size={20} className="text-orange-500" /> Expenses by Category
-            </h3>
+        <div className="space-y-4">
+          <Section title="Expenses by category" icon={Tag}>
             {analytics.byCategory?.length > 0 ? (
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 {analytics.byCategory.map((cat) => {
                   const pct = analytics.totals.totalAmount > 0 ? (cat.total / analytics.totals.totalAmount) * 100 : 0;
                   return (
-                    <div key={cat._id} className="flex items-center gap-4">
-                      <div className="w-32 text-sm font-medium text-gray-700 truncate">{cat._id}</div>
-                      <div className="flex-1 bg-gray-100 rounded-full h-6 overflow-hidden">
+                    <div key={cat._id} className="flex items-center gap-3">
+                      <div className="w-32 text-[12px] font-semibold text-neutral-900 truncate">{cat._id}</div>
+                      <div className="flex-1 bg-neutral-100 rounded-full h-5 overflow-hidden">
                         <div
-                          className="h-full bg-orange-500 rounded-full flex items-center justify-end pr-2"
-                          style={{ width: `${Math.max(pct, 5)}%` }}
+                          className="h-full rounded-full flex items-center justify-end pr-2 transition-all"
+                          style={{ width: `${Math.max(pct, 5)}%`, background: SIG }}
                         >
-                          <span className="text-[10px] font-bold text-white">{pct.toFixed(1)}%</span>
+                          <span className="text-[10px] font-semibold text-white tabular-nums">{pct.toFixed(1)}%</span>
                         </div>
                       </div>
-                      <div className="w-28 text-right text-sm font-semibold text-gray-800">{formatCurrency(cat.total)}</div>
-                      <div className="w-16 text-right text-xs text-gray-400">{cat.count} items</div>
+                      <div className="w-24 text-right text-[12px] font-semibold text-neutral-950 tabular-nums">{formatCurrency(cat.total)}</div>
+                      <div className="w-14 text-right text-[11px] text-neutral-400 font-mono tabular-nums">{cat.count}</div>
                     </div>
                   );
                 })}
               </div>
             ) : (
-              <p className="text-gray-400 text-sm">No data yet</p>
+              <p className="text-[12px] text-neutral-400">No data yet</p>
             )}
-          </div>
+          </Section>
 
-          {/* By Event Type */}
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <TrendingUp size={20} className="text-emerald-600" /> Expenses by Event Type
-            </h3>
+          <Section title="Expenses by event type" icon={TrendingUp}>
             {analytics.byEventType?.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {analytics.byEventType.map((evt) => (
-                  <div key={evt._id} className="border border-gray-100 rounded-lg p-4">
-                    <div className="text-sm font-semibold text-gray-700 mb-2">{evt._id}</div>
-                    <div className="text-xl font-bold text-gray-800">{formatCurrency(evt.total)}</div>
-                    <div className="flex justify-between mt-2 text-xs text-gray-400">
-                      <span>Paid: {formatCurrency(evt.paid)}</span>
-                      <span>{evt.count} expenses</span>
+                  <div key={evt._id} className="rounded-xl border border-neutral-200 p-3.5">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500">{evt._id}</p>
+                    <p className="text-[20px] font-semibold text-neutral-950 tabular-nums leading-none mt-1.5">{formatCurrency(evt.total)}</p>
+                    <div className="flex justify-between mt-2 text-[11px] text-neutral-500">
+                      <span>Paid: <span className="font-mono tabular-nums">{formatCurrency(evt.paid)}</span></span>
+                      <span><span className="font-mono tabular-nums">{evt.count}</span> expenses</span>
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-gray-400 text-sm">No data yet</p>
+              <p className="text-[12px] text-neutral-400">No data yet</p>
             )}
-          </div>
+          </Section>
 
-          {/* By Payment Status */}
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <CreditCard size={20} className="text-green-600" /> By Payment Status
-            </h3>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <Section title="By payment status" icon={CreditCard}>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               {analytics.byStatus?.map((s) => (
-                <div key={s._id} className="border border-gray-100 rounded-lg p-4 text-center">
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium mb-2 ${statusColors[s._id] || "bg-gray-100 text-gray-600"}`}>
-                    {statusIcons[s._id]} {s._id}
-                  </span>
-                  <div className="text-xl font-bold text-gray-800 mt-1">{formatCurrency(s.total)}</div>
-                  <div className="text-xs text-gray-400">{s.count} expenses</div>
+                <div key={s._id} className="rounded-xl border border-neutral-200 p-3.5 text-center">
+                  <ExpenseStatusPill status={s._id} />
+                  <p className="text-[20px] font-semibold text-neutral-950 mt-2 tabular-nums leading-none">{formatCurrency(s.total)}</p>
+                  <p className="text-[11px] text-neutral-500 mt-1"><span className="font-mono tabular-nums">{s.count}</span> expenses</p>
                 </div>
               ))}
             </div>
-          </div>
+          </Section>
         </div>
       )}
 
-      {/* ===== ADD/EDIT EXPENSE MODAL ===== */}
+      {/* === Add / Edit expense modal === */}
       {showExpenseModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
-              <h3 className="text-lg font-bold text-gray-800">{editingExpense ? "Edit Expense" : "Add Expense"}</h3>
-              <button onClick={() => { setShowExpenseModal(false); resetExpenseForm(); }} className="text-gray-400 hover:text-gray-600 w-auto bg-transparent">
-                <X size={20} />
-              </button>
+        <Modal
+          title={editingExpense ? "Edit expense" : "Add expense"}
+          subtitle={editingExpense ? "Update the details of this expense." : "Track a new expense for an event."}
+          onClose={() => { setShowExpenseModal(false); resetExpenseForm(); }}
+          footer={
+            <div className="flex gap-2">
+              <SigButton variant="outline" className="flex-1" onClick={() => { setShowExpenseModal(false); resetExpenseForm(); }}>Cancel</SigButton>
+              <SigButton className="flex-1" onClick={handleSaveExpense}>
+                <CheckCircle className="w-3.5 h-3.5" /> {editingExpense ? "Update" : "Add expense"}
+              </SigButton>
             </div>
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
-                <input
-                  type="text"
-                  value={expenseForm.title}
-                  onChange={(e) => setExpenseForm({ ...expenseForm, title: e.target.value })}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400"
-                  placeholder="e.g., Shuttle cocks for tournament"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Amount (₹) *</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={expenseForm.amount}
-                    onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400"
-                    placeholder="0"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Date *</label>
-                  <input
-                    type="date"
-                    value={expenseForm.expenseDate}
-                    onChange={(e) => setExpenseForm({ ...expenseForm, expenseDate: e.target.value })}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Category *</label>
-                  <select
-                    value={expenseForm.category}
-                    onChange={(e) => setExpenseForm({ ...expenseForm, category: e.target.value })}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400"
-                  >
-                    <option value="">Select category</option>
-                    {categories.map((c) => (
-                      <option key={c._id} value={c._id}>{c.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Event Type</label>
-                  <select
-                    value={expenseForm.eventType}
-                    onChange={(e) => setExpenseForm({ ...expenseForm, eventType: e.target.value })}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400"
-                  >
-                    {EVENT_TYPES.map((t) => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Event Name</label>
-                <input
-                  type="text"
-                  value={expenseForm.eventName}
-                  onChange={(e) => setExpenseForm({ ...expenseForm, eventName: e.target.value })}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400"
-                  placeholder="e.g., State Badminton Championship 2026"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Vendor</label>
-                <input
-                  type="text"
-                  value={expenseForm.vendor}
-                  onChange={(e) => setExpenseForm({ ...expenseForm, vendor: e.target.value })}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400"
-                  placeholder="e.g., Decathlon, Local Sports Shop"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                <textarea
-                  value={expenseForm.description}
-                  onChange={(e) => setExpenseForm({ ...expenseForm, description: e.target.value })}
-                  rows={2}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 resize-none"
-                  placeholder="Optional notes..."
-                />
-              </div>
+          }
+        >
+          <div className="space-y-3">
+            <SigInput label="Title *" value={expenseForm.title} onChange={(e) => setExpenseForm({ ...expenseForm, title: e.target.value })} placeholder="e.g. Shuttlecocks for tournament" />
+            <div className="grid grid-cols-2 gap-3">
+              <SigInput label="Amount (₹) *" type="number" min="0" value={expenseForm.amount} onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })} placeholder="0" />
+              <SigInput label="Date *" type="date" value={expenseForm.expenseDate} onChange={(e) => setExpenseForm({ ...expenseForm, expenseDate: e.target.value })} />
             </div>
-            <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
-              <button onClick={() => { setShowExpenseModal(false); resetExpenseForm(); }} className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 w-auto">
-                Cancel
-              </button>
-              <button onClick={handleSaveExpense} className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 w-auto">
-                {editingExpense ? "Update" : "Add Expense"}
-              </button>
+            <div className="grid grid-cols-2 gap-3">
+              <SigSelect label="Category *" value={expenseForm.category} onChange={(e) => setExpenseForm({ ...expenseForm, category: e.target.value })}>
+                <option value="">Select category</option>
+                {categories.map((c) => <option key={c._id} value={c._id}>{c.name}</option>)}
+              </SigSelect>
+              <SigSelect label="Event type" value={expenseForm.eventType} onChange={(e) => setExpenseForm({ ...expenseForm, eventType: e.target.value })}>
+                {EVENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+              </SigSelect>
+            </div>
+            <SigInput label="Event name" value={expenseForm.eventName} onChange={(e) => setExpenseForm({ ...expenseForm, eventName: e.target.value })} placeholder="e.g. State Badminton Championship 2026" />
+            <SigInput label="Vendor"     value={expenseForm.vendor}    onChange={(e) => setExpenseForm({ ...expenseForm, vendor:    e.target.value })} placeholder="e.g. Decathlon" />
+            <div>
+              <Label>Description</Label>
+              <textarea
+                value={expenseForm.description}
+                onChange={(e) => setExpenseForm({ ...expenseForm, description: e.target.value })}
+                rows={2}
+                className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-[13px] bg-white text-neutral-900 placeholder:text-neutral-400 outline-none transition focus:border-[--sig] focus:ring-2 focus:ring-[--sig-tint] resize-none"
+                style={{ "--sig": SIG, "--sig-tint": SIG_TINT }}
+                placeholder="Optional notes…"
+              />
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
-      {/* ===== CATEGORY MODAL ===== */}
+      {/* === Category modal === */}
       {showCategoryModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md">
-            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
-              <h3 className="text-lg font-bold text-gray-800">Expense Categories</h3>
-              <button onClick={() => setShowCategoryModal(false)} className="text-gray-400 hover:text-gray-600 w-auto bg-transparent">
-                <X size={20} />
-              </button>
-            </div>
-            <div className="p-6">
-              {/* Add new */}
-              <div className="flex gap-2 mb-4">
-                <input
-                  type="text"
-                  value={categoryForm.name}
-                  onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })}
-                  placeholder="New category name..."
-                  className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400"
-                />
-                <button onClick={handleSaveCategory} className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 w-auto">
-                  Add
-                </button>
-              </div>
-              {/* List */}
-              <div className="space-y-2 max-h-60 overflow-y-auto">
-                {categories.length === 0 ? (
-                  <p className="text-sm text-gray-400 text-center py-4">No categories yet. Add one above.</p>
-                ) : (
-                  categories.map((cat) => (
-                    <div key={cat._id} className="flex justify-between items-center px-3 py-2 bg-gray-50 rounded-lg">
-                      <span className="text-sm font-medium text-gray-700">{cat.name}</span>
-                      <button
-                        onClick={() => handleDeleteCategory(cat._id)}
-                        className="text-red-400 hover:text-red-600 w-auto bg-transparent"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
+        <Modal title="Expense categories" subtitle="Add or remove your custom categories." onClose={() => setShowCategoryModal(false)}>
+          <div className="flex gap-2 mb-4">
+            <input
+              type="text"
+              value={categoryForm.name}
+              onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })}
+              placeholder="New category name…"
+              className="flex-1 h-9 px-3 border border-neutral-200 rounded-lg text-[13px] bg-white text-neutral-900 placeholder:text-neutral-400 outline-none transition focus:border-[--sig] focus:ring-2 focus:ring-[--sig-tint]"
+              style={{ "--sig": SIG, "--sig-tint": SIG_TINT }}
+            />
+            <SigButton onClick={handleSaveCategory}>
+              <Plus className="w-3.5 h-3.5" /> Add
+            </SigButton>
           </div>
-        </div>
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            {categories.length === 0 ? (
+              <p className="text-[12px] text-neutral-400 text-center py-4">No categories yet. Add one above.</p>
+            ) : (
+              categories.map((cat) => (
+                <div key={cat._id} className="flex justify-between items-center px-3 py-2 rounded-lg border border-neutral-200">
+                  <span className="text-[13px] font-medium text-neutral-900">{cat.name}</span>
+                  <IconBtn onClick={() => handleDeleteCategory(cat._id)} title="Delete" danger>
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </IconBtn>
+                </div>
+              ))
+            )}
+          </div>
+        </Modal>
       )}
 
-      {/* ===== RECORD PAYMENT MODAL ===== */}
+      {/* === Record payment modal === */}
       {showPaymentModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md">
-            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
-              <h3 className="text-lg font-bold text-gray-800">Record Payment</h3>
-              <button onClick={() => setShowPaymentModal(false)} className="text-gray-400 hover:text-gray-600 w-auto bg-transparent">
-                <X size={20} />
-              </button>
+        <Modal
+          title="Record payment"
+          onClose={() => setShowPaymentModal(false)}
+          footer={
+            <div className="flex gap-2">
+              <SigButton variant="outline" className="flex-1" onClick={() => setShowPaymentModal(false)}>Cancel</SigButton>
+              <SigButton className="flex-1" onClick={handleRecordPayment}>
+                <CheckCircle className="w-3.5 h-3.5" /> Record payment
+              </SigButton>
             </div>
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Amount (₹) *</label>
-                <input
-                  type="number"
-                  min="0"
-                  value={paymentForm.amount}
-                  onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Payment Mode *</label>
-                <select
-                  value={paymentForm.paymentMode}
-                  onChange={(e) => setPaymentForm({ ...paymentForm, paymentMode: e.target.value })}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400"
-                >
-                  {PAYMENT_MODES.map((m) => (
-                    <option key={m} value={m}>{m}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Payment Date *</label>
-                <input
-                  type="date"
-                  value={paymentForm.paymentDate}
-                  onChange={(e) => setPaymentForm({ ...paymentForm, paymentDate: e.target.value })}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Transaction ID</label>
-                <input
-                  type="text"
-                  value={paymentForm.transactionId}
-                  onChange={(e) => setPaymentForm({ ...paymentForm, transactionId: e.target.value })}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400"
-                  placeholder="Optional"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
-                <input
-                  type="text"
-                  value={paymentForm.notes}
-                  onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400"
-                  placeholder="Optional"
-                />
-              </div>
-            </div>
-            <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
-              <button onClick={() => setShowPaymentModal(false)} className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 w-auto">
-                Cancel
-              </button>
-              <button onClick={handleRecordPayment} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 w-auto">
-                Record Payment
-              </button>
-            </div>
+          }
+        >
+          <div className="space-y-3">
+            <SigInput label="Amount (₹) *" type="number" min="0" value={paymentForm.amount} onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })} />
+            <SigSelect label="Payment mode *" value={paymentForm.paymentMode} onChange={(e) => setPaymentForm({ ...paymentForm, paymentMode: e.target.value })}>
+              {PAYMENT_MODES.map((m) => <option key={m} value={m}>{m}</option>)}
+            </SigSelect>
+            <SigInput label="Payment date *" type="date" value={paymentForm.paymentDate} onChange={(e) => setPaymentForm({ ...paymentForm, paymentDate: e.target.value })} />
+            <SigInput label="Transaction ID" value={paymentForm.transactionId} onChange={(e) => setPaymentForm({ ...paymentForm, transactionId: e.target.value })} placeholder="Optional" />
+            <SigInput label="Notes"          value={paymentForm.notes}         onChange={(e) => setPaymentForm({ ...paymentForm, notes:         e.target.value })} placeholder="Optional" />
           </div>
-        </div>
+        </Modal>
       )}
 
-      {/* ===== PAYMENT HISTORY MODAL ===== */}
-      {showPaymentHistory && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-lg">
-            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
-              <div>
-                <h3 className="text-lg font-bold text-gray-800">Payment History</h3>
-                <p className="text-sm text-gray-500">{selectedExpense?.title}</p>
-              </div>
-              <button onClick={() => setShowPaymentHistory(false)} className="text-gray-400 hover:text-gray-600 w-auto bg-transparent">
-                <X size={20} />
-              </button>
-            </div>
-            <div className="p-6">
-              {/* Summary */}
-              <div className="bg-gray-50 rounded-lg p-3 mb-4 flex justify-between text-sm">
-                <div>
-                  <span className="text-gray-500">Total:</span>{" "}
-                  <span className="font-semibold">{formatCurrency(selectedExpense?.amount)}</span>
-                </div>
-                <div>
-                  <span className="text-gray-500">Paid:</span>{" "}
-                  <span className="font-semibold text-green-600">{formatCurrency(selectedExpense?.totalPaid)}</span>
-                </div>
-                <div>
-                  <span className="text-gray-500">Remaining:</span>{" "}
-                  <span className="font-semibold text-orange-600">
-                    {formatCurrency((selectedExpense?.amount || 0) - (selectedExpense?.totalPaid || 0))}
-                  </span>
-                </div>
-              </div>
-
-              {/* Payments list */}
-              {expensePayments.length === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-6">No payments recorded yet</p>
-              ) : (
-                <div className="space-y-3 max-h-60 overflow-y-auto">
-                  {expensePayments.map((p) => (
-                    <div key={p._id} className="flex justify-between items-center px-3 py-2 bg-gray-50 rounded-lg">
-                      <div>
-                        <div className="text-sm font-medium text-gray-700">{formatCurrency(p.amount)}</div>
-                        <div className="text-xs text-gray-400">
-                          {p.paymentMode} • {formatDate(p.paymentDate)}
-                          {p.transactionId && ` • ${p.transactionId}`}
-                        </div>
-                      </div>
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                        p.status === "Paid" ? "bg-green-100 text-green-700" : p.status === "Failed" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"
-                      }`}>
-                        {p.status}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+      {/* === Payment history modal === */}
+      {showHistory && (
+        <Modal
+          title="Payment history"
+          subtitle={selectedExpense?.title}
+          onClose={() => setShowHistory(false)}
+        >
+          <div className="grid grid-cols-3 gap-2 mb-4">
+            <SummaryTile label="Total"     value={formatCurrency(selectedExpense?.amount)} />
+            <SummaryTile label="Paid"      value={formatCurrency(selectedExpense?.totalPaid)} tone="emerald" />
+            <SummaryTile label="Remaining" value={formatCurrency((selectedExpense?.amount || 0) - (selectedExpense?.totalPaid || 0))} tone="amber" />
           </div>
-        </div>
+          {expensePayments.length === 0 ? (
+            <p className="text-[12px] text-neutral-400 text-center py-6">No payments recorded yet</p>
+          ) : (
+            <div className="space-y-2 max-h-72 overflow-y-auto">
+              {expensePayments.map((p) => (
+                <div key={p._id} className="flex justify-between items-center px-3 py-2.5 rounded-lg border border-neutral-200">
+                  <div>
+                    <p className="text-[13px] font-semibold text-neutral-950 tabular-nums">{formatCurrency(p.amount)}</p>
+                    <p className="text-[11px] text-neutral-500 font-mono">
+                      {p.paymentMode} · {formatDate(p.paymentDate)}
+                      {p.transactionId && ` · ${p.transactionId}`}
+                    </p>
+                  </div>
+                  <ExpenseStatusPill status={p.status} />
+                </div>
+              ))}
+            </div>
+          )}
+        </Modal>
       )}
+    </div>
+  );
+}
+
+// ── SIG inline primitives ────────────────────────────────────────────────────
+
+function SigButton({ children, onClick, variant = "primary", type = "button", disabled, className = "" }) {
+  const base = "h-9 px-3.5 inline-flex items-center justify-center gap-1.5 text-[13px] font-semibold rounded-lg transition active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed";
+  if (variant === "outline") {
+    return (
+      <button type={type} onClick={onClick} disabled={disabled}
+        className={`${base} border border-neutral-200 hover:border-neutral-300 text-neutral-700 hover:bg-neutral-50 ${className}`}>
+        {children}
+      </button>
+    );
+  }
+  return (
+    <button type={type} onClick={onClick} disabled={disabled}
+      className={`${base} text-white ${className}`}
+      style={{ backgroundColor: SIG }}>
+      {children}
+    </button>
+  );
+}
+
+function StatTile({ icon: Icon, label, value }) {
+  return (
+    <div className="bg-white border border-neutral-200 rounded-2xl p-4">
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <span className="w-8 h-8 inline-flex items-center justify-center rounded-lg" style={{ background: SIG_TINT, color: SIG }}>
+          <Icon className="w-4 h-4" />
+        </span>
+      </div>
+      <p className="text-[22px] font-semibold leading-none text-neutral-950 tabular-nums">{value ?? 0}</p>
+      <p className="mt-1.5 text-[12px] text-neutral-500">{label}</p>
+    </div>
+  );
+}
+
+function Section({ title, icon: Icon, children }) {
+  return (
+    <div className="bg-white border border-neutral-200 rounded-2xl p-4">
+      <div className="flex items-center gap-2 mb-3">
+        {Icon && <Icon className="w-3.5 h-3.5 text-neutral-400" />}
+        <h3 className="text-[13px] font-semibold text-neutral-950">{title}</h3>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function Label({ children }) {
+  return <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-neutral-500 mb-1.5">{children}</label>;
+}
+
+function SigInput({ label, ...rest }) {
+  return (
+    <div>
+      <Label>{label}</Label>
+      <input
+        {...rest}
+        className="w-full h-9 px-3 border border-neutral-200 rounded-lg text-[13px] bg-white text-neutral-900 placeholder:text-neutral-400 outline-none transition focus:border-[--sig] focus:ring-2 focus:ring-[--sig-tint]"
+        style={{ "--sig": SIG, "--sig-tint": SIG_TINT }}
+      />
+    </div>
+  );
+}
+
+function SigSelect({ label, children, ...rest }) {
+  return (
+    <div>
+      <Label>{label}</Label>
+      <select
+        {...rest}
+        className="w-full h-9 px-3 border border-neutral-200 rounded-lg text-[13px] bg-white text-neutral-900 outline-none transition focus:border-[--sig] focus:ring-2 focus:ring-[--sig-tint]"
+        style={{ "--sig": SIG, "--sig-tint": SIG_TINT }}
+      >
+        {children}
+      </select>
+    </div>
+  );
+}
+
+function FilterSelect({ children, ...rest }) {
+  return (
+    <select
+      {...rest}
+      className="h-8 px-3 border border-neutral-200 rounded-lg text-[12px] bg-white text-neutral-700 focus:outline-none focus:border-[--sig] focus:ring-2 focus:ring-[--sig-tint]"
+      style={{ "--sig": SIG, "--sig-tint": SIG_TINT }}
+    >
+      {children}
+    </select>
+  );
+}
+
+function Pill({ className, children }) {
+  return (
+    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider ${className}`}>
+      {children}
+    </span>
+  );
+}
+
+function IconBtn({ children, onClick, title, danger }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      className={`h-7 w-7 inline-flex items-center justify-center rounded-md transition ${
+        danger ? "text-neutral-400 hover:text-rose-600 hover:bg-rose-50" : "text-neutral-400 hover:text-neutral-900 hover:bg-neutral-100"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function Th({ children, align }) {
+  const a = align === "right" ? "text-right" : align === "center" ? "text-center" : "text-left";
+  return <th className={`py-3 px-4 text-[10px] font-semibold uppercase tracking-[0.08em] text-neutral-500 ${a}`}>{children}</th>;
+}
+
+function Td({ children, align }) {
+  const a = align === "right" ? "text-right" : align === "center" ? "text-center" : "text-left";
+  return <td className={`py-3 px-4 ${a}`}>{children}</td>;
+}
+
+function ExpenseStatusPill({ status }) {
+  let cls = "bg-neutral-100 text-neutral-700";
+  let icon = null;
+  switch (status) {
+    case "Paid":    cls = "bg-emerald-50 text-emerald-700"; icon = <CheckCircle className="w-2.5 h-2.5" />; break;
+    case "Partial": cls = "bg-amber-50 text-amber-700";     icon = <AlertCircle className="w-2.5 h-2.5" />; break;
+    case "Pending": cls = "bg-neutral-100 text-neutral-700"; icon = <Clock className="w-2.5 h-2.5" />; break;
+    case "Failed":  cls = "bg-rose-50 text-rose-700";       icon = <X className="w-2.5 h-2.5" />; break;
+    default: break;
+  }
+  return (
+    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider ${cls}`}>
+      {icon} {status || "—"}
+    </span>
+  );
+}
+
+function Modal({ title, subtitle, onClose, children, footer }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/40 backdrop-blur-sm p-4" onClick={onClose}>
+      <div
+        className="bg-white rounded-2xl border border-neutral-200 shadow-[0_24px_64px_rgba(0,0,0,0.16)] max-w-lg w-full max-h-[85vh] flex flex-col overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between px-5 py-4 border-b border-neutral-100">
+          <div className="min-w-0">
+            <p className="text-[14px] font-semibold text-neutral-950">{title}</p>
+            {subtitle && <p className="text-[12px] text-neutral-500 mt-0.5 truncate">{subtitle}</p>}
+          </div>
+          <button onClick={onClose} className="h-7 w-7 inline-flex items-center justify-center rounded-md hover:bg-neutral-100 text-neutral-500 hover:text-neutral-900 flex-shrink-0">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>
+        {footer && <div className="px-5 py-3 border-t border-neutral-100 bg-neutral-50/60">{footer}</div>}
+      </div>
+    </div>
+  );
+}
+
+function EmptyBlock({ icon: Icon, title, desc, ctaLabel, onCta }) {
+  return (
+    <div className="px-6 py-16 text-center">
+      <div className="w-10 h-10 rounded-xl bg-neutral-100 inline-flex items-center justify-center mb-3">
+        <Icon className="w-5 h-5 text-neutral-400" />
+      </div>
+      <h3 className="text-[14px] font-semibold text-neutral-900">{title}</h3>
+      <p className="text-[13px] text-neutral-500 mt-1 max-w-md mx-auto">{desc}</p>
+      {ctaLabel && (
+        <button onClick={onCta}
+          className="mt-4 h-8 px-3 inline-flex items-center gap-1.5 text-[12px] font-semibold text-white rounded-lg transition active:scale-[0.98]"
+          style={{ backgroundColor: SIG }}>
+          <Plus className="w-3.5 h-3.5" /> {ctaLabel}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function SummaryTile({ label, value, tone }) {
+  const tones = { emerald: "text-emerald-700", amber: "text-amber-700" };
+  return (
+    <div className="rounded-lg border border-neutral-200 px-3 py-2.5">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-neutral-500">{label}</p>
+      <p className={`text-[15px] font-semibold tabular-nums leading-tight mt-1 ${tones[tone] || "text-neutral-950"}`}>{value}</p>
     </div>
   );
 }
