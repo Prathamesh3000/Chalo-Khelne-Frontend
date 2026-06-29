@@ -15,6 +15,8 @@ import ManageClubs from "./SuperAdmin/ManageClubs";
 import SuGroupChatList from "./SuperAdmin/SuGroupChatList";
 import SuGroupChatPage from "./SuperAdmin/SuGroupChatPage";
 import SuNotification from "./SuperAdmin/SuNotification";
+import SuSocial from "./SuperAdmin/SuSocial";
+import SuNews from "./SuperAdmin/SuNews";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 // All SuperAdmin pages own their own dark SuperAdminShell chrome. No
@@ -38,6 +40,8 @@ const SuperAdminapp = () => {
         <Route path="/vendor-marketplace" element={<VendorMarketplace />} />
         <Route path="/turf-approvals"     element={<TurfApprovals />} />
         <Route path="/notification"       element={<SuNotification />} />
+        <Route path="/su-social"          element={<SuSocial />} />
+        <Route path="/news"               element={<SuNews />} />
         <Route path="/group-chat"         element={<SuGroupChatList />} />
         <Route path="/group-chat/:chatId" element={<SuGroupChatPage />} />
       </Route>

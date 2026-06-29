@@ -12,6 +12,7 @@ import MCreateTournament from "./MCreateTournament";
 import {
   getSportName, getTournamentType, getKnockoutFormat, getCurrentStage,
 } from "../utils/sportTrack";
+import { resolveManageUrl } from "../features/tournaments";
 
 const SIG = "#5E6AD2";
 
@@ -184,14 +185,22 @@ const TournamentList = ({ onTournamentSelect, selectedTournament }) => {
     } else if (t.includes("group stage")) {
       navigate(`/tournament-management/group-stage?tournamentId=${tournament._id}`);
     } else if (t.includes("knockout")) {
-      const kf = (getKnockoutFormat(tournament) || "").toLowerCase();
-      if (kf.includes("team") || kf.includes("davis")) {
+      // Davis-Cup team engine only for a real team-track that isn't time/innings.
+      // Football (time) / Cricket (innings) use the auto-advancing Direct engine.
+      const _sports = Array.isArray(tournament?.sports) ? tournament.sports : [];
+      const hasDavisCupTrack = _sports.some((s) =>
+        ["Davis Cup", "Teams Knockout"].includes(s?.knockoutFormat) &&
+        !["time", "innings"].includes((s?.matchFormat?.scoringType || "").toLowerCase())
+      );
+      if (hasDavisCupTrack) {
         navigate(`/tournament-management/team-knockouts?tournamentId=${tournament._id}`);
       } else {
         navigate(`/tournament-management/direct-knockout?tournamentId=${tournament._id}`);
       }
     } else {
-      navigate(`/tournaments/${tournament._id}`);
+      // Unknown / unconfigured type: go straight to the canonical V1 manage
+      // URL instead of bouncing through the V2 overview redirect shim.
+      navigate(resolveManageUrl(tournament));
     }
   };
 

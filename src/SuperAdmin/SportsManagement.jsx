@@ -19,13 +19,16 @@ import { SuperAdminShell } from "../shared/layout";
 const API_URL = `${import.meta.env.VITE_API_BASE_URL}/sports`;
 
 const CATEGORIES = ["Racquet", "Team", "Board", "Individual", "Custom"];
+// Values MUST match the Sport model enum (Modal/Sport.js scoringType):
+// ["sets","innings","time","single","board","custom"]. The old long-form
+// values ("sets-games-points"…) failed Mongoose validation on every write.
 const SCORING_TYPES = [
-  "sets-games-points",
-  "innings-overs",
-  "halves-goals",
-  "quarters-points",
-  "single-score",
-  "custom",
+  { value: "sets", label: "Sets / games / points" },
+  { value: "innings", label: "Innings / overs (cricket)" },
+  { value: "time", label: "Timed (halves / quarters)" },
+  { value: "board", label: "Board-by-board (carrom)" },
+  { value: "single", label: "Single score / result" },
+  { value: "custom", label: "Custom" },
 ];
 
 const categoryColors = {
@@ -39,13 +42,14 @@ const categoryColors = {
 const defaultFormData = {
   name: "",
   category: "Racquet",
-  scoringType: "sets-games-points",
+  scoringType: "sets",
   matchFormat: {
     totalSets: 3,
     pointsPerSet: 21,
     gamesPerSet: null,
     deuceEnabled: true,
     tiebreakEnabled: false,
+    maxPointsCap: null,
     serviceRules: "rally",
     oversCount: null,
     inningsCount: null,
@@ -53,6 +57,10 @@ const defaultFormData = {
     halvesDuration: null,
     quartersCount: null,
     quartersDuration: null,
+    // Board sports (carrom)
+    boardsToWin: null,
+    pointsPerBoard: null,
+    queenValue: null,
   },
   displayConfig: {
     icon: "Trophy",
@@ -113,25 +121,29 @@ function FormatSummary({ sport }) {
   const f = sport.matchFormat;
   const st = sport.scoringType;
   let summary = "";
-  if (st === "sets-games-points") {
+  if (st === "sets") {
     if (f?.totalSets && f?.pointsPerSet)
       summary = `Best of ${f.totalSets}, ${f.pointsPerSet} pts`;
     else if (f?.totalSets && f?.gamesPerSet)
       summary = `Best of ${f.totalSets}, ${f.gamesPerSet} games`;
     else if (f?.totalSets) summary = `Best of ${f.totalSets}`;
     else summary = "—";
-  } else if (st === "innings-overs") {
+  } else if (st === "innings") {
     summary = f?.oversCount
       ? `${f.oversCount} overs, ${f.inningsCount || 2} innings`
       : "—";
-  } else if (st === "halves-goals") {
-    summary = f?.halvesCount
-      ? `${f.halvesCount} halves, ${f.halvesDuration}min`
+  } else if (st === "time") {
+    if (f?.halvesCount)
+      summary = `${f.halvesCount} halves, ${f.halvesDuration}min`;
+    else if (f?.quartersCount)
+      summary = `${f.quartersCount} quarters, ${f.quartersDuration}min`;
+    else summary = "—";
+  } else if (st === "board") {
+    summary = f?.boardsToWin
+      ? `First to ${f.boardsToWin} boards${f.pointsPerBoard ? `, ${f.pointsPerBoard} pts` : ""}`
       : "—";
-  } else if (st === "quarters-points") {
-    summary = f?.quartersCount
-      ? `${f.quartersCount} quarters, ${f.quartersDuration}min`
-      : "—";
+  } else if (st === "single") {
+    summary = "Single result";
   } else {
     summary = "Custom";
   }
@@ -167,11 +179,15 @@ export default function SportsManagement() {
   };
 
   const handleSeed = async () => {
-    if (!window.confirm("Seed the 5 default sport presets?")) return;
+    if (!window.confirm("Seed the default sport presets?")) return;
     setSeeding(true);
     try {
       const { data } = await axios.post(`${API_URL}/seed`);
-      toast.success(`Seeded ${data.count || 0} sports`);
+      const r = data.data || {};
+      toast.success(
+        data.message ||
+          `Seeded sports — ${r.created ?? 0} created, ${r.updated ?? 0} updated`
+      );
       await fetchSports();
     } catch (err) {
       toast.error(err.response?.data?.error || "Seed failed");
@@ -279,21 +295,27 @@ export default function SportsManagement() {
 
   const getFormatFields = () => {
     switch (formData.scoringType) {
-      case "sets-games-points":
+      case "sets":
         return [
           "totalSets",
           "pointsPerSet",
           "gamesPerSet",
           "deuceEnabled",
           "tiebreakEnabled",
+          "maxPointsCap",
           "serviceRules",
         ];
-      case "innings-overs":
+      case "innings":
         return ["oversCount", "inningsCount"];
-      case "halves-goals":
-        return ["halvesCount", "halvesDuration"];
-      case "quarters-points":
-        return ["quartersCount", "quartersDuration"];
+      case "time":
+        return [
+          "halvesCount",
+          "halvesDuration",
+          "quartersCount",
+          "quartersDuration",
+        ];
+      case "board":
+        return ["boardsToWin", "pointsPerBoard", "queenValue"];
       default:
         return [];
     }
@@ -572,8 +594,8 @@ export default function SportsManagement() {
                     onChange={handleInputChange}
                   >
                     {SCORING_TYPES.map((s) => (
-                      <option key={s} value={s}>
-                        {s}
+                      <option key={s.value} value={s.value}>
+                        {s.label}
                       </option>
                     ))}
                   </DarkSelect>

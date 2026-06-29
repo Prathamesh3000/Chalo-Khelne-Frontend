@@ -8,6 +8,7 @@ import { SuperAdminShell } from "../shared/layout";
 
 const initialForm = {
   name: "", email: "", phone: "", designation: "Admin",
+  orgType: "club",
   clubName: "", sports: "", city: "", area: "", address: "",
 };
 
@@ -22,9 +23,28 @@ export default function CreateClubAdmin() {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      const res = await axios.post("/api/clubadminprofile/onboard", formData);
-      setGeneratedCredentials(res.data.credentials || { email: formData.email, password: res.data.password || "Sent via email" });
-      toast.success("Club admin account created successfully!");
+      const isCorporate = formData.orgType === "corporate";
+      // A corporate admin is a different role (corporate_admin) with its own
+      // onboarding + profile — route there and map the form fields.
+      const url = isCorporate ? "/api/corporate/onboard" : "/api/clubadminprofile/onboard";
+      const payload = isCorporate
+        ? {
+            name: formData.name,
+            email: formData.email,
+            phone: formData.phone,
+            designation: formData.designation,
+            companyName: formData.clubName,
+            location: formData.city,
+          }
+        : formData;
+      const res = await axios.post(url, payload);
+      setGeneratedCredentials(
+        res.data.credentials || {
+          email: formData.email,
+          password: res.data.tempPassword || res.data.password || "Sent via email",
+        }
+      );
+      toast.success(`${isCorporate ? "Corporate" : "Club"} admin account created successfully!`);
     } catch (error) {
       toast.error(error.response?.data?.message || "Failed to create account");
     } finally {
@@ -113,20 +133,43 @@ export default function CreateClubAdmin() {
             </div>
           </Section>
 
-          <Section icon={Building2} title="Club details">
-            <DarkInput label="Club name *" name="clubName" value={formData.clubName} onChange={handleChange} placeholder="Alpha Sports Club" required icon={Building2} />
+          <Section icon={Building2} title="Organization details">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-500 mb-1.5">Organization type *</label>
+                <select name="orgType" value={formData.orgType} onChange={handleChange} required
+                  className="w-full h-9 px-3 rounded-md text-[13px] text-gray-200 focus:outline-none"
+                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", colorScheme: "dark" }}>
+                  <option value="club">Club</option>
+                  <option value="school">School</option>
+                  <option value="organization">Organization</option>
+                  <option value="corporate">Corporate club admin</option>
+                </select>
+              </div>
+              <DarkInput label="Name *" name="clubName" value={formData.clubName} onChange={handleChange} placeholder="e.g. S. B. Patil School" required icon={Building2} />
+            </div>
+            {(formData.orgType === "school" || formData.orgType === "organization") && (
+              <p className="text-[11px] text-orange-300/80 mt-2">
+                Unlocks the Trainer module (trainers, sport assignments, students, schedule & attendance).
+              </p>
+            )}
+            {formData.orgType === "corporate" && (
+              <p className="text-[11px] text-orange-300/80 mt-2">
+                Creates a Corporate workspace account (corporate_admin) with its own dashboard. “Name” = company name; City = location.
+              </p>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
-              <DarkInput label="City *"  name="city"  value={formData.city}  onChange={handleChange} placeholder="Mumbai"        required />
-              <DarkInput label="Area *"  name="area"  value={formData.area}  onChange={handleChange} placeholder="Andheri West"  required />
-              <DarkInput label="Sports * (comma separated)" name="sports" value={formData.sports} onChange={handleChange} placeholder="Cricket, Football" required icon={Trophy} />
+              <DarkInput label={formData.orgType === "corporate" ? "Location *" : "City *"} name="city" value={formData.city} onChange={handleChange} placeholder="Mumbai" required />
+              <DarkInput label="Area"  name="area"  value={formData.area}  onChange={handleChange} placeholder="Andheri West"  required={formData.orgType !== "corporate"} />
+              <DarkInput label={`Sports${formData.orgType === "corporate" ? "" : " *"} (comma separated)`} name="sports" value={formData.sports} onChange={handleChange} placeholder="Cricket, Football" required={formData.orgType !== "corporate"} icon={Trophy} />
             </div>
 
             <div className="mt-3">
-              <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-500 mb-1.5">Detailed address *</label>
+              <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-500 mb-1.5">Detailed address {formData.orgType !== "corporate" && "*"}</label>
               <div className="relative">
                 <MapPin className="absolute left-3 top-2.5 w-3.5 h-3.5 text-gray-500" />
-                <textarea name="address" required rows={2} value={formData.address} onChange={handleChange}
+                <textarea name="address" required={formData.orgType !== "corporate"} rows={2} value={formData.address} onChange={handleChange}
                   placeholder="123 Main Street, Building, Landmark…"
                   className="w-full pl-9 pr-3 py-2.5 rounded-md text-[13px] text-gray-200 placeholder:text-gray-500 focus:outline-none resize-none"
                   style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }} />

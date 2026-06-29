@@ -5,8 +5,9 @@ import axios from "axios";
 import { toast } from "react-toastify";
 import {
   ShieldCheck, Plus, Search, Filter, Trophy, Calendar, MapPin,
-  ArrowRight, Users, Edit2, FileSpreadsheet, Download, FileText,
+  ArrowRight, Users, Edit2, FileSpreadsheet, Download, FileText, Target, X,
 } from "lucide-react";
+import { getTournamentType } from "../../utils/sportTrack";
 import { ManagerShell } from "../../shared/layout";
 import { Skeleton } from "../../shared/ui";
 import { cn } from "../../shared/lib";
@@ -113,6 +114,38 @@ export default function ManagerTournaments() {
   // edit mode. Stays in component state; no URL param so a refresh doesn't
   // re-trigger the fetch with stale state.
   const [editingTournament, setEditingTournament] = useState(null);
+
+  // Manage flow — format is PER-SPORT, and the management screens are organised
+  // by stage (group-stage / team-KO / singles-KO), each with its own sport
+  // switcher. So we scan every sport, collect the distinct stages the tournament
+  // actually uses, and: 1 stage → route straight there; 2+ → let the manager
+  // pick. This covers a single combined "group stage + knockout" sport AND a
+  // multi-sport tournament whose sports use different formats.
+  const [chooserTournament, setChooserTournament] = useState(null);
+  const getManageFlows = (t) => {
+    const tracks = Array.isArray(t?.sports) && t.sports.length
+      ? t.sports
+      : [{ type: getTournamentType(t), knockoutFormat: t?.knockoutFormat }];
+    const flows = new Set();
+    for (const s of tracks) {
+      const type = (s?.type || "").toLowerCase();
+      if (type.includes("group stage")) flows.add("group-stage");
+      if (type.includes("knockout")) {
+        const kf = (s?.knockoutFormat || "").toLowerCase();
+        flows.add(kf.includes("team") || kf.includes("davis") ? "team-knockouts" : "direct-knockout");
+      }
+    }
+    return [...flows];
+  };
+  const handleManage = (t) => {
+    const flows = getManageFlows(t);
+    if (flows.length <= 1) {
+      navigate(resolveManageUrl(t));
+    } else {
+      setChooserTournament(t);
+    }
+  };
+
   const handleEdit = async (tournamentId, e) => {
     e.stopPropagation();
     try {
@@ -269,7 +302,7 @@ export default function ManagerTournaments() {
             <TournamentGridCard
               key={t._id}
               tournament={t}
-              onClick={() => navigate(resolveManageUrl(t))}
+              onClick={() => handleManage(t)}
               onEdit={(e) => handleEdit(t._id, e)}
               onBulkUpload={
                 t.isPrivate
@@ -295,6 +328,63 @@ export default function ManagerTournaments() {
         initialData={editingTournament}
         onSuccess={() => queryClient.invalidateQueries({ queryKey: ["tournaments"] })}
       />
+
+      {/* Play-format / stage chooser — shown for "Group Stage + Knockout"
+          tournaments so the manager picks which phase to manage. */}
+      {chooserTournament && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+          onClick={() => setChooserTournament(null)}
+        >
+          <div
+            className="bg-[#1A1D27] border border-white/[0.08] rounded-2xl shadow-2xl w-full max-w-md p-6 relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setChooserTournament(null)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-white bg-transparent w-auto"
+              aria-label="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h3 className="text-lg font-bold text-white">Choose what to manage</h3>
+            <p className="text-sm text-gray-400 mt-1 mb-5">
+              “{chooserTournament.title || chooserTournament.name || "This tournament"}” spans more
+              than one format. Pick which to open — each screen lets you switch between its sports.
+            </p>
+            <div className="space-y-2">
+              {getManageFlows(chooserTournament).map((path) => {
+                const META = {
+                  "group-stage":     { icon: Users,  title: "Group stage",      desc: "Groups, matches, and progression" },
+                  "team-knockouts":  { icon: Trophy, title: "Team knockout",    desc: "Team brackets / Davis Cup finals" },
+                  "direct-knockout": { icon: Target, title: "Singles knockout", desc: "Direct elimination bracket (16 / 32 / 64)" },
+                }[path];
+                if (!META) return null;
+                return (
+                  <button
+                    key={path}
+                    onClick={() => {
+                      const id = chooserTournament._id;
+                      setChooserTournament(null);
+                      navigate(`/tournament-management/${path}?tournamentId=${id}`);
+                    }}
+                    className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/[0.04] border border-white/[0.06] hover:bg-white/[0.07] hover:border-emerald-500/40 transition text-left w-auto"
+                  >
+                    <span className="w-10 h-10 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center flex-shrink-0">
+                      <META.icon className="w-5 h-5" />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-sm font-bold text-white">{META.title}</span>
+                      <span className="block text-xs text-gray-400">{META.desc}</span>
+                    </span>
+                    <ArrowRight className="w-4 h-4 text-gray-500 ml-auto flex-shrink-0" />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </ManagerShell>
   );
 }

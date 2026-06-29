@@ -4,6 +4,7 @@ export { default as TopBar } from "./TopBar";
 export { default as SidebarItem } from "./SidebarItem";
 export { default as SidebarSection } from "./SidebarSection";
 export { default as TournamentShell, Round2Banner } from "./TournamentShell";
+export { default as TournamentFlowHeader } from "./TournamentFlowHeader";
 export { default as ManagerShell } from "./ManagerShell";
 export { default as ClubAdminShell } from "./ClubAdminShell";
 export { default as CorporateShell } from "./CorporateShell";

@@ -8,6 +8,8 @@ import TrainerProfile from "./Trainer/TrainerProfile";
 import TrainerRequests from "./Trainer/TrainerRequests";
 import TrainerPlayerRequests from "./Trainer/TrainerPlayerRequests";
 import TrainerUpcomingSessions from "./Trainer/TrainerUpcomingSessions";
+import TSocial from "./Trainer/TSocial";
+import TNews from "./Trainer/TNews";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 const TrainerApp = () => {
@@ -29,6 +31,8 @@ const TrainerApp = () => {
             path="/trainer/player-requests"
             element={<TrainerPlayerRequests />}
           />
+          <Route path="/trainer-social" element={<TSocial />} />
+          <Route path="/trainer-news" element={<TNews />} />
         </Route>
       </Route>
     </Routes>

@@ -34,7 +34,7 @@ export function LandingFooter() {
         <div className="grid gap-10 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
           <div>
             <div className="flex items-center gap-2">
-              <span className="grid h-9 w-9 place-items-center rounded-md bg-orange-500 text-sm font-black text-white">
+              <span className="grid h-9 w-9 place-items-center rounded-md bg-green-600 text-sm font-black text-white">
                 CK
               </span>
               <span className="text-base font-black uppercase tracking-wider text-white">

@@ -44,6 +44,54 @@ const getUmpireName = (referee) => {
   return referee.name || referee.userName || "Assigned";
 };
 
+// ── Cricket-aware score helpers ──────────────────────────────────────────────
+// Cricket (scoringType "innings") never writes sets/liveScore.player1Points; its
+// runs/wickets live in result.innings[]. The list/modal must read that instead.
+const isCricketMatch = (m) => {
+  const st = (m?.scoringType || m?.matchFormat?.scoringType || m?.liveMatchData?.scoringType || "").toLowerCase();
+  if (st === "innings") return true;
+  return /cricket|baseball/i.test(m?.sportName || m?.liveMatchData?.sportName || "");
+};
+// Pull the freshest innings array (live-state first, then persisted result).
+const getCricketInnings = (m) => {
+  const ls = m?.liveMatchData?.liveScore;
+  if (ls && ls.scoringType === "innings" && Array.isArray(ls.innings) && ls.innings.length) return ls.innings;
+  if (Array.isArray(m?.liveMatchData?.result?.innings) && m.liveMatchData.result.innings.length) return m.liveMatchData.result.innings;
+  if (Array.isArray(m?.result?.innings) && m.result.innings.length) return m.result.innings;
+  return [];
+};
+// "120/5" + "18.4" for one side, or null if that side hasn't batted.
+const cricketSideScore = (innings, side) => {
+  const inn = innings.find((i) => i.battingSide === side);
+  if (!inn) return null;
+  return {
+    text: `${inn.runs ?? 0}/${inn.wickets ?? 0}`,
+    overs: `${inn.oversBowled ?? 0}.${inn.ballsBowled ?? 0}`,
+    inProgress: inn.status === "IN_PROGRESS",
+  };
+};
+// Football (scoringType "time"): goals live in result.finalScore (player1/2Sets).
+const isFootballMatch = (m) => {
+  const st = (m?.scoringType || m?.matchFormat?.scoringType || m?.liveMatchData?.scoringType || "").toLowerCase();
+  if (st === "time") return true;
+  return /football|soccer/i.test(m?.sportName || m?.liveMatchData?.sportName || "");
+};
+const getFootballResult = (m) => {
+  const fs = m?.liveMatchData?.result?.finalScore || m?.result?.finalScore;
+  const g1 = fs?.player1Sets ?? null, g2 = fs?.player2Sets ?? null;
+  const tiebreak = m?.liveMatchData?.matchResult?.tiebreak || m?.matchResult?.tiebreak || null;
+  return { g1, g2, tiebreak };
+};
+const cricketResultText = (m) => {
+  const cr = m?.liveMatchData?.result?.cricketResult || m?.result?.cricketResult;
+  if (!cr) return "";
+  if (cr.isTie && cr.marginType !== "super_over") return "Match tied";
+  if (cr.marginType === "super_over") return "Decided by Super Over";
+  if (cr.marginType === "runs") return `Won by ${cr.marginValue} run${cr.marginValue === 1 ? "" : "s"}`;
+  if (cr.marginType === "wickets") return `Won by ${cr.marginValue} wicket${cr.marginValue === 1 ? "" : "s"}`;
+  return "";
+};
+
 export default function Tournament({
   tournamentId: propTournamentId,
   // Sport currently selected in MGroupStageManagement's per-sport tab strip.
@@ -603,24 +651,31 @@ export default function Tournament({
           const round1Groups = groupsArray.filter(group => !group.round || group.round === 1);
           setGroups(round1Groups);
 
-          // 🎯 Initialize selectedCategory if not set
-          if (round1Groups.length > 0 && !selectedCategory) {
-            // Priority: 1. First category from tournament, 2. Category of first group
-            // STEP 17b.ii — read per-sport categories (sports[0] default).
-            const _resp = response.data.tournament;
-            const tournamentCats = getCategories(tournament).length > 0
-              ? getCategories(tournament)
-              : getCategories(_resp);
-            if (tournamentCats && tournamentCats.length > 0) {
-              setSelectedCategory(tournamentCats[0].name);
-            } else if (round1Groups[0].category) {
-              setSelectedCategory(round1Groups[0].category);
+          // Resolve a category that ACTUALLY matches the fetched groups.
+          // Bug fix: previously this only ran when selectedCategory was empty
+          // (`!selectedCategory`). Switching sports kept the prior sport's
+          // category (e.g. "Open") which filters out the new sport's groups
+          // (e.g. "singles") → "0 groups" until a remount. Now we re-resolve
+          // whenever the current category doesn't match any fetched group.
+          let _resolvedCat = selectedCategory;
+          if (round1Groups.length > 0) {
+            const _norm = (s) => (s || "").toLowerCase().trim().replace(/_/g, " ");
+            const groupCats = round1Groups.map((g) => _norm(g.category));
+            const curOk = selectedCategory && groupCats.includes(_norm(selectedCategory));
+            if (!curOk) {
+              // Prefer the ACTIVE sport's category that exists in the groups,
+              // else fall back to the first group's own category.
+              const sportCats = getCategories(tournament, propActiveSportId) || [];
+              const sportCat = sportCats.find((c) => groupCats.includes(_norm(c.name)));
+              _resolvedCat = (sportCat && sportCat.name) || round1Groups[0].category || "";
+              setSelectedCategory(_resolvedCat);
             }
           }
 
-          // Use the filtered groups for initial active group
-          const filteredForInitial = selectedCategory
-            ? round1Groups.filter(g => g.category === selectedCategory)
+          // Use the resolved category for the initial active group.
+          const _normCat = (s) => (s || "").toLowerCase().trim().replace(/_/g, " ");
+          const filteredForInitial = _resolvedCat
+            ? round1Groups.filter((g) => _normCat(g.category) === _normCat(_resolvedCat))
             : round1Groups;
 
           if (filteredForInitial.length > 0) {
@@ -1589,6 +1644,35 @@ export default function Tournament({
     const pBName = (selectedMatch.player2?.userName || selectedMatch.player2?.playerName || 'Player B') +
       (isDoubles && selectedMatch.player2?.partner?.userName ? ` & ${selectedMatch.player2.partner.userName}` : '');
 
+    // Sport-aware routing. The /scoreboard page is SET-based (TT, Badminton,
+    // Foosball — games of points). Non-set sports — Cricket (innings), Carrom
+    // (board), Chess (single), Football (time) — render nothing useful there,
+    // so route them to the DynamicScorer page which shows their real scorer.
+    // UI-generated matches often lack a stamped `scoringType`, so fall back to
+    // mapping the sportName (which matches always carry).
+    const _SPORT_ST = {
+      cricket: 'innings', baseball: 'innings', carrom: 'board', chess: 'single',
+      football: 'time', basketball: 'time', hockey: 'time', kabaddi: 'time',
+    };
+    const _scoringType = (
+      selectedMatch.scoringType ||
+      selectedMatch.matchFormat?.scoringType ||
+      _SPORT_ST[(selectedMatch.sportName || '').toLowerCase()] ||
+      ''
+    ).toLowerCase();
+    if (_scoringType && _scoringType !== 'sets') {
+      navigate(`/tournament-management/match/${tournamentId}/${selectedMatch._id}/score`, {
+        state: {
+          tournamentId: selectedMatch.tournamentId || tournamentId,
+          groupId: selectedMatch.groupId || activeGroup || activeRound2Group,
+          matchType,
+          playerAName: pAName,
+          playerBName: pBName,
+        },
+      });
+      return;
+    }
+
     navigate(`/tournament-management/group-stage/${tournamentId}/scoreboard`, {
       state: {
         matchId: selectedMatch._id,
@@ -1695,9 +1779,10 @@ export default function Tournament({
         ))}
       </div>
 
-      {/* Category Filter — STEP 17b.ii: per-sport via helper */}
+      {/* Category Filter — per ACTIVE sport (not sports[0]) so e.g. Foosball
+          shows Singles/Doubles, not Cricket's "Open". */}
       {(() => {
-        const _cats = getCategories(tournament);
+        const _cats = getCategories(tournament, propActiveSportId);
         return _cats.length > 0 && (
         <div className="mb-5">
           <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">
@@ -2214,7 +2299,7 @@ export default function Tournament({
               {getTournamentType(tournament) === "knockout + group stage" &&
                 getCurrentStage(tournament) !== "knockout" &&
                 getCurrentStage(tournament) !== "completed" && (
-                <div className="mt-4">
+                <div className="mt-4 mx-5">
                   <button
                     className="w-full py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 bg-gradient-to-r from-orange-500 to-orange-600 text-white hover:from-orange-600 hover:to-orange-700 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                     onClick={handleTransitionToKnockout}
@@ -2261,8 +2346,10 @@ export default function Tournament({
                         );
                         const p1Sets = match.result?.finalScore?.player1Sets;
                         const p2Sets = match.result?.finalScore?.player2Sets;
-                        const liveP1 = match.liveScore?.player1Points ?? 0;
-                        const liveP2 = match.liveScore?.player2Points ?? 0;
+                        // Prefer the freshly re-fetched live-state; the list's own
+                        // match.liveScore is the schema default {0,0} and would mask it.
+                        const liveP1 = match.liveMatchData?.liveScore?.player1Points ?? match.liveScore?.player1Points ?? 0;
+                        const liveP2 = match.liveMatchData?.liveScore?.player2Points ?? match.liveScore?.player2Points ?? 0;
                         const umpireName = getUmpireName(match.referee);
 
                         const statusChip = isCompleted ? (
@@ -2382,7 +2469,24 @@ export default function Tournament({
                                   {renderPlayerRow(p1Name, p1Won, match.player1?.playerId?.profileImage, "left")}
                                 </div>
                                 <div className="flex-shrink-0 text-center">
-                                  {isCompleted && p1Sets != null ? (
+                                  {isCricketMatch(match) && (isLive || isCompleted) ? (() => {
+                                    const innings = getCricketInnings(match);
+                                    const c1 = cricketSideScore(innings, "player1");
+                                    const c2 = cricketSideScore(innings, "player2");
+                                    if (!c1 && !c2) return <span className="text-xs font-bold text-gray-500">VS</span>;
+                                    return (
+                                      <div className="flex flex-col items-center leading-tight">
+                                        <div className="flex items-center gap-1.5">
+                                          <span className={`text-sm font-bold ${p1Won ? "text-emerald-400" : "text-gray-100"}`}>{c1?.text ?? "—"}</span>
+                                          <span className="text-gray-600 text-xs">v</span>
+                                          <span className={`text-sm font-bold ${p2Won ? "text-emerald-400" : "text-gray-100"}`}>{c2?.text ?? "—"}</span>
+                                        </div>
+                                        <span className="text-[9px] text-gray-500 mt-0.5">
+                                          {c1 ? `${c1.overs}` : "—"} ov{c2 ? ` · ${c2.overs}` : ""}
+                                        </span>
+                                      </div>
+                                    );
+                                  })() : isCompleted && p1Sets != null ? (
                                     <div className="flex items-center gap-1">
                                       <span className={`text-lg font-bold ${p1Won ? "text-emerald-400" : "text-gray-500"}`}>{p1Sets}</span>
                                       <span className="text-gray-600">-</span>
@@ -2688,7 +2792,7 @@ export default function Tournament({
                               </div>
 
                               {/* Enhanced Live Score Display for Top Players (Round 2) */}
-                              {match.status === 'IN_PROGRESS' && match.liveScore && (
+                              {(match.status === 'IN_PROGRESS' || match.status === 'in_progress') && (match.liveMatchData?.liveScore || match.liveScore) && (
                                 <div className="mt-3 p-2 bg-amber-500/100/10 rounded-lg border border-yellow-500/30">
                                   <div className="text-center">
                                     <div className="text-sm text-amber-300 font-medium mb-1 flex items-center justify-center gap-2">
@@ -2696,10 +2800,10 @@ export default function Tournament({
                                       Live Score - Round 2
                                     </div>
                                     <div className="text-lg font-bold text-gray-100">
-                                      {match.liveScore.player1Points || 0} - {match.liveScore.player2Points || 0}
+                                      {(match.liveMatchData?.liveScore?.player1Points ?? match.liveScore?.player1Points ?? 0)} - {(match.liveMatchData?.liveScore?.player2Points ?? match.liveScore?.player2Points ?? 0)}
                                     </div>
                                     <div className="text-xs text-amber-400 mt-1">
-                                      Set {match.currentSet || 1}, Game {match.currentGame || 1}
+                                      Set {match.liveMatchData?.currentSet ?? match.currentSet ?? 1}, Game {match.liveMatchData?.currentGame ?? match.currentGame ?? 1}
                                     </div>
                                     <div className="text-xs text-emerald-400 mt-1 bg-emerald-500/10 px-2 py-1 rounded">
                                       Top Players championship impact
@@ -3134,8 +3238,8 @@ export default function Tournament({
                                     );
                                     const p1Sets = match.result?.finalScore?.player1Sets ?? match.score?.player1Sets;
                                     const p2Sets = match.result?.finalScore?.player2Sets ?? match.score?.player2Sets;
-                                    const liveP1 = match.liveScore?.player1Points ?? 0;
-                                    const liveP2 = match.liveScore?.player2Points ?? 0;
+                                    const liveP1 = match.liveMatchData?.liveScore?.player1Points ?? match.liveScore?.player1Points ?? 0;
+                                    const liveP2 = match.liveMatchData?.liveScore?.player2Points ?? match.liveScore?.player2Points ?? 0;
                                     const marginTop = mIdx === 0 ? 0 : (pitch - CARD_H);
 
                                     return (
@@ -3716,16 +3820,38 @@ export default function Tournament({
                 <div className="flex items-stretch gap-3">
                   {renderPlayerCard(p1Name, p1Img, p1Won, "p1")}
                   <div className="flex-shrink-0 flex flex-col items-center justify-center px-2">
-                    {(isComp || isLive) ? (
-                      <div className="flex items-center gap-2">
-                        <span className={`text-4xl font-extrabold ${p1Won ? "text-emerald-400" : "text-gray-500"}`}>{p1Sets}</span>
-                        <span className="text-2xl text-gray-600">–</span>
-                        <span className={`text-4xl font-extrabold ${p2Won ? "text-emerald-400" : "text-gray-500"}`}>{p2Sets}</span>
-                      </div>
+                    {isCricketMatch(m) && (isComp || isLive) ? (() => {
+                      const innings = getCricketInnings(m);
+                      const c1 = cricketSideScore(innings, "player1");
+                      const c2 = cricketSideScore(innings, "player2");
+                      return (
+                        <>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-2xl font-extrabold ${p1Won ? "text-emerald-400" : "text-gray-100"}`}>{c1?.text ?? "—"}</span>
+                            <span className="text-xl text-gray-600">–</span>
+                            <span className={`text-2xl font-extrabold ${p2Won ? "text-emerald-400" : "text-gray-100"}`}>{c2?.text ?? "—"}</span>
+                          </div>
+                          <span className="text-[10px] text-gray-500 mt-0.5">
+                            {c1 ? `${c1.overs} ov` : ""}{c2 ? ` · ${c2.overs} ov` : ""}
+                          </span>
+                          <span className="text-[10px] text-gray-500 font-bold mt-0.5 uppercase tracking-wider">Runs</span>
+                        </>
+                      );
+                    })() : (isComp || isLive) ? (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-4xl font-extrabold ${p1Won ? "text-emerald-400" : "text-gray-500"}`}>{p1Sets}</span>
+                          <span className="text-2xl text-gray-600">–</span>
+                          <span className={`text-4xl font-extrabold ${p2Won ? "text-emerald-400" : "text-gray-500"}`}>{p2Sets}</span>
+                        </div>
+                        <span className="text-[10px] text-gray-500 font-bold mt-1 uppercase tracking-wider">Sets</span>
+                      </>
                     ) : (
-                      <span className="text-xl font-bold text-gray-500">VS</span>
+                      <>
+                        <span className="text-xl font-bold text-gray-500">VS</span>
+                        <span className="text-[10px] text-gray-500 font-bold mt-1 uppercase tracking-wider">Sets</span>
+                      </>
                     )}
-                    <span className="text-[10px] text-gray-500 font-bold mt-1 uppercase tracking-wider">Sets</span>
                   </div>
                   {renderPlayerCard(p2Name, p2Img, p2Won, "p2")}
                 </div>
@@ -3748,8 +3874,48 @@ export default function Tournament({
                   </div>
                 </div>
 
-                {/* Live points (in-progress only) */}
-                {isLive && (m.liveScore || m.liveMatchData?.liveScore) && (
+                {/* Live cricket summary (in-progress innings) */}
+                {isLive && isCricketMatch(m) && (() => {
+                  const ls = m.liveMatchData?.liveScore || {};
+                  const innings = getCricketInnings(m);
+                  const c1 = cricketSideScore(innings, "player1");
+                  const c2 = cricketSideScore(innings, "player2");
+                  if (!c1 && !c2) return null;
+                  return (
+                    <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-amber-500/100 animate-pulse" />
+                          <span className="font-bold text-amber-300 text-sm">LIVE SCORE</span>
+                        </div>
+                        <span className="text-xs text-amber-400">
+                          Innings {ls.currentInnings ?? innings.length} · CRR {ls.currentRunRate ?? "—"}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-around">
+                        <div className="text-center">
+                          <p className="text-xs text-gray-300 mb-1 truncate max-w-[140px]">{p1Name}</p>
+                          <p className="text-3xl font-extrabold text-white">{c1?.text ?? "—"}</p>
+                          <p className="text-[11px] text-gray-400">{c1 ? `${c1.overs} ov` : "yet to bat"}</p>
+                        </div>
+                        <span className="text-xl text-gray-500">–</span>
+                        <div className="text-center">
+                          <p className="text-xs text-gray-300 mb-1 truncate max-w-[140px]">{p2Name}</p>
+                          <p className="text-3xl font-extrabold text-white">{c2?.text ?? "—"}</p>
+                          <p className="text-[11px] text-gray-400">{c2 ? `${c2.overs} ov` : "yet to bat"}</p>
+                        </div>
+                      </div>
+                      {ls.target != null && (
+                        <div className="text-center text-xs text-yellow-300 font-semibold mt-3 border-t border-amber-500/20 pt-2">
+                          Need {ls.required} off {ls.ballsRemaining} balls · RRR {ls.requiredRate ?? "—"}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* Live points (in-progress, set sports only) */}
+                {isLive && !isCricketMatch(m) && (m.liveScore || m.liveMatchData?.liveScore) && (
                   <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4">
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
@@ -3757,29 +3923,94 @@ export default function Tournament({
                         <span className="font-bold text-amber-300 text-sm">LIVE POINTS</span>
                       </div>
                       <span className="text-xs text-amber-400">
-                        Set {m.currentSet || m.liveMatchData?.currentSet || 1} · Game {m.currentGame || m.liveMatchData?.currentGame || 1}
+                        Set {m.liveMatchData?.currentSet ?? m.currentSet ?? 1} · Game {m.liveMatchData?.currentGame ?? m.currentGame ?? 1}
                       </span>
                     </div>
                     <div className="flex items-center justify-around">
                       <div className="text-center">
                         <p className="text-xs text-gray-300 mb-1">{p1Name}</p>
                         <p className="text-3xl font-extrabold text-white">
-                          {m.liveScore?.player1Points ?? m.liveMatchData?.liveScore?.player1Points ?? 0}
+                          {m.liveMatchData?.liveScore?.player1Points ?? m.liveScore?.player1Points ?? 0}
                         </p>
                       </div>
                       <span className="text-xl text-gray-500">–</span>
                       <div className="text-center">
                         <p className="text-xs text-gray-300 mb-1">{p2Name}</p>
                         <p className="text-3xl font-extrabold text-white">
-                          {m.liveScore?.player2Points ?? m.liveMatchData?.liveScore?.player2Points ?? 0}
+                          {m.liveMatchData?.liveScore?.player2Points ?? m.liveScore?.player2Points ?? 0}
                         </p>
                       </div>
                     </div>
                   </div>
                 )}
 
-                {/* Set-by-set breakdown */}
-                {(m.sets || m.liveMatchData?.sets) && (m.sets?.length > 0 || m.liveMatchData?.sets?.length > 0) && (
+                {/* Cricket — innings breakdown */}
+                {isCricketMatch(m) && (() => {
+                  const innings = getCricketInnings(m);
+                  if (!innings.length) return null;
+                  const resText = cricketResultText(m);
+                  const row = (side, label) => {
+                    const inn = innings.find((i) => i.battingSide === side);
+                    const ex = inn?.extras || {};
+                    const exTot = (ex.wides || 0) + (ex.noBalls || 0) + (ex.byes || 0) + (ex.legByes || 0);
+                    return (
+                      <div className="px-4 py-3 border-b border-white/[0.05] last:border-0">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-bold text-gray-100 truncate">{label}</span>
+                          {inn ? (
+                            <span className="text-lg font-black text-white">{inn.runs ?? 0}/{inn.wickets ?? 0}
+                              <span className="text-xs font-semibold text-gray-400 ml-1.5">({inn.oversBowled ?? 0}.{inn.ballsBowled ?? 0} ov)</span>
+                            </span>
+                          ) : <span className="text-xs text-gray-500 italic">Yet to bat</span>}
+                        </div>
+                        {inn && (exTot > 0 || (inn.fallOfWickets || []).length > 0) && (
+                          <div className="text-[11px] text-gray-500 mt-1">
+                            Extras {exTot} (b {ex.byes || 0}, lb {ex.legByes || 0}, w {ex.wides || 0}, nb {ex.noBalls || 0})
+                            {(inn.fallOfWickets || []).length ? ` · FoW: ${inn.fallOfWickets.map((f) => `${f.wicket}-${f.runs}`).join(", ")}` : ""}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  };
+                  return (
+                    <div className="border border-white/[0.06] rounded-xl overflow-hidden">
+                      <div className="bg-white/[0.04] px-4 py-2.5 border-b border-white/[0.06] flex items-center justify-between">
+                        <h4 className="text-sm font-bold text-gray-300">Innings Breakdown</h4>
+                        {resText && <span className="text-[10px] text-emerald-300 uppercase tracking-wider font-bold">{resText}</span>}
+                      </div>
+                      {row("player1", p1Name)}
+                      {row("player2", p2Name)}
+                    </div>
+                  );
+                })()}
+
+                {/* Football — full-time result */}
+                {isFootballMatch(m) && (isComp || isLive) && (() => {
+                  const { g1, g2, tiebreak } = getFootballResult(m);
+                  if (g1 == null && g2 == null) return null;
+                  const draw = g1 === g2 && !tiebreak;
+                  const winName = tiebreak ? (tiebreak.winner === "player1" ? p1Name : p2Name) : g1 > g2 ? p1Name : p2Name;
+                  return (
+                    <div className="border border-white/[0.06] rounded-xl overflow-hidden">
+                      <div className="bg-white/[0.04] px-4 py-2.5 border-b border-white/[0.06]">
+                        <h4 className="text-sm font-bold text-gray-300">{isComp ? "Full Time" : "Live Score"}</h4>
+                      </div>
+                      <div className="px-4 py-4">
+                        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+                          <span className="text-sm font-bold text-gray-100 text-right truncate">{p1Name}</span>
+                          <span className="text-2xl font-black text-white">{g1 ?? 0} – {g2 ?? 0}</span>
+                          <span className="text-sm font-bold text-gray-100 truncate">{p2Name}</span>
+                        </div>
+                        <div className="text-center text-xs font-semibold mt-2 text-emerald-300">
+                          {draw ? "Match drawn" : `${winName} won${tiebreak ? " on penalties" : ""}`}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Set-by-set breakdown — set sports only */}
+                {!isCricketMatch(m) && !isFootballMatch(m) && (m.sets || m.liveMatchData?.sets) && (m.sets?.length > 0 || m.liveMatchData?.sets?.length > 0) && (
                   <div className="border border-white/[0.06] rounded-xl overflow-hidden">
                     <div className="bg-white/[0.04] px-4 py-2.5 border-b border-white/[0.06] flex items-center justify-between">
                       <h4 className="text-sm font-bold text-gray-300">Set-by-Set Breakdown</h4>

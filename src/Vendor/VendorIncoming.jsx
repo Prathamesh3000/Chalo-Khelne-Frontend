@@ -46,9 +46,10 @@ export default function VendorIncoming() {
   const confirmAccept = async () => {
     if (offer.purchasePrice === "" || Number(offer.purchasePrice) < 0) return toast.info("Enter a valid purchase price");
     if (!offer.pickupDate) return toast.info("Pick a collection date");
+    const id = sel._id;
     setBusy(true);
     try {
-      await axios.post(`/api/vendor-store/products/${sel._id}/accept`, {
+      await axios.post(`/api/vendor-store/products/${id}/accept`, {
         purchasePrice: Number(offer.purchasePrice),
         repairNeeded: offer.repairNeeded,
         repairCost: offer.repairCost === "" ? 0 : Number(offer.repairCost),
@@ -56,6 +57,8 @@ export default function VendorIncoming() {
         pickupDate: offer.pickupDate,
       });
       toast.success("Offer sent to the seller");
+      // Drop it from the incoming list immediately (it's no longer pending_review).
+      setItems((prev) => prev.filter((it) => it._id !== id));
       close();
       fetchIncoming(page);
     } catch (err) {
@@ -64,10 +67,13 @@ export default function VendorIncoming() {
   };
 
   const confirmReject = async () => {
+    const id = sel._id;
     setBusy(true);
     try {
-      await axios.post(`/api/vendor-store/products/${sel._id}/reject`, { reason });
+      await axios.post(`/api/vendor-store/products/${id}/reject`, { reason });
       toast.success("Product rejected — seller notified");
+      // Drop it from the incoming list immediately (it's no longer pending_review).
+      setItems((prev) => prev.filter((it) => it._id !== id));
       close();
       fetchIncoming(page);
     } catch (err) {
@@ -108,7 +114,7 @@ export default function VendorIncoming() {
               </div>
               <div className="p-3">
                 <p className="font-medium text-gray-800 truncate">{p.itemName}</p>
-                <p className="text-xs text-gray-500">{p.sport} · {p.category} · {p.condition}</p>
+                <p className="text-xs text-gray-500">{p.sport} · {p.category} · {p.condition} · Qty {p.quantity || 1}</p>
                 <div className="flex items-center justify-between mt-2">
                   <span className="text-sm font-semibold text-gray-800">{p.isDonation ? "Free" : money(p.askingPrice)}</span>
                   <span className="text-[11px] text-gray-400">by {p.sellerName || p.seller?.name || "Seller"}</span>
@@ -156,6 +162,7 @@ export default function VendorIncoming() {
                     <Row label="Sport / Category" value={`${sel.sport} · ${sel.category}`} />
                     <Row label="Brand / Size" value={[sel.brand, sel.size].filter(Boolean).join(" · ") || "—"} />
                     <Row label="Condition" value={sel.condition} />
+                    <Row label="Quantity" value={String(sel.quantity || 1)} />
                     <Row label="Seller's asking" value={sel.isDonation ? "Free / Donation" : money(sel.askingPrice)} />
                     <Row label="Original price" value={money(sel.originalPrice)} />
                     <Row label="Seller" value={sel.sellerName || sel.seller?.name || "—"} />

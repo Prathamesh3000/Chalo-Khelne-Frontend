@@ -36,6 +36,7 @@ export const SIDEBAR_SECTIONS = [
     icon: Trophy,
     items: [
       { key: "tournaments", label: "All Tournaments", icon: Trophy, path: "/mtournament-management", roles: ["manager"] },
+      { key: "create-tournament", label: "Create Tournament", icon: Plus, path: "/mtournament-management?create=1", roles: ["manager"] },
       { key: "tournaments", label: "Tournaments", icon: Trophy, path: "/ptournament-management", roles: ["player"] },
       { key: "tournaments", label: "Tournaments", icon: Trophy, path: "/corporate-tournaments", roles: ["corporate_admin"] },
       { key: "bookings", label: "Slot Booking", icon: Grid3X3, path: "/mslot-Booking", roles: ["manager"] },
@@ -76,9 +77,15 @@ export const SIDEBAR_SECTIONS = [
     items: [
       { key: "social", label: "Social Feed", icon: MessageSquare, path: "/msocial", roles: ["manager"] },
       { key: "social", label: "Social Feed", icon: MessageSquare, path: "/club-social", roles: ["clubadmin"] },
+      { key: "social", label: "Social Feed", icon: MessageSquare, path: "/psocial", roles: ["player"] },
+      { key: "social", label: "Social Feed", icon: MessageSquare, path: "/trainer-social", roles: ["trainer"] },
+      { key: "social", label: "Social Feed", icon: MessageSquare, path: "/vendor-social", roles: ["vendor"] },
       { key: "group-chat", label: "Group Chats", icon: MessageCircle, path: "/group-chat", roles: ["manager", "clubadmin", "superadmin", "corporate_admin"] },
       { key: "news", label: "News", icon: Newspaper, path: "/mnews", roles: ["manager"] },
       { key: "news", label: "News", icon: Newspaper, path: "/news", roles: ["superadmin"] },
+      { key: "news", label: "News", icon: Newspaper, path: "/pnews", roles: ["player"] },
+      { key: "news", label: "News", icon: Newspaper, path: "/trainer-news", roles: ["trainer"] },
+      { key: "news", label: "News", icon: Newspaper, path: "/vendor-news", roles: ["vendor"] },
     ],
   },
 

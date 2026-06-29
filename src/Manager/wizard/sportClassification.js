@@ -8,6 +8,13 @@ export const TEAM_SPORTS = new Set([
 
 export const INDIVIDUAL_SPORTS = new Set([
   "Chess", "Carrom", "Snooker",
+  // Foosball (table football) — singles or doubles, two-sided like a racquet
+  // match, not a team-of-many. Scored as goals within games (engine: "sets").
+  "Foosball",
+  // Racquet sports — singles/doubles both score on the individual axis
+  // (two sides, not a team-of-many). Previously absent from both sets,
+  // which left them unconstrained in the create-tournament wizard.
+  "Badminton", "Pickleball", "Table Tennis", "Tennis", "Squash",
 ]);
 
 // Sports that use the 4-level nested shape (match → set → game → points).
@@ -28,6 +35,7 @@ export const SPORT_SCORING_TYPES = {
   "Kabaddi":      "time",
   "Chess":        "single",
   "Carrom":       "single",
+  "Foosball":     "sets",
 };
 
 export function isTeamOnlySport(sportName) {

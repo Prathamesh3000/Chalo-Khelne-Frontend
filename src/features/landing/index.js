@@ -1,9 +1,16 @@
+export { Preloader } from "./components/Preloader";
 export { LandingHeader } from "./components/LandingHeader";
 export { Hero } from "./components/Hero";
 export { ScrollingSportStrip } from "./components/ScrollingSportStrip";
+export { Tournaments } from "./components/Tournaments";
+export { Turfs } from "./components/Turfs";
+export { Social } from "./components/Social";
+export { Coaching } from "./components/Coaching";
+export { WhyChaloKhelne } from "./components/WhyChaloKhelne";
 export { StatsBar } from "./components/StatsBar";
 export { HowItWorks } from "./components/HowItWorks";
 export { SportsGrid } from "./components/SportsGrid";
 export { ForClubs } from "./components/ForClubs";
+export { Inquiry } from "./components/Inquiry";
 export { CTABanner } from "./components/CTABanner";
 export { LandingFooter } from "./components/LandingFooter";

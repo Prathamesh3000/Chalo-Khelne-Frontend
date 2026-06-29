@@ -1,12 +1,12 @@
 import { useContext } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
-  ChevronLeft, ChevronDown, ChevronRight, Check, LayoutDashboard,
-  Trophy, Dumbbell, Settings, LogOut,
+  ChevronLeft, ChevronDown, ChevronRight, Check, LogOut, Trophy, Dumbbell,
 } from "lucide-react";
 import { AuthContext } from "../../context/AuthContext";
 import { cn, useTabSwitchSkeleton } from "../lib";
 import { Skeleton } from "../ui";
+import { getSidebarForRole } from "./sidebarConfig";
 
 /**
  * Tournament-management shell — sidebar + topbar + page header + pipeline +
@@ -40,10 +40,10 @@ export default function TournamentShell({
 }) {
   const switching = useTabSwitchSkeleton(activeTabKey);
   return (
-    <div className="flex min-h-screen bg-[#0F1117]">
+    <div className="ck-dark flex min-h-[100vh] bg-[#0F1117]">
       <ShellSidebar />
 
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 w-full">
         <ShellTopbar breadcrumbs={breadcrumbs} />
 
         <main className="flex-1 px-6 py-6 max-w-[1280px] w-full mx-auto text-gray-200">
@@ -78,41 +78,20 @@ function TabSwitchSkeleton() {
 }
 
 // ── Sidebar ──────────────────────────────────────────────────────────────────
-
-const NAV_SECTIONS = [
-  {
-    label: "Overview",
-    items: [
-      { label: "Dashboard", icon: LayoutDashboard, to: "/mdashboard" },
-    ],
-  },
-  {
-    label: "My Tournaments",
-    items: [
-      { label: "All Tournaments", icon: Trophy, to: "/mtournament-management" },
-    ],
-  },
-  {
-    label: "Sports",
-    items: [
-      { label: "Cricket",   icon: Dumbbell, to: "/mtournament-management?sport=Cricket" },
-      { label: "Football",  icon: Dumbbell, to: "/mtournament-management?sport=Football" },
-      { label: "Badminton", icon: Dumbbell, to: "/mtournament-management?sport=Badminton" },
-      { label: "Tennis",    icon: Dumbbell, to: "/mtournament-management?sport=Tennis" },
-    ],
-  },
-  {
-    label: "Account",
-    items: [
-      { label: "Settings", icon: Settings, to: "/msettings" },
-    ],
-  },
-];
+// Global nav comes from the single role-based sidebarConfig (same source as
+// AppLayout + ManagerShell) so navigation is identical across every shell.
 
 function ShellSidebar() {
   const auth = useContext(AuthContext);
   const navigate = useNavigate();
+  const user = auth?.user || auth?.auth;
+  const role = user?.role || "manager";
   const currentPath = typeof window !== "undefined" ? window.location.pathname + window.location.search : "";
+
+  const navSections = getSidebarForRole(role).map((section) => ({
+    label: section.label, // may be null (Dashboard / Settings groups) → header hidden
+    items: section.items.map((it) => ({ label: it.label, icon: it.icon, to: it.path })),
+  }));
 
   const logout = () => {
     auth?.logout?.();
@@ -136,11 +115,13 @@ function ShellSidebar() {
 
       {/* Nav */}
       <nav className="flex-1 px-3 pb-4 overflow-y-auto">
-        {NAV_SECTIONS.map((section) => (
-          <div key={section.label} className="mt-5 first:mt-2">
-            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-gray-500 px-3 mb-1.5">
-              {section.label}
-            </p>
+        {navSections.map((section, idx) => (
+          <div key={section.label || `section-${idx}`} className="mt-5 first:mt-2">
+            {section.label && (
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-gray-500 px-3 mb-1.5">
+                {section.label}
+              </p>
+            )}
             <ul className="space-y-0.5">
               {section.items.map((item) => {
                 const active = isActive(item.to);

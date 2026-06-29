@@ -1,12 +1,9 @@
 import { useContext, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import {
-  LayoutDashboard, Trophy, Plus, Grid3X3, ShieldCheck, Dumbbell,
-  Briefcase, CreditCard, Tag, Settings, LogOut, Search, Bell,
-  MessageSquare, MessageCircle, Newspaper, UserCheck,
-} from "lucide-react";
+import { LogOut, Search, Bell } from "lucide-react";
 import { AuthContext } from "../../context/AuthContext";
 import { cn } from "../lib";
+import { getSidebarForRole } from "./sidebarConfig";
 
 /**
  * Manager workspace shell — used by /mdashboard and any other manager pages
@@ -20,9 +17,9 @@ import { cn } from "../lib";
  */
 export default function ManagerShell({ children, searchPlaceholder }) {
   return (
-    <div className="flex min-h-screen bg-[#0F1117]">
+    <div className="ck-dark flex min-h-[100vh] bg-[#0F1117]">
       <ManagerSidebar />
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 w-full">
         <ManagerTopbar searchPlaceholder={searchPlaceholder} />
         <main className="flex-1 px-6 py-6 max-w-[1280px] w-full mx-auto text-gray-200">
           {children}
@@ -33,53 +30,11 @@ export default function ManagerShell({ children, searchPlaceholder }) {
 }
 
 // ── Sidebar ──────────────────────────────────────────────────────────────────
-
-const NAV_SECTIONS = [
-  {
-    label: "Overview",
-    items: [
-      { label: "Dashboard", icon: LayoutDashboard, to: "/mdashboard" },
-    ],
-  },
-  {
-    label: "Tournaments",
-    items: [
-      { label: "All tournaments",   icon: Trophy,  to: "/mtournament-management" },
-      { label: "Create tournament", icon: Plus,    to: "/mtournament-management?create=1" },
-      { label: "Slot booking",      icon: Grid3X3, to: "/mslot-Booking" },
-    ],
-  },
-  {
-    label: "Community",
-    items: [
-      { label: "Social feed", icon: MessageSquare, to: "/msocial" },
-      { label: "Group chats", icon: MessageCircle, to: "/group-chat" },
-      { label: "News",        icon: Newspaper,     to: "/mnews" },
-    ],
-  },
-  {
-    label: "Management",
-    items: [
-      { label: "Referee",             icon: ShieldCheck, to: "/mrefree" },
-      { label: "Trainers",            icon: Dumbbell,    to: "/mtrainers" },
-      { label: "Staff applications",  icon: Briefcase,   to: "/staff-applications" },
-      { label: "Hire requests",       icon: UserCheck,   to: "/hire-requests" },
-    ],
-  },
-  {
-    label: "Finance",
-    items: [
-      { label: "Payments", icon: CreditCard, to: "/payments" },
-      { label: "Coupons",  icon: Tag,        to: "/mcoupons" },
-    ],
-  },
-  {
-    label: "Account",
-    items: [
-      { label: "Settings", icon: Settings, to: "/msettings" },
-    ],
-  },
-];
+//
+// Nav is sourced from the single role-based config in sidebarConfig.js (the same
+// source AppLayout uses) so the manager sees ONE consistent navigation no matter
+// which shell wraps the page. We only adapt the config's {label, path, icon}
+// shape to this shell's {label, to, icon} and keep the dark visual styling here.
 
 function ManagerSidebar() {
   const auth = useContext(AuthContext);
@@ -89,6 +44,11 @@ function ManagerSidebar() {
   const initial = (name.trim()[0] || "M").toUpperCase();
   const role = user?.role || "manager";
   const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
+
+  const navSections = getSidebarForRole(role).map((section) => ({
+    label: section.label, // may be null (Dashboard / Settings groups) → header hidden
+    items: section.items.map((it) => ({ label: it.label, icon: it.icon, to: it.path })),
+  }));
 
   const isActive = (to) => {
     if (!to) return false;
@@ -114,14 +74,16 @@ function ManagerSidebar() {
 
       {/* Nav */}
       <nav className="flex-1 px-3 pb-4 overflow-y-auto">
-        {NAV_SECTIONS.map((section) => (
-          <div key={section.label} className="mt-5 first:mt-3">
-            <p
-              className="text-[10px] uppercase text-gray-500 px-3 mb-1.5"
-              style={{ letterSpacing: "0.08em" }}
-            >
-              {section.label}
-            </p>
+        {navSections.map((section, idx) => (
+          <div key={section.label || `section-${idx}`} className="mt-5 first:mt-3">
+            {section.label && (
+              <p
+                className="text-[10px] uppercase text-gray-500 px-3 mb-1.5"
+                style={{ letterSpacing: "0.08em" }}
+              >
+                {section.label}
+              </p>
+            )}
             <ul className="space-y-0.5">
               {section.items.map((item) => {
                 const active = isActive(item.to);

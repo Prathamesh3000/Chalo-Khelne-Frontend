@@ -9,7 +9,7 @@ export default function AppLayout({ role = "manager" }) {
 
   return (
     <CommandPaletteProvider>
-      <div className="flex h-screen bg-[#FAFAFA] overflow-hidden">
+      <div className="flex h-screen bg-[#FAFAFA] max-h-[100vh]">
         <Sidebar
           role={role}
           mobileOpen={mobileMenuOpen}
@@ -19,8 +19,8 @@ export default function AppLayout({ role = "manager" }) {
         <div className="flex-1 flex flex-col overflow-hidden">
           <TopBar onMenuClick={() => setMobileMenuOpen(true)} />
 
-          <main className="flex-1 overflow-y-auto">
-            <div className="max-w-[1320px] mx-auto">
+          <main className="overflow-y-scroll">
+            <div className="mx-[24px]">
               <Outlet />
             </div>
           </main>

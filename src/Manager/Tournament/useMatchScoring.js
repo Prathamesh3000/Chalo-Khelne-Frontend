@@ -7,10 +7,11 @@ const fetchMatchLiveState = async (matchId) => {
   return res.data.match;
 };
 
-const completeGameApi = async ({ matchId, player1Score, player2Score }) => {
+const completeGameApi = async ({ matchId, player1Score, player2Score, penaltyWinner = null }) => {
   const res = await axios.post(`/api/tournaments/matches/${matchId}/complete-game`, {
     finalPlayer1Points: player1Score,
     finalPlayer2Points: player2Score,
+    ...(penaltyWinner ? { penaltyWinner } : {}),
   });
   return res.data;
 };
@@ -18,6 +19,24 @@ const completeGameApi = async ({ matchId, player1Score, player2Score }) => {
 const syncPointsTableApi = async (matchId) => {
   await axios.post(`/api/tournaments/scores/${matchId}`, {});
 };
+
+// ── Cricket (innings) incremental endpoints ──
+const cricketSetupApi = ({ matchId, ...body }) =>
+  axios.post(`/api/tournaments/matches/${matchId}/cricket/setup`, body).then((r) => r.data);
+const cricketLineupApi = ({ matchId, ...body }) =>
+  axios.post(`/api/tournaments/matches/${matchId}/cricket/lineup`, body).then((r) => r.data);
+const cricketBallApi = ({ matchId, ...body }) =>
+  axios.post(`/api/tournaments/matches/${matchId}/cricket/ball`, body).then((r) => r.data);
+const cricketUndoApi = ({ matchId }) =>
+  axios.post(`/api/tournaments/matches/${matchId}/cricket/undo`, {}).then((r) => r.data);
+const cricketSwitchInningsApi = ({ matchId, ...body }) =>
+  axios.post(`/api/tournaments/matches/${matchId}/cricket/innings-switch`, body).then((r) => r.data);
+const cricketFinishApi = ({ matchId, ...body }) =>
+  axios.post(`/api/tournaments/matches/${matchId}/cricket/finish`, body).then((r) => r.data);
+
+// ── Carrom (board) incremental endpoint ──
+const carromBoardApi = ({ matchId, ...body }) =>
+  axios.post(`/api/tournaments/matches/${matchId}/carrom/board`, body).then((r) => r.data);
 
 export default function useMatchScoring(matchId) {
   const queryClient = useQueryClient();
@@ -70,8 +89,19 @@ export default function useMatchScoring(matchId) {
     mutationFn: () => syncPointsTableApi(matchId),
   });
 
-  // Bulk submit games sequentially
-  const submitBulkScores = async (games) => {
+  // Cricket + Carrom incremental mutations — each refetches live-state on success
+  const invalidateLive = () => queryClient.invalidateQueries({ queryKey: keys.matchLiveState(matchId) });
+  const cricketSetupMutation = useMutation({ mutationFn: (body) => cricketSetupApi({ matchId, ...body }), onSuccess: invalidateLive });
+  const cricketLineupMutation = useMutation({ mutationFn: (body) => cricketLineupApi({ matchId, ...body }), onSuccess: invalidateLive });
+  const cricketBallMutation = useMutation({ mutationFn: (body) => cricketBallApi({ matchId, ...body }), onSuccess: invalidateLive });
+  const cricketUndoMutation = useMutation({ mutationFn: () => cricketUndoApi({ matchId }), onSuccess: invalidateLive });
+  const cricketSwitchMutation = useMutation({ mutationFn: (body) => cricketSwitchInningsApi({ matchId, ...(body || {}) }), onSuccess: invalidateLive });
+  const cricketFinishMutation = useMutation({ mutationFn: (body) => cricketFinishApi({ matchId, ...(body || {}) }), onSuccess: invalidateLive });
+  const carromBoardMutation = useMutation({ mutationFn: (body) => carromBoardApi({ matchId, ...body }), onSuccess: invalidateLive });
+
+  // Bulk submit games sequentially. opts.penaltyWinner ("player1"|"player2")
+  // decides a level knockout match for time sports (Football penalty shootout).
+  const submitBulkScores = async (games, opts = {}) => {
     const toSubmit = games.filter((g) => g.a !== "" && g.b !== "");
     if (toSubmit.length === 0) throw new Error("No scores to submit");
 
@@ -79,7 +109,7 @@ export default function useMatchScoring(matchId) {
       const scoreA = parseInt(game.a, 10);
       const scoreB = parseInt(game.b, 10);
       if (isNaN(scoreA) || isNaN(scoreB)) continue;
-      await completeGameApi({ matchId, player1Score: scoreA, player2Score: scoreB });
+      await completeGameApi({ matchId, player1Score: scoreA, player2Score: scoreB, penaltyWinner: opts.penaltyWinner || null });
       await new Promise((r) => setTimeout(r, 300));
     }
 
@@ -121,10 +151,27 @@ export default function useMatchScoring(matchId) {
     sets, player1SetsWon, player2SetsWon,
     isCompleted, isInProgress, winnerName,
 
+    // Live score block (cricket innings / carrom board) from the backend
+    liveScore: match?.liveScore || null,
+
     // Mutations
     completeGame: completeGameMutation.mutateAsync,
-    submitting: completeGameMutation.isPending,
+    submitting: completeGameMutation.isPending ||
+      cricketBallMutation.isPending || cricketUndoMutation.isPending ||
+      cricketSwitchMutation.isPending || cricketFinishMutation.isPending ||
+      cricketSetupMutation.isPending || cricketLineupMutation.isPending ||
+      carromBoardMutation.isPending,
     submitBulkScores,
     syncToPointsTable: syncMutation.mutateAsync,
+
+    // Cricket (innings)
+    setupCricketInnings: cricketSetupMutation.mutateAsync,
+    updateCricketLineup: cricketLineupMutation.mutateAsync,
+    submitCricketBall: cricketBallMutation.mutateAsync,
+    undoCricketBall: cricketUndoMutation.mutateAsync,
+    switchCricketInnings: cricketSwitchMutation.mutateAsync,
+    finishCricketMatch: cricketFinishMutation.mutateAsync,
+    // Carrom (board)
+    submitCarromBoard: carromBoardMutation.mutateAsync,
   };
 }

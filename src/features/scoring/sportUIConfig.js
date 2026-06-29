@@ -65,6 +65,32 @@ const SPORT_UI = {
     },
   },
 
+  "Foosball": {
+    scoringType: "sets",
+    icon: "⚽",
+    color: "#8B5CF6",
+    labels: {
+      set: "Game",        // a foosball match is a best-of-N GAMES (not "sets")
+      game: "Game",
+      point: "Goal",      // a "point" is a GOAL
+      matchResult: "Games",
+    },
+    scoring: {
+      inputType: "counter",   // +1 / -1 goal buttons
+      showDeuce: false,       // win-by-2 but no "deuce" wording
+      showService: false,     // no service in foosball
+      showGameScore: true,
+    },
+    defaults: {
+      totalSets: 3,
+      setsToWin: 2,
+      gamesPerSet: 1,
+      gamesToWin: 1,
+      pointsToWin: 10,        // first to 10 GOALS
+      marginToWin: 2,
+    },
+  },
+
   "Tennis": {
     scoringType: "sets",
     icon: "🎾",
@@ -230,22 +256,24 @@ const SPORT_UI = {
   },
 
   "Carrom": {
-    scoringType: "single",
+    scoringType: "board",
     icon: "🎯",
     color: "#92400E",
     labels: {
       set: "Board",
       score: "Point",
-      matchResult: "Points",
+      matchResult: "Boards",
     },
     scoring: {
-      inputType: "manual",
+      inputType: "board",
       showCoinCount: true,
+      queenBonus: 3,
     },
     defaults: {
       totalSets: 3,
-      setsToWin: 2,
-      pointsToWin: 25,
+      boardsToWin: 2,
+      pointsPerBoard: 25,
+      queenValue: 3,
     },
   },
 
@@ -376,6 +404,7 @@ export function getScoringRenderer(sportName) {
     case "sets": return "SetBasedScorer";
     case "time": return "TimeBasedScorer";
     case "innings": return "InningsBasedScorer";
+    case "board": return "BoardBasedScorer";
     case "single": return "SingleResultScorer";
     default: return "SetBasedScorer";
   }

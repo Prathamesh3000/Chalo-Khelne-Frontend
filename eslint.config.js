@@ -36,6 +36,26 @@ export default [
         'warn',
         { allowConstantExport: true },
       ],
+      // Phase 6: forbid direct axios — use the shared client (auth + single-flight
+      // refresh-token interceptors live there). 'warn' for now (~113 legacy
+      // offenders migrate incrementally); flip to 'error' once they're cleared.
+      'no-restricted-imports': [
+        'warn',
+        {
+          paths: [
+            {
+              name: 'axios',
+              message:
+                'Do not import axios directly. Use the shared client: `import { api } from "src/shared/api/client"`. Direct axios bypasses the auth/refresh interceptors.',
+            },
+          ],
+        },
+      ],
     },
+  },
+  {
+    // The shared client IS the one place axios is allowed.
+    files: ['src/shared/api/client.js'],
+    rules: { 'no-restricted-imports': 'off' },
   },
 ]

@@ -176,7 +176,7 @@ const ManagerAdmin = () => {
       const managerData = { ...newManager };
       if (clubId) managerData.clubId = clubId;
       const response = await axios.post(`/api/manager/managers`, managerData);
-      toast.success("Manager added successfully! Login credentials sent via email.");
+      toast.success(response.data?.message || "Manager added successfully.");
       setNewManager({ name: "", email: "", password: "" });
       if (response.data && response.data._id) {
         await logActivity(response.data._id, "update", "Manager account created", { action: "create" });
@@ -222,6 +222,7 @@ const ManagerAdmin = () => {
     for (let i = 0; i < 10; i++) password += chars.charAt(Math.floor(Math.random() * chars.length));
     setNewManager((prev) => ({ ...prev, password }));
   };
+
 
   const requestSort = (key) => {
     let direction = "ascending";
@@ -339,7 +340,7 @@ const ManagerAdmin = () => {
           <Section title="Add new manager" icon={UserPlus}>
             <form onSubmit={handleAddManager}>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-                <DarkInput label="Name" name="name" value={newManager.name} onChange={handleInputChange} placeholder="Manager name" required />
+                <DarkInput label="Name" name="name" value={newManager.name} onChange={handleInputChange} placeholder="Full name" required />
                 <DarkInput label="Email" name="email" type="email" value={newManager.email} onChange={handleInputChange} placeholder="manager@example.com" required />
                 <div>
                   <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-500 mb-1.5">Password</label>
@@ -430,7 +431,19 @@ const ManagerAdmin = () => {
                   <tbody>
                     {filteredManagers.map((manager) => (
                       <tr key={manager._id} className="border-b border-white/[0.04] last:border-b-0 hover:bg-white/[0.02] transition">
-                        <Td><span className="text-[13px] font-medium text-white">{manager.name}</span></Td>
+                        <Td>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[13px] font-medium text-white">{manager.name}</span>
+                            {manager.staffRole && manager.staffRole !== "manager" && (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-orange-500/15 text-orange-300">
+                                {manager.staffRole}
+                              </span>
+                            )}
+                          </div>
+                          {manager.sports?.length > 0 && (
+                            <span className="block text-[11px] text-gray-500 mt-0.5">{manager.sports.join(", ")}</span>
+                          )}
+                        </Td>
                         <Td><span className="text-[12px] text-gray-300">{manager.email}</span></Td>
                         <Td align="center">
                           <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${

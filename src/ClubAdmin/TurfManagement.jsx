@@ -171,9 +171,8 @@ const TurfManagement = () => {
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`inline-flex items-center gap-1.5 h-7 px-3 rounded-[5px] text-[12px] font-medium transition w-auto ${
-                active ? "bg-[#181A22] text-white shadow-[0_1px_2px_rgba(0,0,0,0.3)]" : "text-gray-400 hover:text-white"
-              }`}
+              className={`inline-flex items-center gap-1.5 h-7 px-3 rounded-[5px] text-[12px] font-medium transition w-auto ${active ? "bg-[#181A22] text-white shadow-[0_1px_2px_rgba(0,0,0,0.3)]" : "text-gray-400 hover:text-white"
+                }`}
             >
               <tab.icon className="w-3.5 h-3.5" /> {tab.label}
             </button>
@@ -183,53 +182,56 @@ const TurfManagement = () => {
 
       {/* ADD TAB */}
       {activeTab === "add" && (
-        <form onSubmit={handleSubmit} className="space-y-3 max-w-5xl">
-          <Section icon={Dumbbell} title="Basic information">
-            <DarkInput label="Turf name *" value={name} onChange={setName} placeholder="e.g. Shivaji Sports Arena" />
-            <DarkTextarea label="Description" value={description} onChange={setDescription} placeholder="Describe your facility — surface type, size, environment…" rows={3} />
-          </Section>
+        <form onSubmit={handleSubmit} className="space-y-3 px-[16px] mb-10">
+          <div className="flex w-full gap-[16px]">
+            <Section icon={Dumbbell} title="Basic information" className="w-full">
+              <DarkInput label="Turf name *" value={name} onChange={setName} placeholder="e.g. Shivaji Sports Arena" />
+              <DarkTextarea label="Description" value={description} onChange={setDescription} placeholder="Describe your facility — surface type, size, environment…" rows={3} />
+            </Section>
 
-          <Section icon={Camera} title="Turf photos">
-            <div className="grid grid-cols-3 gap-3">
-              {[0, 1, 2].map((idx) => (
-                <div key={idx}
-                  className={`relative rounded-md overflow-hidden transition ${images[idx] ? "" : "hover:bg-white/[0.04]"}`}
-                  style={{ border: images[idx] ? "1px solid rgba(249,115,22,0.4)" : "1px dashed rgba(255,255,255,0.12)" }}>
-                  {images[idx] ? (
-                    <>
-                      <img src={images[idx]} alt="" className="w-full h-32 object-cover" />
-                      <button type="button" onClick={() => handleRemoveImage(idx)}
-                        className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/60 hover:bg-black/80 backdrop-blur-sm rounded-md flex items-center justify-center transition w-auto">
-                        <X className="w-3 h-3 text-white" />
-                      </button>
-                    </>
-                  ) : (
-                    <label className="flex flex-col items-center justify-center h-32 cursor-pointer">
-                      <Camera className="w-5 h-5 text-gray-500 mb-1.5" />
-                      <span className="text-[11px] text-gray-400 font-medium">Photo {idx + 1}</span>
-                      <span className="text-[10px] text-gray-600 mt-0.5">Click to upload</span>
-                      <input type="file" ref={fileInputRefs[idx]} onChange={(e) => handleImageChange(e, idx)} className="hidden" accept="image/*" />
-                    </label>
-                  )}
-                </div>
-              ))}
-            </div>
-          </Section>
+            <Section icon={Camera} title="Turf photos" className="w-full">
+              <div className="grid grid-cols-3 gap-3">
+                {[0, 1, 2].map((idx) => (
+                  <div key={idx}
+                    className={`relative rounded-md overflow-hidden transition ${images[idx] ? "" : "hover:bg-white/[0.04]"}`}
+                    style={{ border: images[idx] ? "1px solid rgba(249,115,22,0.4)" : "1px dashed rgba(255,255,255,0.12)" }}>
+                    {images[idx] ? (
+                      <>
+                        <img src={images[idx]} alt="" className="w-full h-32 object-cover" />
+                        <button type="button" onClick={() => handleRemoveImage(idx)}
+                          className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/60 hover:bg-black/80 backdrop-blur-sm rounded-md flex items-center justify-center transition w-auto">
+                          <X className="w-3 h-3 text-white" />
+                        </button>
+                      </>
+                    ) : (
+                      <label className="flex flex-col items-center justify-center h-32 cursor-pointer">
+                        <Camera className="w-5 h-5 text-gray-500 mb-1.5" />
+                        <span className="text-[11px] text-gray-400 font-medium">Photo {idx + 1}</span>
+                        <span className="text-[10px] text-gray-600 mt-0.5">Click to upload</span>
+                        <input type="file" ref={fileInputRefs[idx]} onChange={(e) => handleImageChange(e, idx)} className="hidden" accept="image/*" />
+                      </label>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </Section>
+          </div>
 
-          <Section icon={MapPin} title="Location">
-            <DarkInput label="Full address *" value={locationAddress} onChange={setLocationAddress} placeholder="Street address, landmark" />
-            <div className="grid grid-cols-3 gap-3">
-              <DarkInput label="Area" value={area} onChange={setArea} placeholder="e.g. Kharadi" />
-              <DarkInput label="City" value={city} onChange={setCity} placeholder="Pune" />
-              <DarkInput label="Pincode" value={pincode} onChange={setPincode} placeholder="411014" />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <DarkInput label="Latitude" value={latitude} onChange={setLatitude} placeholder="18.5255" type="number" />
-              <DarkInput label="Longitude" value={longitude} onChange={setLongitude} placeholder="73.8409" type="number" />
-            </div>
-          </Section>
+          <div className="flex w-full gap-[16px]">
+            <Section icon={MapPin} title="Location" className="w-full">
+              <DarkInput label="Full address *" value={locationAddress} onChange={setLocationAddress} placeholder="Street address, landmark" />
+              <div className="grid grid-cols-3 gap-3">
+                <DarkInput label="Area" value={area} onChange={setArea} placeholder="e.g. Kharadi" />
+                <DarkInput label="City" value={city} onChange={setCity} placeholder="Pune" />
+                <DarkInput label="Pincode" value={pincode} onChange={setPincode} placeholder="411014" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <DarkInput label="Latitude" value={latitude} onChange={setLatitude} placeholder="18.5255" type="number" />
+                <DarkInput label="Longitude" value={longitude} onChange={setLongitude} placeholder="73.8409" type="number" />
+              </div>
+            </Section>
 
-          <Section icon={IndianRupee} title="Sports & pricing">
+            <Section icon={IndianRupee} title="Sports & pricing" className="w-full">
             <div className="flex items-end gap-2">
               <div className="flex-1">
                 <DarkInput label="Sport name" value={sportInput} onChange={setSportInput} placeholder="or pick from below" />
@@ -275,58 +277,59 @@ const TurfManagement = () => {
                 ))}
               </div>
             )}
-          </Section>
+            </Section>
+          </div>
 
-          <Section icon={Clock} title="Operating hours">
-            <div className="grid grid-cols-2 gap-3 mb-3">
-              <DarkInput label="Opening time" value={openTime} onChange={setOpenTime} type="time" />
-              <DarkInput label="Closing time" value={closeTime} onChange={setCloseTime} type="time" />
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-500 mb-2">Open days</label>
+          <div className="flex w-full gap-[16px]">
+            <Section icon={Clock} title="Operating hours" className="w-full">
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <DarkInput label="Opening time" value={openTime} onChange={setOpenTime} type="time" />
+                <DarkInput label="Closing time" value={closeTime} onChange={setCloseTime} type="time" />
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-500 mb-2">Open days</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {DAYS.map((day) => {
+                    const selected = selectedDays.includes(day);
+                    return (
+                      <button key={day} type="button" onClick={() => toggleDay(day)}
+                        className={`px-3 py-1.5 rounded-md text-[11px] font-bold capitalize transition w-auto ${selected
+                            ? "bg-orange-500 text-white"
+                            : "text-gray-400 hover:text-white hover:bg-white/[0.06]"
+                          }`}
+                        style={!selected ? { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" } : undefined}>
+                        {day.slice(0, 3)}
+                      </button>
+                    );
+                  })}
+                  <button type="button" onClick={() => setSelectedDays(selectedDays.length === DAYS.length ? [] : [...DAYS])}
+                    className="px-3 py-1.5 rounded-md text-[11px] font-bold text-orange-400 hover:text-orange-300 hover:bg-orange-500/15 transition w-auto"
+                    style={{ background: "rgba(249,115,22,0.10)", border: "1px solid rgba(249,115,22,0.25)" }}>
+                    {selectedDays.length === DAYS.length ? "Clear all" : "Select all"}
+                  </button>
+                </div>
+              </div>
+            </Section>
+
+            <Section icon={Star} title="Facilities & amenities" className="w-full">
               <div className="flex flex-wrap gap-1.5">
-                {DAYS.map((day) => {
-                  const selected = selectedDays.includes(day);
+                {FACILITY_PRESETS.map((f) => {
+                  const selected = facilities.includes(f);
                   return (
-                    <button key={day} type="button" onClick={() => toggleDay(day)}
-                      className={`px-3 py-1.5 rounded-md text-[11px] font-bold capitalize transition w-auto ${
-                        selected
-                          ? "bg-orange-500 text-white"
-                          : "text-gray-400 hover:text-white hover:bg-white/[0.06]"
-                      }`}
-                      style={!selected ? { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" } : undefined}>
-                      {day.slice(0, 3)}
+                    <button key={f} type="button" onClick={() => toggleFacility(f)}
+                      className={`px-2.5 py-1.5 rounded-md text-[11px] font-medium transition w-auto inline-flex items-center gap-1.5 ${selected ? "bg-emerald-500/15 text-emerald-300" : "text-gray-400 hover:text-white hover:bg-white/[0.06]"
+                        }`}
+                      style={!selected
+                        ? { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }
+                        : { border: "1px solid rgba(16,185,129,0.25)" }}>
+                      {selected && <Check className="w-3 h-3" />}
+                      {f}
                     </button>
                   );
                 })}
-                <button type="button" onClick={() => setSelectedDays(selectedDays.length === DAYS.length ? [] : [...DAYS])}
-                  className="px-3 py-1.5 rounded-md text-[11px] font-bold text-orange-400 hover:text-orange-300 hover:bg-orange-500/15 transition w-auto"
-                  style={{ background: "rgba(249,115,22,0.10)", border: "1px solid rgba(249,115,22,0.25)" }}>
-                  {selectedDays.length === DAYS.length ? "Clear all" : "Select all"}
-                </button>
               </div>
-            </div>
-          </Section>
-
-          <Section icon={Star} title="Facilities & amenities">
-            <div className="flex flex-wrap gap-1.5">
-              {FACILITY_PRESETS.map((f) => {
-                const selected = facilities.includes(f);
-                return (
-                  <button key={f} type="button" onClick={() => toggleFacility(f)}
-                    className={`px-2.5 py-1.5 rounded-md text-[11px] font-medium transition w-auto inline-flex items-center gap-1.5 ${
-                      selected ? "bg-emerald-500/15 text-emerald-300" : "text-gray-400 hover:text-white hover:bg-white/[0.06]"
-                    }`}
-                    style={!selected
-                      ? { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }
-                      : { border: "1px solid rgba(16,185,129,0.25)" }}>
-                    {selected && <Check className="w-3 h-3" />}
-                    {f}
-                  </button>
-                );
-              })}
-            </div>
-          </Section>
+            </Section>
+          </div>
 
           <div className="flex items-center gap-2 pt-3" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
             <button type="button" onClick={() => setActiveTab("manage")}
@@ -395,9 +398,8 @@ function TurfCard({ turf, onDelete }) {
             <ImageOff className="w-8 h-8 text-gray-600" />
           </div>
         )}
-        <span className={`absolute top-2 right-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-          turf.isActive ? "bg-emerald-500/15 text-emerald-300" : "bg-red-500/15 text-red-300"
-        }`}
+        <span className={`absolute top-2 right-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${turf.isActive ? "bg-emerald-500/15 text-emerald-300" : "bg-red-500/15 text-red-300"
+          }`}
           style={{ backdropFilter: "blur(8px)" }}>
           {turf.isActive ? "Active" : "Inactive"}
         </span>
@@ -455,9 +457,9 @@ function TurfCard({ turf, onDelete }) {
 
 // ── Dark inline primitives ───────────────────────────────────────────────────
 
-function Section({ icon: Icon, title, children }) {
+function Section({ icon: Icon, title, children, className = "" }) {
   return (
-    <div className="bg-[#181A22] border border-white/[0.06] rounded-lg overflow-hidden">
+    <div className={`bg-[#181A22] border border-white/[0.06] rounded-lg overflow-hidden ${className}`}>
       <div className="px-5 py-3.5 border-b border-white/[0.06] flex items-center gap-2.5">
         <span className="w-7 h-7 rounded-md bg-orange-500/15 grid place-items-center flex-shrink-0">
           <Icon className="w-3.5 h-3.5 text-orange-400" />

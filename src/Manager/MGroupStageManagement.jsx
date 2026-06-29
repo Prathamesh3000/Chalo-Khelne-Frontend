@@ -15,7 +15,7 @@ import KnockoutFormatPanel, { hasFormatPanelErrors } from "./components/Knockout
 import { buildRequestRounds, isSetBasedSport } from "./utils/knockoutDefaults";
 import { getSportName, getCategories, getCurrentStage } from "../utils/sportTrack";
 import { TabBar, SubTabs, Skeleton } from "../shared/ui";
-import { TournamentShell, Round2Banner } from "../shared/layout";
+import { TournamentShell, Round2Banner, TournamentFlowHeader } from "../shared/layout";
 
 // currentStage → pipeline-step index. Stages we don't know map to 0 (early).
 const STAGE_TO_STEP_IDX = {
@@ -791,9 +791,27 @@ const GroupStageManagement = () => {
     // include it in deps so multi-sport switches refetch the right groups.
   }, [tournamentId, activeSportId]);
 
-  // Filter players based on search term and category
+  // Filter players based on active sport, search term and category
   useEffect(() => {
     let filtered = registeredPlayers;
+
+    // Sport scope — in a MULTI-sport tournament only show registrants for the
+    // ACTIVE sport. Each booking carries the sport(s) it signed up for via
+    // `categories[].sportName`. Single-sport tournaments skip this (all
+    // registrants belong to the one sport, and legacy bookings may lack a tag).
+    const isMultiSport = Array.isArray(tournament?.sports) && tournament.sports.length > 1;
+    const activeSportName = isMultiSport
+      ? (tournament.sports.find((s) => String(s.sportId) === String(activeSportId))?.sportName || null)
+      : null;
+    if (activeSportName) {
+      filtered = filtered.filter((player) =>
+        !player.categories || player.categories.length === 0
+          ? false // a registrant with no sport tag isn't part of this sport
+          : player.categories.some(
+              (c) => (c.sportName || "").toLowerCase() === activeSportName.toLowerCase()
+            )
+      );
+    }
 
     // Search term filter
     if (searchTerm) {
@@ -820,7 +838,7 @@ const GroupStageManagement = () => {
 
     setFilteredPlayers(filtered);
     setCurrentPage(1); // Reset to first page when searching or filtering
-  }, [searchTerm, registeredPlayers, selectedRegisterPlayerCategory]);
+  }, [searchTerm, registeredPlayers, selectedRegisterPlayerCategory, activeSportId, tournament]);
 
   // Reset pagination when the Round 2 filter chip changes — otherwise a
   // manager on page 3 of "All" who switches to "Top 1" can land on an empty
@@ -1897,7 +1915,20 @@ const GroupStageManagement = () => {
       activeStep={_steps[_activeStepIdx]?.key}
       breadcrumbs={_breadcrumbs}
       activeTabKey={`${selectedTab}|${selectedSubTab}`}
-      banner={isRound2Mode ? <Round2Banner onCancel={() => setIsRound2Mode(false)} /> : null}
+      banner={isRound2Mode ? <Round2Banner onCancel={() => setIsRound2Mode(false)} /> : (
+        <TournamentFlowHeader
+          tournament={tournament}
+          sportId={activeSportId}
+          counts={{ players: registeredPlayers.length, groups: Object.keys(playerGroups || {}).length }}
+          onPrimaryAction={() => {
+            // Route to the stage's actual next step instead of always "Groups":
+            // before groups exist, the manager registers/selects players and
+            // creates groups from the Registered Players tab.
+            const hasGroups = Object.keys(playerGroups || {}).length > 0;
+            setSelectedTab(hasGroups ? "Groups" : "Registered Players");
+          }}
+        />
+      )}
       tabBar={(
         <TabBar
           urlKey="tab"
@@ -1929,30 +1960,37 @@ const GroupStageManagement = () => {
           Round 2 reset is in flight to prevent mid-reset sport switching
           from targeting the wrong sport's data (approval note #2). */}
       {Array.isArray(tournament?.sports) && tournament.sports.length > 1 && (
-        <div className="bg-white/[0.04] rounded-2xl border border-white/[0.06] p-3 flex items-center gap-2 overflow-x-auto">
-          <span className="text-[11px] uppercase tracking-wider font-bold text-gray-400 mr-2 whitespace-nowrap flex-shrink-0">
+        <div className="flex items-center gap-3 flex-wrap mb-4">
+          <span className="text-[11px] uppercase tracking-[0.14em] font-bold text-gray-500 whitespace-nowrap flex-shrink-0">
             Sport
           </span>
-          {tournament.sports.map((s) => {
-            const isActive = String(s.sportId) === String(activeSportId);
-            return (
-              <button
-                key={String(s.sportId)}
-                onClick={() => handleSportSwitch(s.sportId)}
-                disabled={resetting}
-                className={`px-4 py-2 rounded-xl text-sm font-bold transition-all whitespace-nowrap flex-shrink-0 ${
-                  isActive
-                    ? "bg-emerald-500/100 text-white shadow-sm shadow-emerald-200"
-                    : "bg-[#181A22] text-gray-300 border border-white/[0.06] hover:bg-white/[0.06]"
-                } ${resetting ? "opacity-50 cursor-not-allowed" : ""}`}
-                title={resetting ? "Reset in progress — please wait" : undefined}
-              >
-                {s.sportName}
-              </button>
-            );
-          })}
+          {/* Segmented control — the track only spans its content, never the
+              full row. `w-auto` overrides the global `button { width:100% }`. */}
+          <div className="inline-flex items-center gap-1 p-1 rounded-xl bg-white/[0.04] border border-white/[0.06] max-w-full overflow-x-auto">
+            {tournament.sports.map((s) => {
+              const isActive = String(s.sportId) === String(activeSportId);
+              return (
+                <button
+                  key={String(s.sportId)}
+                  onClick={() => handleSportSwitch(s.sportId)}
+                  disabled={resetting}
+                  className={`w-auto flex-shrink-0 flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-[13px] font-semibold whitespace-nowrap transition-all ${
+                    isActive
+                      ? "bg-emerald-500 text-white shadow-sm"
+                      : "text-gray-400 hover:text-white hover:bg-white/[0.06]"
+                  } ${resetting ? "opacity-50 cursor-not-allowed" : ""}`}
+                  title={resetting ? "Reset in progress — please wait" : undefined}
+                >
+                  {isActive && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-white/90 flex-shrink-0" />
+                  )}
+                  {s.sportName}
+                </button>
+              );
+            })}
+          </div>
           {resetting && (
-            <span className="text-[11px] text-gray-400 italic ml-2 flex-shrink-0">
+            <span className="text-[11px] text-gray-400 italic flex-shrink-0">
               Resetting…
             </span>
           )}
@@ -2177,17 +2215,12 @@ const GroupStageManagement = () => {
                     {(isRound2Mode ? round2FilteredPlayers.length : filteredPlayers.length) > 0 ? (
                       <>
                         {(() => {
-                          // Auto-collapse Categories column when every visible player
-                          // shares the same single-category set (typical "Open Category"
-                          // tournaments). Round 2 always shows Points instead.
-                          const uniformCategories = !isRound2Mode && (() => {
-                            const reps = currentPlayers.map((p) =>
-                              (p.categories || []).map((c) => c.name).sort().join("|") || "—"
-                            );
-                            return new Set(reps).size <= 1;
-                          })();
-                          const showSecondaryColumn = isRound2Mode || !uniformCategories;
-                          const secondaryHeader = isRound2Mode ? "Points" : "Categories";
+                          // Registration is taken per (sport, category), so always
+                          // surface that in a dedicated column — even when the whole
+                          // list shares one category — so the manager can see what
+                          // each player signed up for. Round 2 shows Points instead.
+                          const showSecondaryColumn = true;
+                          const secondaryHeader = isRound2Mode ? "Points" : "Category";
                           return (
                         <div className="bg-[#181A22] rounded-2xl border border-white/[0.06] overflow-hidden shadow-sm">
                           <table className="w-full">
@@ -2315,7 +2348,9 @@ const GroupStageManagement = () => {
                                       {showSecondaryColumn && (
                                         <td className="px-4 py-2.5 text-sm text-gray-300">
                                           {player.categories && player.categories.length > 0
-                                            ? player.categories.map(cat => cat.name).join(", ")
+                                            ? player.categories
+                                                .map(cat => cat.sportName ? `${cat.sportName} · ${cat.name}` : cat.name)
+                                                .join(", ")
                                             : '—'
                                           }
                                         </td>
@@ -2733,17 +2768,17 @@ const GroupStageManagement = () => {
       {/* Step 1: Number of Groups */}
       {modalStep === 1 && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-          <div className="bg-[#F0F4F9] p-[52px] rounded-[24px] relative min-w-[395px] shadow-lg min-h-[291px]">
+          <div className="bg-[#1A1D27] border border-white/[0.08] p-[52px] rounded-[24px] relative min-w-[395px] shadow-lg min-h-[291px]">
             <button
-              className="absolute top-0 right-6 text-xl text-gray-300 bg-transparent hover:bg-transparent w-0"
+              className="absolute top-4 right-4 text-xl text-gray-400 hover:text-white bg-transparent hover:bg-transparent w-auto"
               onClick={resetModal}
             >
               <FiX />
             </button>
-            <h2 className="text-[16px] md:text-[18px] font-[600] text-center text-black mb-[10px]">
+            <h2 className="text-[16px] md:text-[18px] font-[600] text-center text-white mb-[10px]">
               {isRound2Mode ? "Create Round 2 Groups" : "Create Number of Groups"}
             </h2>
-            <p className="text-center text-gray-300 mb-6">
+            <p className="text-center text-gray-400 mb-6">
               {isRound2Mode ? `Selected Top Players for Round 2: ${selectedRound2Players.length}` : `Selected Players: ${selectedPlayers.length}`}
             </p>
 
@@ -2751,11 +2786,11 @@ const GroupStageManagement = () => {
               <label className="block text-sm font-medium mb-2 text-gray-300">Number of Groups:</label>
               <input
                 type="number"
-                min="2"
+                min="1"
                 max="10"
                 value={numGroups}
                 onChange={(e) => setNumGroups(parseInt(e.target.value) || 0)}
-                className="w-full border rounded-lg px-3 py-3 mb-6 text-center text-lg"
+                className="w-full bg-[#12141B] border border-white/[0.08] text-white rounded-lg px-3 py-3 mb-6 text-center text-lg focus:outline-none focus:border-emerald-500 placeholder:text-gray-600"
                 placeholder="Enter number of groups"
               />
             </div>
@@ -2763,14 +2798,14 @@ const GroupStageManagement = () => {
             <div className="flex justify-center gap-4">
               <button
                 onClick={resetModal}
-                className="px-6 py-2 text-gray-300 border rounded-lg hover:bg-white/[0.04]"
+                className="px-6 py-2 text-gray-300 border border-white/[0.08] rounded-lg hover:bg-white/[0.04] w-auto"
               >
                 Cancel
               </button>
               <button
                 onClick={handleNextStep}
-                className="px-6 py-2 bg-orange-500/100 text-white rounded-lg hover:bg-orange-600"
-                disabled={numGroups <= 1}
+                className="px-6 py-2 bg-orange-500/100 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed w-auto"
+                disabled={numGroups < 1}
               >
                 Next
               </button>
@@ -2782,14 +2817,14 @@ const GroupStageManagement = () => {
       {/* Step 2: Group Names */}
       {modalStep === 2 && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-          <div className="bg-[#F0F4F9] p-[52px] rounded-[24px] relative min-w-[395px] max-h-[453px] shadow-lg overflow-y-auto">
+          <div className="bg-[#1A1D27] border border-white/[0.08] p-[52px] rounded-[24px] relative min-w-[395px] max-h-[453px] shadow-lg overflow-y-auto">
             <button
-              className="absolute top-0 right-6 text-xl text-gray-300 bg-transparent hover:bg-transparent w-0"
+              className="absolute top-4 right-4 text-xl text-gray-400 hover:text-white bg-transparent hover:bg-transparent w-auto"
               onClick={resetModal}
             >
               <FiX />
             </button>
-            <h2 className="font-[600] md:text-[18px] text-center text-black mb-6">
+            <h2 className="font-[600] md:text-[18px] text-center text-white mb-6">
               Enter Group Names
             </h2>
 
@@ -2807,7 +2842,7 @@ const GroupStageManagement = () => {
                       newNames[index] = e.target.value;
                       setGroupNames(newNames);
                     }}
-                    className="w-full border rounded-lg px-3 py-2"
+                    className="w-full bg-[#12141B] border border-white/[0.08] text-white rounded-lg px-3 py-2 focus:outline-none focus:border-emerald-500 placeholder:text-gray-600"
                     placeholder={`Group ${String.fromCharCode(65 + index)}`}
                   />
                 </div>
@@ -2817,7 +2852,7 @@ const GroupStageManagement = () => {
             <div className="flex justify-center gap-4">
               <button
                 onClick={() => setModalStep(1)}
-                className="px-6 py-2 text-gray-300 border rounded-lg hover:bg-white/[0.04]"
+                className="px-6 py-2 text-gray-300 border border-white/[0.08] rounded-lg hover:bg-white/[0.04] w-auto"
               >
                 Back
               </button>
@@ -2835,9 +2870,9 @@ const GroupStageManagement = () => {
       {/* Step 3: Players per Group */}
       {modalStep === 3 && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-          <div className="bg-[#F0F4F9] p-[52px] rounded-[24px] relative min-w-[395px] max-h-[515px] shadow-lg overflow-y-auto">
+          <div className="bg-[#1A1D27] border border-white/[0.08] p-[52px] rounded-[24px] relative min-w-[395px] max-h-[515px] shadow-lg overflow-y-auto">
             <button
-              className="absolute top-0 right-6 text-xl text-gray-300 bg-transparent hover:bg-transparent w-0"
+              className="absolute top-4 right-4 text-xl text-gray-400 hover:text-white bg-transparent hover:bg-transparent w-auto"
               onClick={resetModal}
             >
               <FiX />
@@ -2864,7 +2899,7 @@ const GroupStageManagement = () => {
                         [name]: e.target.value
                       }));
                     }}
-                    className="w-20 border rounded px-2 py-1 text-center"
+                    className="w-20 bg-[#12141B] border border-white/[0.08] text-white rounded px-2 py-1 text-center focus:outline-none focus:border-emerald-500 placeholder:text-gray-600"
                     placeholder="0"
                   />
                 </div>
@@ -2880,7 +2915,7 @@ const GroupStageManagement = () => {
             <div className="flex justify-center gap-4">
               <button
                 onClick={() => setModalStep(2)}
-                className="px-6 py-2 text-gray-300 border rounded-lg hover:bg-white/[0.04]"
+                className="px-6 py-2 text-gray-300 border border-white/[0.08] rounded-lg hover:bg-white/[0.04] w-auto"
               >
                 Back
               </button>
@@ -2898,9 +2933,9 @@ const GroupStageManagement = () => {
       {/* Step 4: Confirmation */}
       {modalStep === 4 && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-          <div className="bg-[#F0F4F9] p-[52px] rounded-[24px] relative min-w-[381px] min-h-[294px] shadow-lg">
+          <div className="bg-[#1A1D27] border border-white/[0.08] p-[52px] rounded-[24px] relative min-w-[381px] min-h-[294px] shadow-lg">
             <button
-              className="absolute top-0 right-6 text-xl text-gray-300 bg-transparent hover:bg-transparent w-0"
+              className="absolute top-4 right-4 text-xl text-gray-400 hover:text-white bg-transparent hover:bg-transparent w-auto"
               onClick={resetModal}
             >
               <FiX />
@@ -2926,13 +2961,13 @@ const GroupStageManagement = () => {
             <div className="flex justify-center gap-4">
               <button
                 onClick={() => setModalStep(3)}
-                className="px-6 py-2 text-gray-300 border rounded-lg hover:bg-white/[0.04]"
+                className="px-6 py-2 text-gray-300 border border-white/[0.08] rounded-lg hover:bg-white/[0.04] w-auto"
               >
                 Back
               </button>
               <button
                 onClick={handleNextStep}
-                className="px-6 py-2 bg-green-500/100 text-white rounded-lg hover:bg-green-600"
+                className="px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 w-auto flex items-center gap-1"
               >
                 <FiPlus /> Create Groups
               </button>
@@ -2944,9 +2979,9 @@ const GroupStageManagement = () => {
       {/* Step 5: Success */}
       {modalStep === 5 && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-          <div className="bg-[#F0F4F9] p-[52px] rounded-2xl relative min-w-[404px] min-h-[265px] shadow-lg">
+          <div className="bg-[#1A1D27] border border-white/[0.08] p-[52px] rounded-2xl relative min-w-[404px] min-h-[265px] shadow-lg">
             <button
-              className="absolute top-0 right-6 text-xl text-gray-300 bg-transparent hover:bg-transparent w-0"
+              className="absolute top-4 right-4 text-xl text-gray-400 hover:text-white bg-transparent hover:bg-transparent w-auto"
               onClick={resetModal}
             >
               <FiX />

@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { TabBar, Skeleton } from "../shared/ui";
-import { TournamentShell } from "../shared/layout";
+import { TournamentShell, TournamentFlowHeader } from "../shared/layout";
 
 // Keep label-keyed legacy state but expose canonical keys to the URL.
 const TK_URL_TO_LABEL = {
@@ -68,11 +68,23 @@ const TeamKnockouts = () => {
     axios.get(`/api/tournaments/${tournamentId}`).then((r) => {
       if (cancelled) return;
       const t = r.data?.tournament || r.data;
-      if (t) setTournamentInfo({
-        title: t.title || "Tournament",
-        sportName: Array.isArray(t.sports) ? (t.sports[0]?.sportName || "") : "",
-        currentStage: t.currentStage || "knockout",
-      });
+      if (t) {
+        // Multi-sport: pick the sport-track running a Davis-Cup-style team
+        // knockout, else fall back to the first track. Time/innings sports
+        // (Football, Cricket) are EXCLUDED — they use the Direct engine, not
+        // this sets/games/points Davis-Cup engine.
+        const tracks = Array.isArray(t.sports) ? t.sports : [];
+        const teamTrack = tracks.find((s) =>
+          ["Davis Cup", "Teams Knockout"].includes(s?.knockoutFormat) &&
+          !["time", "innings"].includes((s?.matchFormat?.scoringType || "").toLowerCase())
+        ) || tracks[0] || null;
+        setTournamentInfo({
+          title: t.title || "Tournament",
+          sportName: teamTrack?.sportName || "",
+          sportId: teamTrack?.sportId || teamTrack?._id || null,
+          currentStage: t.currentStage || "knockout",
+        });
+      }
     }).catch(() => {});
     return () => { cancelled = true; };
   }, [tournamentId]);
@@ -125,6 +137,7 @@ const TeamKnockouts = () => {
     try {
       const res = await axios.post("/api/tournaments/team-knockout/round-robin/generate", {
         tournamentId,
+        sportId: tournamentInfo?.sportId || null,
         scheduleDetails: {
           matchStartTime: rrSchedule.matchStartTime,
           matchInterval: rrSchedule.matchInterval,
@@ -436,6 +449,7 @@ const TeamKnockouts = () => {
 
         const requestBody = {
           tournamentId,
+          sportId: tournamentInfo?.sportId || null, // multi-sport: this sport-track
           selectedBookingIds: cleanedSelectedTeams.map((team) => team._id),
           byeBookingIds: cleanedByeTeams.map((team) => team._id),
           // ADD CLEANED DATA TO THE REQUEST
@@ -552,6 +566,7 @@ const TeamKnockouts = () => {
           },
           body: JSON.stringify({
             tournamentId,
+            sportId: tournamentInfo?.sportId || null,
             currentRound,
             scheduleDetails: {
               matchStartTime:
@@ -1083,6 +1098,52 @@ const TeamKnockouts = () => {
       breadcrumbs={_breadcrumbs}
       activeTabKey={selectedTab}
       tabBar={_tabBar}
+      banner={
+        <TournamentFlowHeader
+          tournament={tournamentInfo}
+          sportId={tournamentInfo?.sportId || null}
+          overrideStatus={
+            teams.length === 0
+              ? "No teams registered yet"
+              : rrGenerated
+              ? `${rrMatches.length} round-robin matches`
+              : `${teams.length} teams registered`
+          }
+          overrideNext={
+            teams.length === 0
+              ? "Register teams to begin"
+              : rrGenerated
+              ? "Score the matches to complete the league"
+              : "Generate the round-robin fixtures"
+          }
+          primaryLabel={
+            teams.length === 0
+              ? "Add teams"
+              : rrGenerated
+              ? "View matches"
+              : rrLoading
+              ? "Generating…"
+              : "Generate round robin"
+          }
+          onPrimaryAction={() => {
+            if (teams.length === 0) {
+              setSelectedTab("Registered Teams");
+            } else if (rrGenerated) {
+              setSelectedTab("Round Robin");
+            } else if (!rrLoading) {
+              // Drive the generate directly — round-robin fixtures need no
+              // extra input (schedule defaults to now / 30-min / court 1 and
+              // can be fine-tuned on the Round Robin tab afterwards).
+              const ok = window.confirm(
+                `Generate round-robin fixtures for all ${teams.length} teams?\n\n` +
+                `Every team plays every other once (${(teams.length * (teams.length - 1)) / 2} matches), ` +
+                `starting now on court 1. You can reschedule on the Round Robin tab.`
+              );
+              if (ok) handleGenerateRoundRobin();
+            }
+          }}
+        />
+      }
     >
       <div className="max-w-[1400px] mx-auto">
         {/* Tab bar is rendered by TournamentShell via the `tabBar` slot. */}

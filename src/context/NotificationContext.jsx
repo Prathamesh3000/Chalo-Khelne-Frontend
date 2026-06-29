@@ -12,7 +12,7 @@ export const useNotifications = () => useContext(NotificationContext);
 // existed, so this previously always fell back to localhost — breaking the
 // socket (and the booking:new alerts below) in production.
 const SERVER_URL =
-  (import.meta.env.VITE_API_BASE_URL || "").replace(/\/api\/?$/i, "") || "http://localhost:3003";
+  (import.meta.env.VITE_API_BASE_URL || "").replace(/\/api\/?$/i, "") || "http://localhost:3004";
 
 export const NotificationProvider = ({ children }) => {
   const [notifications, setNotifications] = useState([]);

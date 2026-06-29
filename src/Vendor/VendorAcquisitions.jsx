@@ -21,6 +21,7 @@ export default function VendorAcquisitions() {
   const [busyId, setBusyId] = useState(null);
   const [publishFor, setPublishFor] = useState(null); // product being published
   const [salePrice, setSalePrice] = useState("");
+  const [qty, setQty] = useState("");
 
   const fetchItems = async (status = tab) => {
     setLoading(true);
@@ -47,12 +48,16 @@ export default function VendorAcquisitions() {
     } finally { setBusyId(null); }
   };
 
-  const openPublish = (p) => { setPublishFor(p); setSalePrice(""); };
+  const openPublish = (p) => { setPublishFor(p); setSalePrice(""); setQty(String(p.quantity || 1)); };
   const confirmPublish = async () => {
     if (salePrice === "" || Number(salePrice) <= 0) return toast.info("Enter a valid resale price");
+    if (qty === "" || Number(qty) <= 0) return toast.info("Enter a valid quantity");
     setBusyId(publishFor._id);
     try {
-      await axios.post(`/api/vendor-store/products/${publishFor._id}/publish`, { vendorSalePrice: Number(salePrice) });
+      await axios.post(`/api/vendor-store/products/${publishFor._id}/publish`, {
+        vendorSalePrice: Number(salePrice),
+        quantity: Number(qty),
+      });
       toast.success("Published to the store");
       setPublishFor(null);
       fetchItems(tab);
@@ -101,7 +106,7 @@ export default function VendorAcquisitions() {
               </div>
               <div className="min-w-0 flex-1">
                 <p className="font-medium text-gray-800 truncate">{p.itemName}</p>
-                <p className="text-xs text-gray-500">{p.sport} · {p.condition}</p>
+                <p className="text-xs text-gray-500">{p.sport} · {p.condition} · Qty {p.quantity || 1}</p>
                 <p className="text-xs text-gray-400 mt-0.5">
                   Offer {money(p.vendorOffer?.purchasePrice)}
                   {p.vendorOffer?.repairNeeded ? ` · repair ${money(p.vendorOffer?.repairCost)}` : ""}
@@ -144,6 +149,11 @@ export default function VendorAcquisitions() {
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1">Resale Price (₹) <span className="text-red-500">*</span></label>
                 <input type="number" min="1" value={salePrice} onChange={(e) => setSalePrice(e.target.value)} placeholder="Price shown to buyers" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-200" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Quantity <span className="text-red-500">*</span></label>
+                <input type="number" min="1" value={qty} onChange={(e) => setQty(e.target.value)} placeholder="Units available" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-200" />
+                <p className="text-[11px] text-gray-400 mt-1">Seller listed {publishFor.quantity || 1} unit(s). This is shown on the product page.</p>
               </div>
               <div className="flex gap-2 pt-1">
                 <button onClick={() => setPublishFor(null)} className="w-auto flex-1 border border-gray-200 text-gray-600 hover:bg-gray-50 rounded-lg py-2 text-sm font-medium">Cancel</button>

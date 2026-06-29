@@ -1,13 +1,16 @@
 import { getSportConfig } from "./sportUIConfig";
 import SetBasedScorer from "./SetBasedScorer";
 import TimeBasedScorer from "./TimeBasedScorer";
+import FootballScorer from "./FootballScorer";
 import InningsBasedScorer from "./InningsBasedScorer";
 import SingleResultScorer from "./SingleResultScorer";
+import BoardBasedScorer from "./BoardBasedScorer";
 
 const RENDERERS = {
   sets: SetBasedScorer,
   time: TimeBasedScorer,
   innings: InningsBasedScorer,
+  board: BoardBasedScorer,
   single: SingleResultScorer,
 };
 
@@ -27,7 +30,12 @@ const RENDERERS = {
  */
 export default function DynamicScorer({ sportName, ...props }) {
   const config = getSportConfig(sportName);
-  const Renderer = RENDERERS[config.scoringType] || SetBasedScorer;
+  // Football gets its own rich, event-driven board; other time sports
+  // (Basketball, Hockey, Kabaddi) use the generic TimeBasedScorer.
+  const isFootball = /football|soccer/i.test(sportName || "");
+  const Renderer = isFootball
+    ? FootballScorer
+    : (RENDERERS[config.scoringType] || SetBasedScorer);
 
-  return <Renderer config={config} {...props} />;
+  return <Renderer config={config} sportName={sportName} {...props} />;
 }

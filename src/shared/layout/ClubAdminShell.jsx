@@ -2,7 +2,7 @@ import { useContext, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, MapPin, Users, ShieldCheck, MessageSquare, MessageCircle,
-  TrendingUp, CreditCard, UserCog, LogOut, Search, Bell,
+  Newspaper, TrendingUp, CreditCard, UserCog, LogOut, Search, Bell, Dumbbell,
 } from "lucide-react";
 import { AuthContext } from "../../context/AuthContext";
 import { cn } from "../lib";
@@ -14,11 +14,11 @@ import { cn } from "../lib";
  */
 export default function ClubAdminShell({ children, searchPlaceholder }) {
   return (
-    <div className="flex min-h-screen bg-[#0F1117]">
+    <div className="ck-dark flex max-h-[100vh] min-h-[100vh] bg-[#0F1117] gap-[24px]">
       <ClubAdminSidebar />
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex flex-col min-w-0 w-full">
         <ClubAdminTopbar searchPlaceholder={searchPlaceholder} />
-        <main className="flex-1 px-6 py-6 max-w-[1280px] w-full mx-auto text-gray-200">
+        <main className="w-full mx-auto text-gray-200 overflow-y-scroll">
           {children}
         </main>
       </div>
@@ -45,6 +45,7 @@ const NAV_SECTIONS = [
     label: "Management",
     items: [
       { label: "Staff / Managers", icon: Users,      to: "/staff-admin" },
+      { label: "Trainer",          icon: Dumbbell,   to: "/trainer-management" },
       { label: "Referee",          icon: ShieldCheck, to: "/club-refree" },
     ],
   },
@@ -53,6 +54,7 @@ const NAV_SECTIONS = [
     items: [
       { label: "Social feed", icon: MessageSquare, to: "/club-social" },
       { label: "Group chats", icon: MessageCircle, to: "/group-chat" },
+      { label: "News",        icon: Newspaper,     to: "/club-news" },
     ],
   },
   {
@@ -191,7 +193,7 @@ function ClubAdminTopbar({ searchPlaceholder }) {
 
   return (
     <header
-      className="h-14 flex items-center justify-between gap-4 px-6"
+      className="flex items-center justify-between gap-4 px-6 py-4 flex items-center gap-2.5"
       style={{ background: "#0F1117", borderBottom: "1px solid rgba(255,255,255,0.06)" }}
     >
       <span className="text-[13px] text-gray-400">{DATE_FMT.format(today)}</span>

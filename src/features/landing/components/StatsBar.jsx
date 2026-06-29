@@ -17,8 +17,8 @@ export function StatsBar() {
           backgroundImage: "repeating-linear-gradient(135deg, transparent 0, transparent 12px, white 12px, white 13px)",
         }}
       />
-      <div className="absolute inset-x-0 top-6 h-px bg-gradient-to-r from-transparent via-orange-500/50 to-transparent" />
-      <div className="absolute inset-x-0 bottom-6 h-px bg-gradient-to-r from-transparent via-orange-500/50 to-transparent" />
+      <div className="absolute inset-x-0 top-6 h-px bg-gradient-to-r from-transparent via-green-600/50 to-transparent" />
+      <div className="absolute inset-x-0 bottom-6 h-px bg-gradient-to-r from-transparent via-green-600/50 to-transparent" />
 
       <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <ul className="grid grid-cols-2 gap-y-10 sm:grid-cols-4">
@@ -38,7 +38,7 @@ function StatItem({ stat, active, divider }) {
   return (
     <li className={`flex flex-col items-center text-center sm:items-start sm:text-left ${divider ? "sm:border-l sm:border-white/10 sm:pl-8" : ""}`}>
       <span className="text-5xl font-black tabular-nums leading-none tracking-tight text-white sm:text-6xl lg:text-7xl">
-        {formatted}<span className="text-orange-500">{stat.suffix}</span>
+        {formatted}<span className="text-green-600">{stat.suffix}</span>
       </span>
       <span className="mt-3 text-[10px] font-bold uppercase tracking-[0.2em] text-white/50 sm:text-xs">
         {stat.label}

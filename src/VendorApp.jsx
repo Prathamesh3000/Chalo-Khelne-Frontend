@@ -5,6 +5,8 @@ import VendorDashboard from "./Vendor/VendorDashboard";
 import VendorProfile from "./Vendor/VendorProfile";
 import VendorIncoming from "./Vendor/VendorIncoming";
 import VendorAcquisitions from "./Vendor/VendorAcquisitions";
+import VSocial from "./Vendor/VSocial";
+import VNews from "./Vendor/VNews";
 
 const VendorApp = () => {
   return (
@@ -15,6 +17,8 @@ const VendorApp = () => {
           <Route path="/vendor-incoming" element={<VendorIncoming />} />
           <Route path="/vendor-acquisitions" element={<VendorAcquisitions />} />
           <Route path="/vendor-profile" element={<VendorProfile />} />
+          <Route path="/vendor-social" element={<VSocial />} />
+          <Route path="/vendor-news" element={<VNews />} />
         </Route>
       </Route>
     </Routes>

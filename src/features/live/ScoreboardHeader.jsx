@@ -1,7 +1,7 @@
 import { Trophy, Radio } from "lucide-react";
 
 export default function ScoreboardHeader({ config, derived, matchFormat }) {
-  const { p1, p2, p1Sets, p2Sets, status, isLive, isCompleted, winner, sportName, singleResult, singleResultLabel, innings, timeScore } = derived;
+  const { p1, p2, p1Sets, p2Sets, status, isLive, isCompleted, winner, sportName, singleResult, singleResultLabel, innings, timeScore, live, board } = derived;
   const scoringType = config.scoringType;
 
   // Determine what to show in the center based on sport type
@@ -91,6 +91,11 @@ export default function ScoreboardHeader({ config, derived, matchFormat }) {
             <span className="mt-3 text-[10px] font-bold text-gray-500 uppercase tracking-[0.15em]">
               {config.labels.matchResult || "Runs"}
             </span>
+            {live?.currentInnings === 2 && live?.target != null && !isCompleted && (
+              <span className="mt-2 text-xs font-bold text-yellow-300">
+                Target {live.target} · Need {live.required} off {live.ballsRemaining} · RRR {live.requiredRate ?? "—"}
+              </span>
+            )}
           </div>
         );
       }
@@ -100,6 +105,29 @@ export default function ScoreboardHeader({ config, derived, matchFormat }) {
           <span className="text-3xl font-black text-gray-600">VS</span>
           <span className="mt-2 text-[10px] font-bold text-gray-500 uppercase tracking-[0.15em]">
             {isLive ? "Match in progress" : "Yet to bat"}
+          </span>
+        </div>
+      );
+    }
+
+    // Board-based sports (Carrom) — boards won (big) + points (small)
+    if (scoringType === "board") {
+      return (
+        <div className="flex flex-col items-center">
+          <div className="flex items-baseline gap-4">
+            <span className={`text-6xl lg:text-7xl font-black tabular-nums leading-none ${winner === p1 ? "text-emerald-400" : "text-white"}`}>
+              {board?.p1Boards ?? 0}
+            </span>
+            <span className="text-2xl font-bold text-gray-600">-</span>
+            <span className={`text-6xl lg:text-7xl font-black tabular-nums leading-none ${winner === p2 ? "text-emerald-400" : "text-white"}`}>
+              {board?.p2Boards ?? 0}
+            </span>
+          </div>
+          <span className="mt-2 text-xs text-gray-500 font-semibold tabular-nums">
+            {board?.p1Points ?? 0} - {board?.p2Points ?? 0} pts
+          </span>
+          <span className="mt-2 text-[10px] font-bold text-gray-500 uppercase tracking-[0.15em]">
+            {config.labels.matchResult || "Boards"}
           </span>
         </div>
       );
@@ -148,6 +176,7 @@ export default function ScoreboardHeader({ config, derived, matchFormat }) {
   const renderWinnerScore = () => {
     if (scoringType === "single" && singleResult) return `(${singleResult})`;
     if (scoringType === "innings") return `(${innings.p1Runs ?? 0} - ${innings.p2Runs ?? 0})`;
+    if (scoringType === "board") return `(${board?.p1Boards ?? 0} - ${board?.p2Boards ?? 0} boards)`;
     if (scoringType === "time") return `(${timeScore.p1Score} - ${timeScore.p2Score})`;
     return `(${p1Sets} - ${p2Sets})`;
   };

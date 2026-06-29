@@ -78,6 +78,17 @@ button:focus-visible {
   outline-offset: 2px;
 }
 
+/* Dark dashboards: render native <select> dropdowns (and their option popup)
+   dark for readability. Scoped to the dark shells via .ck-dark so light pages
+   keep their default light dropdowns. */
+.ck-dark select {
+  color-scheme: dark;
+}
+.ck-dark option {
+  background-color: #181a22;
+  color: #e5e7eb;
+}
+
 h1, h2, h3, h4, h5, h6 {
   margin: 0;
   line-height: 1.2;

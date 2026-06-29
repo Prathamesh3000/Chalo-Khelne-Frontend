@@ -41,11 +41,15 @@ export default function MatchScoringPage() {
     sets, player1SetsWon, player2SetsWon,
     isCompleted, isInProgress, winnerName,
     submitBulkScores, loadMatch,
+    liveScore,
+    setupCricketInnings, updateCricketLineup,
+    submitCricketBall, undoCricketBall, switchCricketInnings, finishCricketMatch,
+    submitCarromBoard,
   } = useMatchScoring(matchId);
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-gray-50">
+      <div className="flex items-center justify-center h-screen bg-white/[0.04]">
         <div className="text-center">
           <RefreshCcw className="w-8 h-8 text-orange-500 animate-spin mx-auto mb-3" />
           <p className="text-gray-500">Loading match...</p>
@@ -56,10 +60,10 @@ export default function MatchScoringPage() {
 
   if (error || !match) {
     return (
-      <div className="flex items-center justify-center h-screen bg-gray-50">
+      <div className="flex items-center justify-center h-screen bg-white/[0.04]">
         <div className="text-center">
           <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-3" />
-          <p className="text-red-600 font-semibold">{error || "Match not found"}</p>
+          <p className="text-red-400 font-semibold">{error || "Match not found"}</p>
           <button onClick={() => navigate(-1)} className="mt-4 text-orange-500 underline">Go Back</button>
         </div>
       </div>
@@ -79,11 +83,49 @@ export default function MatchScoringPage() {
   // Format description for header
   const formatDesc = getFormatDescription(scoringType, matchFormat, sportConfig);
 
+  // Cricket/Carrom broadcast boards want the full width; set sports read better
+  // in a narrow column.
+  const containerW = isSetBased ? "max-w-4xl" : "max-w-7xl";
+
+  // Football has its own full-bleed, light, event-driven board that owns the
+  // whole view (its own header/clock/tabs). Render it directly, skipping the
+  // dark page chrome, breadcrumbs and summary card.
+  const isFootball = scoringType === "time" && /football|soccer/i.test(sportName || "");
+  if (isFootball && !isCompleted && matchFormat) {
+    return (
+      <div className="min-h-screen bg-[#0a0e16] p-2 sm:p-3">
+        <DynamicScorer
+          sportName={sportName}
+          matchFormat={matchFormat}
+          player1Name={player1Name}
+          player2Name={player2Name}
+          player1Squad={match.player1?.squad || []}
+          player2Squad={match.player2?.squad || []}
+          matchMeta={{
+            venue: match.courtNumber || "",
+            date: match.startTime || null,
+            referee: match.referee?.name || "",
+            competition: match.roundName || match.round || "Group Stage",
+            matchNumber: match.matchNumber,
+            tournamentTitle: match.tournamentId?.title || "",
+            // Knockout matches can't end level → force a penalty-shootout winner.
+            isKnockout: !!(match.nextMatchId || match.roundName ||
+              (typeof match.round === "string" && /final|quarter|semi|knockout|round/i.test(match.round))),
+          }}
+          onSubmitScores={submitBulkScores}
+          submitting={submitting}
+          onBack={() => navigate(backTo)}
+          onRefresh={() => {}}
+        />
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#0F1117] text-gray-200">
       {/* Header */}
       <div className="text-white px-6 py-4" style={{ background: `linear-gradient(135deg, ${sportConfig.color || "#F97316"}, ${sportConfig.color || "#F97316"}dd)` }}>
-        <div className="max-w-4xl mx-auto flex items-center gap-4">
+        <div className={`${containerW} mx-auto flex items-center gap-4`}>
           <button onClick={() => navigate(backTo)} className="p-2 hover:bg-white/10 rounded-lg transition w-auto">
             <ArrowLeft className="w-5 h-5" />
           </button>
@@ -101,7 +143,7 @@ export default function MatchScoringPage() {
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto p-6 space-y-6">
+      <div className={`${containerW} mx-auto p-6 space-y-6`}>
         <Breadcrumbs
           items={[
             { label: "Tournaments", to: "/mtournament-management" },
@@ -110,16 +152,17 @@ export default function MatchScoringPage() {
           ]}
         />
 
-        {/* Players + Score Summary */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="bg-gradient-to-r from-orange-50 to-orange-50 p-6">
+        {/* Players + Score Summary — hidden for live cricket/carrom; their boards own the view */}
+        {(isSetBased || isCompleted) && (
+        <div className="bg-[#181A22] rounded-2xl shadow-sm border border-white/[0.06] overflow-hidden">
+          <div className="bg-gradient-to-r from-orange-500/10 to-transparent p-6">
             <div className="flex items-center justify-between">
               <PlayerCard name={player1Name} score={player1SetsWon} isWinner={winnerName === player1Name} />
               <div className="flex flex-col items-center">
                 <span className="text-xs text-gray-400 font-bold uppercase tracking-widest mb-1">
                   {sportConfig.labels?.matchResult || (isSetBased ? "Sets" : "Score")}
                 </span>
-                <span className="text-3xl font-black text-gray-800">
+                <span className="text-3xl font-black text-gray-100">
                   {player1SetsWon} — {player2SetsWon}
                 </span>
               </div>
@@ -137,6 +180,7 @@ export default function MatchScoringPage() {
             </div>
           )}
         </div>
+        )}
 
         {/* Set-based Scorecard — only for set-based sports */}
         {isSetBased && sets.length > 0 && (
@@ -146,22 +190,22 @@ export default function MatchScoringPage() {
 
         {/* Non-set match summary for time/innings/single */}
         {!isSetBased && sets.length > 0 && sets[0]?.games?.length > 0 && (
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-            <h3 className="font-bold text-gray-800 mb-3">Match Summary</h3>
-            <div className="bg-gray-50 rounded-xl p-4">
+          <div className="bg-[#181A22] rounded-2xl shadow-sm border border-white/[0.06] p-6">
+            <h3 className="font-bold text-gray-100 mb-3">Match Summary</h3>
+            <div className="bg-white/[0.04] rounded-xl p-4">
               {sets[0].games.filter(g => g.status === "COMPLETED").map((g, i) => (
                 <div key={i} className="flex items-center justify-between py-2">
-                  <span className="text-sm font-semibold text-gray-600">{player1Name}</span>
+                  <span className="text-sm font-semibold text-gray-400">{player1Name}</span>
                   <div className="flex items-center gap-2">
-                    <span className={`text-lg font-black ${(g.finalScore?.player1 || 0) > (g.finalScore?.player2 || 0) ? "text-green-600" : "text-gray-400"}`}>
+                    <span className={`text-lg font-black ${(g.finalScore?.player1 || 0) > (g.finalScore?.player2 || 0) ? "text-emerald-400" : "text-gray-400"}`}>
                       {g.finalScore?.player1 ?? 0}
                     </span>
                     <span className="text-gray-300">-</span>
-                    <span className={`text-lg font-black ${(g.finalScore?.player2 || 0) > (g.finalScore?.player1 || 0) ? "text-green-600" : "text-gray-400"}`}>
+                    <span className={`text-lg font-black ${(g.finalScore?.player2 || 0) > (g.finalScore?.player1 || 0) ? "text-emerald-400" : "text-gray-400"}`}>
                       {g.finalScore?.player2 ?? 0}
                     </span>
                   </div>
-                  <span className="text-sm font-semibold text-gray-600">{player2Name}</span>
+                  <span className="text-sm font-semibold text-gray-400">{player2Name}</span>
                 </div>
               ))}
             </div>
@@ -180,6 +224,17 @@ export default function MatchScoringPage() {
             onSubmitScores={submitBulkScores}
             submitting={submitting}
             onRefresh={() => {}}
+            // Live block + incremental scorers for cricket (innings) & carrom (board)
+            liveScore={liveScore}
+            player1Squad={match?.player1?.squad || []}
+            player2Squad={match?.player2?.squad || []}
+            onSetupInnings={setupCricketInnings}
+            onUpdateLineup={updateCricketLineup}
+            onSubmitBall={submitCricketBall}
+            onUndoBall={undoCricketBall}
+            onSwitchInnings={switchCricketInnings}
+            onFinishMatch={finishCricketMatch}
+            onSubmitBoard={submitCarromBoard}
           />
         )}
       </div>
@@ -228,7 +283,7 @@ function PlayerCard({ name, score, isWinner }) {
       <div className={`w-16 h-16 rounded-full flex items-center justify-center text-white text-2xl font-black ${isWinner ? "bg-green-500 ring-4 ring-green-200" : "bg-orange-500"}`}>
         {name?.charAt(0) || "?"}
       </div>
-      <span className={`mt-2 font-bold text-sm ${isWinner ? "text-green-700" : "text-gray-800"}`}>{name}</span>
+      <span className={`mt-2 font-bold text-sm ${isWinner ? "text-emerald-300" : "text-gray-100"}`}>{name}</span>
       {isWinner && <Trophy className="w-4 h-4 text-yellow-500 mt-1" />}
     </div>
   );
@@ -236,24 +291,24 @@ function PlayerCard({ name, score, isWinner }) {
 
 function SetScorecard({ sets, player1Name, player2Name, player1SetsWon, player2SetsWon, match, nested }) {
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-      <h3 className="font-bold text-gray-800 mb-4">Set Scorecard</h3>
+    <div className="bg-[#181A22] rounded-2xl shadow-sm border border-white/[0.06] p-6">
+      <h3 className="font-bold text-gray-100 mb-4">Set Scorecard</h3>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-gray-100">
+            <tr className="border-b border-white/[0.06]">
               <th className="text-left py-2 px-3 text-gray-500 font-medium">Player</th>
               {sets.map((s, i) => (
-                <th key={i} className={`text-center py-2 px-3 font-medium ${s.status === "COMPLETED" ? "text-gray-800" : "text-gray-300"}`}>
+                <th key={i} className={`text-center py-2 px-3 font-medium ${s.status === "COMPLETED" ? "text-gray-100" : "text-gray-300"}`}>
                   S{s.setNumber || i + 1}
                 </th>
               ))}
-              <th className="text-center py-2 px-3 font-bold text-gray-800">Sets</th>
+              <th className="text-center py-2 px-3 font-bold text-gray-100">Sets</th>
             </tr>
           </thead>
           <tbody>
             {[{ name: player1Name, key: "player1", setsWon: player1SetsWon }, { name: player2Name, key: "player2", setsWon: player2SetsWon }].map((player) => (
-              <tr key={player.key} className="border-b border-gray-50 last:border-b-0">
+              <tr key={player.key} className="border-b border-white/[0.06] last:border-b-0">
                 <td className="py-3 px-3 font-semibold text-orange-500">{player.name}</td>
                 {sets.map((s, i) => {
                   if (nested) {
@@ -265,7 +320,7 @@ function SetScorecard({ sets, player1Name, player2Name, player1SetsWon, player2S
                     }).length || 0;
                     const otherGames = (s.games?.filter(g => g.status === "COMPLETED").length || 0) - gamesWon;
                     return (
-                      <td key={i} className={`text-center py-3 px-3 font-bold ${gamesWon > otherGames ? "text-green-600" : "text-gray-400"}`}>
+                      <td key={i} className={`text-center py-3 px-3 font-bold ${gamesWon > otherGames ? "text-emerald-400" : "text-gray-400"}`}>
                         {s.status === "COMPLETED" || s.games?.length > 0 ? gamesWon : "-"}
                       </td>
                     );
@@ -277,7 +332,7 @@ function SetScorecard({ sets, player1Name, player2Name, player1SetsWon, player2S
                     const otherScore = g?.finalScore?.[otherKey] ?? null;
                     const isWinner = myScore != null && otherScore != null && myScore > otherScore;
                     return (
-                      <td key={i} className={`text-center py-3 px-3 font-bold ${isWinner ? "text-green-600" : "text-gray-400"}`}>
+                      <td key={i} className={`text-center py-3 px-3 font-bold ${isWinner ? "text-emerald-400" : "text-gray-400"}`}>
                         {myScore != null ? myScore : "-"}
                       </td>
                     );
@@ -303,7 +358,7 @@ function SetScorecard({ sets, player1Name, player2Name, player1SetsWon, player2S
 function SetDetail({ set, player1Name, player2Name, match }) {
   if (!set.games || set.games.length === 0) return null;
   return (
-    <div className={`border rounded-xl p-3 min-w-[120px] ${set.status === "COMPLETED" ? "border-gray-200" : "border-orange-200 bg-orange-50"}`}>
+    <div className={`border rounded-xl p-3 min-w-[120px] ${set.status === "COMPLETED" ? "border-white/[0.06]" : "border-orange-500/40 bg-orange-500/10"}`}>
       <div className="text-xs font-bold text-gray-500 mb-2 text-center uppercase">Set {set.setNumber}</div>
       <div className="space-y-1">
         {set.games.map((g, i) => {
@@ -311,15 +366,15 @@ function SetDetail({ set, player1Name, player2Name, match }) {
           const p2 = g.finalScore?.player2 ?? g.awayPoints ?? 0;
           return (
             <div key={i} className="flex justify-center gap-2 text-sm">
-              <span className={`font-bold ${p1 > p2 ? "text-green-600" : "text-gray-400"}`}>{p1}</span>
+              <span className={`font-bold ${p1 > p2 ? "text-emerald-400" : "text-gray-400"}`}>{p1}</span>
               <span className="text-gray-300">-</span>
-              <span className={`font-bold ${p2 > p1 ? "text-green-600" : "text-gray-400"}`}>{p2}</span>
+              <span className={`font-bold ${p2 > p1 ? "text-emerald-400" : "text-gray-400"}`}>{p2}</span>
             </div>
           );
         })}
       </div>
       {set.setWinner && (
-        <div className="text-[10px] text-center text-green-600 font-bold mt-1 border-t border-gray-100 pt-1">
+        <div className="text-[10px] text-center text-emerald-400 font-bold mt-1 border-t border-white/[0.06] pt-1">
           {typeof set.setWinner === "object" ? (set.setWinner.playerName || "Winner") : set.setWinner === "player1" ? player1Name : player2Name}
         </div>
       )}

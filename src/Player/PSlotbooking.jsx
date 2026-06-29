@@ -13,7 +13,7 @@ const PSlotbooking = () => {
     const fetchTurfs = async () => {
       try {
         const token = localStorage.getItem("token");
-        const response = await fetch(`/api/turf/turfs/`, {
+        const response = await fetch(`/api/turfs`, {
           headers: {
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
@@ -29,7 +29,7 @@ const PSlotbooking = () => {
       try {
         if (!userId) return;
         const token = localStorage.getItem("token");
-        const response = await fetch(`/api/turf/turfs/bookings/user/${userId}`, {
+        const response = await fetch(`/api/players/turf-bookings/user/${userId}`, {
           headers: {
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },

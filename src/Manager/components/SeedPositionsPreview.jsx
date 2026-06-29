@@ -91,24 +91,24 @@ export default function SeedPositionsPreview({ drawSize, numberOfSeeds, players 
   };
 
   return (
-    <div className="mb-6 bg-gray-50 rounded-xl p-4 border border-gray-200">
+    <div className="mb-6 bg-[#181A22] rounded-xl p-4 border border-white/[0.06]">
       <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
         <div className="flex items-center gap-2">
-          <h4 className="text-sm font-bold text-gray-800">Seed Positions Preview</h4>
-          <span className="text-[10px] font-bold bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full uppercase tracking-wider">
+          <h4 className="text-sm font-bold text-white">Seed Positions Preview</h4>
+          <span className="text-[10px] font-bold bg-orange-500/20 text-orange-300 px-2 py-0.5 rounded-full uppercase tracking-wider">
             {drawSize} Draw
           </span>
-          <span className="text-[10px] font-bold bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full uppercase tracking-wider">
+          <span className="text-[10px] font-bold bg-white/[0.08] text-gray-300 px-2 py-0.5 rounded-full uppercase tracking-wider">
             {seededCount}/{drawSize} Seeded
           </span>
           {Array.isArray(players) && (
-            <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full uppercase tracking-wider">
+            <span className="text-[10px] font-bold bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full uppercase tracking-wider">
               {players.length} Players
             </span>
           )}
         </div>
       </div>
-      <p className="text-[11px] text-gray-500 mb-3">
+      <p className="text-[11px] text-gray-400 mb-3">
         {lineToPlayer
           ? "Priority BYEs are exact; remaining placement is an example — extras shuffle server-side."
           : "Where each seed will be placed in the bracket (updates live as you change draw size or seeds)."}
@@ -131,31 +131,31 @@ export default function SeedPositionsPreview({ drawSize, numberOfSeeds, players 
                   key={row.lineNumber}
                   className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs transition-colors ${
                     row.isSeeded
-                      ? "bg-orange-50 border border-orange-200"
+                      ? "bg-orange-500/10 border border-orange-500/30"
                       : isBye
-                        ? "bg-gray-100 border border-dashed border-gray-300"
-                        : "bg-white border border-gray-200"
+                        ? "bg-white/[0.04] border border-dashed border-white/[0.12]"
+                        : "bg-white/[0.04] border border-white/[0.06]"
                   }`}
                 >
                   <span
                     className={`w-7 text-center text-[10px] font-bold flex-shrink-0 ${
-                      row.isSeeded ? "text-orange-600" : "text-gray-400"
+                      row.isSeeded ? "text-orange-400" : "text-gray-500"
                     }`}
                   >
                     {row.lineNumber}
                   </span>
                   <span
                     className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                      row.isSeeded ? "bg-orange-500" : isBye ? "bg-gray-400" : "bg-gray-300"
+                      row.isSeeded ? "bg-orange-500" : isBye ? "bg-gray-400" : "bg-gray-500"
                     }`}
                   />
                   <span
                     className={`truncate ${
                       row.isSeeded
-                        ? "font-bold text-orange-700"
+                        ? "font-bold text-orange-300"
                         : isBye
-                          ? "italic text-gray-400"
-                          : "text-gray-700"
+                          ? "italic text-gray-500"
+                          : "text-gray-300"
                     }`}
                   >
                     {label}

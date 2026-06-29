@@ -2,7 +2,7 @@ import { useContext, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, Clock, CheckCircle, MessageSquare, UserPlus, Building2,
-  Trophy, BookOpen, FileText, Layers, Shield, Store, MessageCircle,
+  Trophy, BookOpen, FileText, Layers, Shield, Store, MessageCircle, Newspaper,
   LogOut, Search, Bell,
 } from "lucide-react";
 import { AuthContext } from "../../context/AuthContext";
@@ -15,9 +15,9 @@ import { cn } from "../lib";
  */
 export default function SuperAdminShell({ children, searchPlaceholder }) {
   return (
-    <div className="flex min-h-screen bg-[#0F1117]">
+    <div className="ck-dark flex min-h-[100vh] bg-[#0F1117]">
       <SuperAdminSidebar />
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 w-full">
         <SuperAdminTopbar searchPlaceholder={searchPlaceholder} />
         <main className="flex-1 px-6 py-6 max-w-[1280px] w-full mx-auto text-gray-200">
           {children}
@@ -70,7 +70,9 @@ const NAV_SECTIONS = [
   {
     label: "Community",
     items: [
+      { label: "Social feed", icon: MessageSquare, to: "/su-social" },
       { label: "Group chats", icon: MessageCircle, to: "/group-chat" },
+      { label: "News",        icon: Newspaper,     to: "/news" },
     ],
   },
 ];

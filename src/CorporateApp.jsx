@@ -6,6 +6,8 @@ import CorporateTournaments from "./CorporateAdmin/CorporateTournaments";
 import CoGroupChatList from "./CorporateAdmin/CoGroupChatList";
 import CoGroupChatPage from "./CorporateAdmin/CoGroupChatPage";
 import CoNotification from "./CorporateAdmin/CoNotification";
+import CoSocial from "./CorporateAdmin/CoSocial";
+import CoNews from "./CorporateAdmin/CoNews";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 // All Corporate pages own their own dark CorporateShell chrome. No AppLayout
@@ -18,6 +20,8 @@ const CorporateApp = () => {
         <Route path="/corporate-tournaments" element={<CorporateTournaments />} />
         <Route path="/corporate-staff"       element={<CorporateStaff />} />
         <Route path="/corporate-profile"     element={<CorporateProfile />} />
+        <Route path="/corporate-social"      element={<CoSocial />} />
+        <Route path="/corporate-news"        element={<CoNews />} />
         <Route path="/notification"          element={<CoNotification />} />
         <Route path="/group-chat"            element={<CoGroupChatList />} />
         <Route path="/group-chat/:chatId"    element={<CoGroupChatPage />} />

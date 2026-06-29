@@ -1,5 +1,6 @@
-import { useState, useEffect, useContext } from "react";
-import axios from "axios";
+import { useContext } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "../shared/api/client";
 import { AuthContext } from "../context/AuthContext";
 import { assetUrl } from "../shared/lib/assetUrl";
 import {
@@ -8,26 +9,22 @@ import {
 import { getSportName, getTournamentType } from "../utils/sportTrack";
 import { CorporateShell } from "../shared/layout";
 
+/** @typedef {import('@chalo/api-types').Tournament} Tournament */
+
 const CorporateTournaments = () => {
   const { user } = useContext(AuthContext);
-  const [tournaments, setTournaments] = useState([]);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (user?._id) fetchCorporateTournaments();
-  }, [user]);
-
-  const fetchCorporateTournaments = async () => {
-    try {
-      setLoading(true);
-      const res = await axios.get(`/api/tournaments/corporate/${user._id}`);
-      if (res.data.success) setTournaments(res.data.tournaments);
-    } catch (error) {
-      console.error("Error fetching tournaments:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Phase 6: TanStack Query + shared client (was useState/useEffect + bare axios).
+  // Caches by user, dedupes refetches, and routes through the auth/refresh
+  // interceptors. Behavior (loading flag + tournaments list) is unchanged.
+  const { data: tournaments = [], isLoading: loading } = useQuery({
+    queryKey: ["corporate-tournaments", user?._id],
+    queryFn: async () => {
+      const res = await api.get(`/tournaments/corporate/${user._id}`);
+      return res.data?.success ? res.data.tournaments : (res.data?.tournaments ?? []);
+    },
+    enabled: !!user?._id,
+  });
 
   return (
     <CorporateShell searchPlaceholder="Search tournaments…">

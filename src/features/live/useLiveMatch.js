@@ -103,14 +103,43 @@ export default function useLiveMatch(matchId) {
   const singleResult = config.scoringType === "single" ? (result.result || finalScore.result || null) : null;
   const singleResultLabel = singleResult && config.scoring?.resultLabels?.[singleResult];
 
-  // For Cricket/innings: extract runs, wickets, overs
+  // Live block from the backend (cricket innings / carrom board incremental state)
+  const ls = match.liveScore && match.liveScore.scoringType ? match.liveScore : null;
+  const live = ls ? {
+    scoringType: ls.scoringType,
+    currentInnings: ls.currentInnings ?? null,
+    battingPlayer: ls.battingPlayer ?? null,
+    target: ls.target ?? null,
+    required: ls.required ?? null,
+    ballsRemaining: ls.ballsRemaining ?? null,
+    requiredRate: ls.requiredRate ?? null,
+    currentRunRate: ls.currentRunRate ?? null,
+    innings: ls.innings ?? [],
+    boards: ls.boards ?? [],
+    p1Boards: ls.player1Boards ?? 0,
+    p2Boards: ls.player2Boards ?? 0,
+    p1Points: ls.player1Points ?? 0,
+    p2Points: ls.player2Points ?? 0,
+  } : null;
+
+  // For Cricket/innings: prefer the live innings array; fall back to finalScore.
+  const liveInn = (side) => (live?.innings || []).find((i) => i.battingSide === side) || null;
   const innings = {
-    p1Runs: finalScore.player1Runs ?? finalScore.player1 ?? result.player1Score ?? null,
-    p2Runs: finalScore.player2Runs ?? finalScore.player2 ?? result.player2Score ?? null,
-    p1Wickets: finalScore.player1Wickets ?? null,
-    p2Wickets: finalScore.player2Wickets ?? null,
-    p1Overs: finalScore.player1Overs ?? null,
-    p2Overs: finalScore.player2Overs ?? null,
+    p1Runs: liveInn("player1")?.runs ?? finalScore.player1Runs ?? finalScore.player1 ?? result.player1Score ?? null,
+    p2Runs: liveInn("player2")?.runs ?? finalScore.player2Runs ?? finalScore.player2 ?? result.player2Score ?? null,
+    p1Wickets: liveInn("player1")?.wickets ?? finalScore.player1Wickets ?? null,
+    p2Wickets: liveInn("player2")?.wickets ?? finalScore.player2Wickets ?? null,
+    p1Overs: liveInn("player1") ? `${liveInn("player1").oversBowled}.${liveInn("player1").ballsBowled}` : (finalScore.player1Overs ?? null),
+    p2Overs: liveInn("player2") ? `${liveInn("player2").oversBowled}.${liveInn("player2").ballsBowled}` : (finalScore.player2Overs ?? null),
+  };
+
+  // For Carrom/board: boards won + points
+  const board = {
+    p1Boards: live?.p1Boards ?? finalScore.player1Sets ?? 0,
+    p2Boards: live?.p2Boards ?? finalScore.player2Sets ?? 0,
+    p1Points: live?.p1Points ?? 0,
+    p2Points: live?.p2Points ?? 0,
+    boards: live?.boards ?? [],
   };
 
   // For time-based (Football, Basketball): extract goals/points
@@ -123,7 +152,7 @@ export default function useLiveMatch(matchId) {
     match, isLoading, error, config, matchFormat, lastUpdated: dataUpdatedAt, isRealtime,
     derived: {
       p1, p2, p1Sets, p2Sets, sets, status, isLive, isCompleted, winner, timeline, sportName,
-      singleResult, singleResultLabel, innings, timeScore,
+      singleResult, singleResultLabel, innings, timeScore, live, board,
     },
   };
 }

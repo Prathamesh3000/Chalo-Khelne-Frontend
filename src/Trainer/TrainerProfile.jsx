@@ -92,7 +92,7 @@ const TrainerProfile = () => {
   const handleProfileUpdate = async () => {
     try {
       const response = await axios.put(
-        `/api/trainers/profile/${auth._id}`,
+        `/api/trainer/profile/${auth._id}`,
         formData
       );
       setProfile(response.data);
@@ -107,7 +107,7 @@ const TrainerProfile = () => {
     e.preventDefault();
     try {
       const response = await axios.post(
-        `/api/trainers/certificate/${auth._id}`,
+        `/api/trainer/certificate/${auth._id}`,
         newCertificate
       );
       setProfile({
@@ -131,7 +131,7 @@ const TrainerProfile = () => {
   const handleRemoveCertificate = async (certId) => {
     try {
       const response = await axios.delete(
-        `/api/trainers/certificate/${auth._id}/${certId}`
+        `/api/trainer/certificate/${auth._id}/${certId}`
       );
       setProfile({
         ...profile,

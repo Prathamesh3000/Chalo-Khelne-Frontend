@@ -8,7 +8,7 @@ export function HowItWorks() {
     <section className="bg-[#0A0A0A] text-white py-24 sm:py-32">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
-          <p className="text-[11px] font-black uppercase tracking-[0.3em] text-orange-500">
+          <p className="text-[11px] font-black uppercase tracking-[0.3em] text-green-600">
             How it works
           </p>
           <h2 className="mt-3 text-4xl font-black uppercase leading-tight tracking-tight sm:text-5xl">
@@ -25,13 +25,13 @@ export function HowItWorks() {
             return (
               <li
                 key={step.n}
-                className="group relative rounded-2xl border border-white/10 bg-white/[0.02] p-7 transition-colors hover:border-orange-500/40 hover:bg-white/[0.04]"
+                className="group relative rounded-2xl border border-white/10 bg-white/[0.02] p-7 transition-colors hover:border-green-600/40 hover:bg-white/[0.04]"
               >
                 <div className="flex items-center gap-3">
-                  <span className="grid h-10 w-10 place-items-center rounded-lg bg-orange-500/10 text-orange-400">
+                  <span className="grid h-10 w-10 place-items-center rounded-lg bg-green-600/10 text-green-500">
                     <Icon className="h-5 w-5" />
                   </span>
-                  <span className="text-5xl font-black tabular-nums text-white/15 group-hover:text-orange-500/30 transition-colors">
+                  <span className="text-5xl font-black tabular-nums text-white/15 group-hover:text-green-600/30 transition-colors">
                     0{step.n}
                   </span>
                 </div>

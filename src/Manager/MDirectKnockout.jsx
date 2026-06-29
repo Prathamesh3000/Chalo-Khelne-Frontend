@@ -2,7 +2,7 @@ import { toast } from "react-toastify";
 import { useState, useEffect, useContext } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { TabBar, Skeleton } from "../shared/ui";
-import { TournamentShell } from "../shared/layout";
+import { TournamentShell, TournamentFlowHeader } from "../shared/layout";
 import {
   Trophy, Users, Swords, Clock, ChevronRight, Plus, X, Search,
   RotateCcw, Upload, Check, AlertCircle, Zap, Target, Crown, Trash2,
@@ -31,6 +31,26 @@ const getUmpireName = (referee) => {
 // getSeedOrder imported from ../utils/seedingUtils (Mirror & Flip).
 // Preview UI lives in ./components/SeedPositionsPreview.jsx.
 
+// Sports this page can actually manage: a SINGLES / direct knockout. A sport
+// qualifies when its type includes "knockout" and its knockoutFormat is NOT a
+// team format (Teams Knockout / Davis Cup — those belong to the team-KO page).
+// Group-stage-only sports (e.g. a Chess track with type "group stage") are
+// excluded so they never appear in this page's switcher.
+const getDirectKnockoutSports = (tournament) => {
+  const sports = Array.isArray(tournament?.sports) ? tournament.sports : [];
+  return sports.filter((s) => {
+    const type = (s?.type || "").toLowerCase();
+    if (!type.includes("knockout")) return false;
+    // Time/innings sports (Football, Cricket) always use the auto-advancing
+    // Direct engine — the Davis-Cup team engine is sets/games/points based and
+    // can't score a single timed/innings match.
+    const st = (s?.matchFormat?.scoringType || "").toLowerCase();
+    if (st === "time" || st === "innings") return true;
+    const kf = (s?.knockoutFormat || "").toLowerCase();
+    return !(kf.includes("team") || kf.includes("davis"));
+  });
+};
+
 export default function MDirectKnockout() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -44,6 +64,8 @@ export default function MDirectKnockout() {
   const [assignModalMatch, setAssignModalMatch] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("setup"); // bracket | setup | scoring
+  // Active sport for multi-sport tournaments. Null for single-sport / legacy.
+  const [activeSportId, setActiveSportId] = useState(null);
 
   // URL → tab state (?tab=setup|bracket|scoring). Keeps refresh + deep-links honest.
   useEffect(() => {
@@ -84,14 +106,43 @@ export default function MDirectKnockout() {
   useEffect(() => {
     if (tournamentId) {
       fetchTournament();
-      fetchMatches();
-      fetchRegisteredPlayers();
     }
   }, [tournamentId]);
 
-  // Refresh court pool whenever the tournament loads (we need its sportId).
+  // Initialize / re-validate activeSportId when tournament data lands. Default
+  // to the first SINGLES-knockout sport (not sports[0], which may be a
+  // group-stage track). Falls back to all sports if none are tagged knockout
+  // (legacy single-sport direct-knockout tournaments).
   useEffect(() => {
-    const sid = tournament?.sports?.[0]?.sportId;
+    if (!tournament) return;
+    const dk = getDirectKnockoutSports(tournament);
+    const pool = dk.length ? dk : (Array.isArray(tournament.sports) ? tournament.sports : []);
+    if (pool.length > 0) {
+      const valid = pool.map((s) => String(s.sportId));
+      const current = activeSportId ? String(activeSportId) : null;
+      if (!current || !valid.includes(current)) {
+        setActiveSportId(pool[0].sportId);
+      }
+    } else {
+      setActiveSportId(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tournament]);
+
+  // Fetch the bracket, sport-scoped. For multi-sport tournaments, wait until
+  // activeSportId is resolved so we never flash the wrong sport's bracket.
+  useEffect(() => {
+    if (!tournamentId) return;
+    const multi = Array.isArray(tournament?.sports) && tournament.sports.length > 0;
+    if (multi && !activeSportId) return;
+    fetchMatches();
+    fetchRegisteredPlayers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tournamentId, activeSportId, tournament]);
+
+  // Refresh court pool for the active sport.
+  useEffect(() => {
+    const sid = activeSportId || tournament?.sports?.[0]?.sportId;
     if (!tournamentId || !sid) return;
     (async () => {
       try {
@@ -101,7 +152,7 @@ export default function MDirectKnockout() {
         setTournamentCourts([]);
       }
     })();
-  }, [tournamentId, tournament?.sports?.[0]?.sportId]);
+  }, [tournamentId, activeSportId, tournament?.sports]);
 
   const fetchTournament = async () => {
     try {
@@ -113,7 +164,8 @@ export default function MDirectKnockout() {
   const fetchMatches = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`/api/tournaments/direct-knockout/${tournamentId}/matches`);
+      const sportQuery = activeSportId ? `?sportId=${activeSportId}` : "";
+      const res = await axios.get(`/api/tournaments/direct-knockout/${tournamentId}/matches${sportQuery}`);
       if (res.data.success) {
         setMatches(res.data.matches || []);
         setMatchesByRound(res.data.matchesByRound || {});
@@ -131,6 +183,15 @@ export default function MDirectKnockout() {
         // Extract player info from confirmed bookings
         const players = bookings
           .filter((b) => b.status === "confirmed")
+          // Multi-sport: only this sport's registrants. Each booking carries its
+          // sport(s) in `sportSelections[]` (there is no top-level sportId).
+          // Bookings with no selections pass through (legacy single-sport).
+          .filter((b) => {
+            if (!activeSportId) return true;
+            const ss = Array.isArray(b.sportSelections) ? b.sportSelections : [];
+            if (ss.length === 0) return true;
+            return ss.some((s) => String(s.sportId) === String(activeSportId));
+          })
           .map((b) => ({
             playerId: b.userId?._id || b.userId,
             userName: b.userName || b.userId?.name || "Unknown",
@@ -294,11 +355,9 @@ export default function MDirectKnockout() {
 
     setGenerating(true);
     try {
-      // STEP 16d — backend now requires sportId. This screen is a
-      // tournament-level standalone view with no sport-switcher UI, so
-      // we send sports[0].sportId. Multi-sport standalone is a
-      // separate feature (a sport tab strip on this screen).
-      const _firstSportId = tournament?.sports?.[0]?.sportId || null;
+      // STEP 16d — backend requires sportId. Use the active sport from the
+      // sport switcher (falls back to sports[0] for single-sport tournaments).
+      const _firstSportId = activeSportId || tournament?.sports?.[0]?.sportId || null;
 
       // For custom mode: send players in seed-slot order, backend treats as standard (input order = seed order)
       const res = await axios.post("/api/tournaments/direct-knockout/standalone/create", {
@@ -347,11 +406,16 @@ export default function MDirectKnockout() {
     }
   };
 
-  // Reset bracket
+  // Reset bracket (sport-scoped in multi-sport tournaments so one sport's
+  // reset never wipes another sport's bracket).
   const handleReset = async () => {
-    if (!confirm("Reset entire bracket? All match data will be lost.")) return;
+    const sportLabel = tournament?.sports?.length > 1
+      ? ` for ${tournament.sports.find((s) => String(s.sportId) === String(activeSportId))?.sportName || "this sport"}`
+      : "";
+    if (!confirm(`Reset the entire bracket${sportLabel}? All its match data will be lost.`)) return;
     try {
-      await axios.delete(`/api/tournaments/direct-knockout/${tournamentId}/reset`);
+      const sportQuery = activeSportId ? `?sportId=${activeSportId}` : "";
+      await axios.delete(`/api/tournaments/direct-knockout/${tournamentId}/reset${sportQuery}`);
       setMatches([]);
       setMatchesByRound({});
       toast.success("Bracket reset");
@@ -360,19 +424,43 @@ export default function MDirectKnockout() {
     }
   };
 
+  // Switch the active sport (multi-sport tournaments). Clears in-flight setup
+  // selection so the new sport starts fresh; the fetch effects re-pull the new
+  // sport's bracket + registrants. Non-destructive — no saved data is touched.
+  const handleSportSwitch = (newSportId) => {
+    if (String(newSportId) === String(activeSportId)) return;
+    if (selectedPlayers.length > 0 &&
+        !confirm("Discard your current player selection and switch sport?")) return;
+    setSelectedPlayers([]);
+    setCustomSlots([]);
+    setActiveSlot(null);
+    setSearchQuery("");
+    setActiveSportId(newSportId);
+  };
+
   // Score a game
   const handleCompleteGame = async () => {
-    if (!activeMatch || !p1Score || !p2Score) return;
-    if (Number(p1Score) === Number(p2Score)) {
-      toast.warn("Scores cannot be tied");
-      return;
+    if (!activeMatch || p1Score === "" || p2Score === "") return;
+    const a = Number(p1Score), b = Number(p2Score);
+    // Time/innings sports (Football, Cricket) can end level — a knockout is then
+    // decided by a penalty shootout / super-over. Other sports can't tie.
+    const st = (activeMatch.scoringType || "").toLowerCase();
+    const isTimeOrInnings = st === "time" || st === "innings";
+    let penaltyWinner = null;
+    if (a === b) {
+      if (!isTimeOrInnings) { toast.warn("Scores cannot be tied"); return; }
+      const n1 = activeMatch.player1?.playerName || "Team A";
+      const n2 = activeMatch.player2?.playerName || "Team B";
+      const w = window.prompt(`Knockout level at ${a}-${b} — penalty shootout winner?\nType "1" for ${n1} or "2" for ${n2}:`);
+      if (w !== "1" && w !== "2") { toast.info("Penalty winner required to decide a knockout."); return; }
+      penaltyWinner = w === "1" ? "player1" : "player2";
     }
 
     setScoringLoading(true);
     try {
       const res = await axios.post(
         `/api/tournaments/direct-knockout/matches/${activeMatch.matchId}/complete-game`,
-        { player1Score: Number(p1Score), player2Score: Number(p2Score) }
+        { player1Score: a, player2Score: b, ...(penaltyWinner ? { penaltyWinner } : {}) }
       );
 
       if (res.data.success) {
@@ -420,12 +508,12 @@ export default function MDirectKnockout() {
 
   const getStatusBadge = (status) => {
     const styles = {
-      SCHEDULED: "bg-orange-100 text-orange-600",
-      IN_PROGRESS: "bg-yellow-100 text-yellow-700",
-      COMPLETED: "bg-green-100 text-green-700",
-      CANCELLED: "bg-gray-100 text-gray-500",
+      SCHEDULED: "bg-orange-500/20 text-orange-400",
+      IN_PROGRESS: "bg-yellow-500/20 text-yellow-700",
+      COMPLETED: "bg-emerald-500/20 text-emerald-300",
+      CANCELLED: "bg-white/[0.06] text-gray-500",
     };
-    return styles[status] || "bg-gray-100 text-gray-500";
+    return styles[status] || "bg-white/[0.06] text-gray-500";
   };
 
   // BYE handler
@@ -461,7 +549,11 @@ export default function MDirectKnockout() {
   // Shell props — pipeline derived from bracket presence + completion.
   const _shellTournament = tournament ? {
     title: tournament.title || "Singles Knockout",
-    sportName: Array.isArray(tournament.sports) ? (tournament.sports[0]?.sportName || "") : "",
+    // Show the ACTIVE sport (the one being managed), not sports[0] — otherwise
+    // a multi-sport tournament always shows its first sport's name in the header.
+    sportName: (Array.isArray(tournament.sports)
+      ? tournament.sports.find((s) => String(s.sportId) === String(activeSportId))?.sportName
+      : "") || tournament.sports?.[0]?.sportName || "",
     currentStage: tournament.currentStage || "knockout",
   } : null;
   const _steps = [
@@ -498,7 +590,66 @@ export default function MDirectKnockout() {
       breadcrumbs={_breadcrumbs}
       activeTabKey={activeTab}
       tabBar={_tabBar}
+      banner={
+        <TournamentFlowHeader
+          tournament={tournament}
+          sportId={tournament?.sports?.[0]?.sportId || null}
+          overrideStatus={
+            champion
+              ? "Tournament complete"
+              : hasBracket
+              ? `${completedCount}/${matches.length} matches scored`
+              : "Bracket not set up yet"
+          }
+          overrideNext={
+            champion
+              ? "View the final results"
+              : hasBracket
+              ? "Score the remaining matches"
+              : "Seed the players and generate the bracket"
+          }
+          primaryLabel={
+            champion ? "View bracket" : hasBracket ? "Score matches" : "Set up bracket"
+          }
+          onPrimaryAction={() =>
+            setActiveTab(champion ? "bracket" : hasBracket ? "scoring" : "setup")
+          }
+        />
+      }
     >
+      {/* Multi-sport sport switcher — only SINGLES-knockout sports, and only
+          when there's more than one of them. */}
+      {getDirectKnockoutSports(tournament).length > 1 && (
+        <div className="flex items-center gap-3 flex-wrap mb-4">
+          <span className="text-[11px] uppercase tracking-[0.14em] font-bold text-gray-400 whitespace-nowrap flex-shrink-0">
+            Sport
+          </span>
+          {/* Segmented control — track spans its content only; `w-auto`
+              overrides the global `button { width:100% }`. */}
+          <div className="inline-flex items-center gap-1 p-1 rounded-xl bg-white/[0.06] border border-white/[0.06] max-w-full overflow-x-auto">
+            {getDirectKnockoutSports(tournament).map((s) => {
+              const isActive = String(s.sportId) === String(activeSportId);
+              return (
+                <button
+                  key={String(s.sportId)}
+                  onClick={() => handleSportSwitch(s.sportId)}
+                  className={`w-auto flex-shrink-0 flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-[13px] font-semibold whitespace-nowrap transition-all ${
+                    isActive
+                      ? "bg-emerald-600 text-white shadow-sm"
+                      : "text-gray-500 hover:text-white hover:bg-[#12141B]"
+                  }`}
+                >
+                  {isActive && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-white/90 flex-shrink-0" />
+                  )}
+                  {s.sportName}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Page header actions (Bulk Score / Reset) — kept inline since they're
           specific to the bracket state, not tournament chrome. */}
       <div className="flex items-center justify-end gap-2 mb-4">
@@ -513,7 +664,7 @@ export default function MDirectKnockout() {
             </button>
             <button
               onClick={handleReset}
-              className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-lg text-sm font-medium hover:bg-red-100 border border-red-200 w-auto"
+              className="flex items-center gap-2 px-4 py-2 bg-red-500/10 text-red-600 rounded-lg text-sm font-medium hover:bg-red-500/20 border border-red-200 w-auto"
             >
               <RotateCcw size={16} />
               Reset
@@ -536,19 +687,19 @@ export default function MDirectKnockout() {
       {/* Stats Row */}
       {hasBracket && (
         <div className="grid grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-xl p-4 border border-gray-200">
+          <div className="bg-[#181A22] rounded-xl p-4 border border-white/[0.06]">
             <p className="text-xs text-gray-500">Total Matches</p>
-            <p className="text-2xl font-bold text-gray-900">{matches.length}</p>
+            <p className="text-2xl font-bold text-white">{matches.length}</p>
           </div>
-          <div className="bg-white rounded-xl p-4 border border-gray-200">
+          <div className="bg-[#181A22] rounded-xl p-4 border border-white/[0.06]">
             <p className="text-xs text-gray-500">Completed</p>
-            <p className="text-2xl font-bold text-green-600">{completedCount}</p>
+            <p className="text-2xl font-bold text-emerald-400">{completedCount}</p>
           </div>
-          <div className="bg-white rounded-xl p-4 border border-gray-200">
+          <div className="bg-[#181A22] rounded-xl p-4 border border-white/[0.06]">
             <p className="text-xs text-gray-500">Pending</p>
             <p className="text-2xl font-bold text-orange-500">{matches.length - completedCount}</p>
           </div>
-          <div className="bg-white rounded-xl p-4 border border-gray-200">
+          <div className="bg-[#181A22] rounded-xl p-4 border border-white/[0.06]">
             <p className="text-xs text-gray-500">Rounds</p>
             <p className="text-2xl font-bold text-emerald-600">{Object.keys(matchesByRound).length}</p>
           </div>
@@ -561,9 +712,9 @@ export default function MDirectKnockout() {
       {activeTab === "bracket" && (
         <div>
           {!hasBracket ? (
-            <div className="bg-white rounded-2xl p-12 text-center border border-gray-200">
+            <div className="bg-[#181A22] rounded-2xl p-12 text-center border border-white/[0.06]">
               <Swords size={48} className="mx-auto text-gray-300 mb-4" />
-              <h3 className="text-lg font-semibold text-gray-600 mb-2">No Bracket Generated</h3>
+              <h3 className="text-lg font-semibold text-gray-400 mb-2">No Bracket Generated</h3>
               <p className="text-gray-400 mb-4">Go to "Setup Draw" to create the knockout bracket</p>
               <button
                 onClick={() => setActiveTab("setup")}
@@ -575,10 +726,10 @@ export default function MDirectKnockout() {
           ) : (
             <div className="space-y-6">
               {Object.entries(matchesByRound).map(([roundName, roundMatches]) => (
-                <div key={roundName} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div key={roundName} className="bg-[#181A22] rounded-xl border border-white/[0.06] overflow-hidden">
                   {/* Round Header */}
-                  <div className="bg-gray-50 px-5 py-3 border-b border-gray-200 flex justify-between items-center">
-                    <h3 className="font-bold text-gray-800">{getRoundDisplayName(roundName)}</h3>
+                  <div className="bg-white/[0.04] px-5 py-3 border-b border-white/[0.06] flex justify-between items-center">
+                    <h3 className="font-bold text-gray-100">{getRoundDisplayName(roundName)}</h3>
                     <span className="text-xs text-gray-500">
                       {roundMatches.filter((m) => m.status === "COMPLETED").length}/{roundMatches.length} completed
                     </span>
@@ -590,10 +741,10 @@ export default function MDirectKnockout() {
                       <div
                         key={match._id}
                         className={`rounded-xl border p-4 transition-all cursor-pointer hover:shadow-md ${match.status === "COMPLETED"
-                            ? "border-green-200 bg-green-50/30"
+                            ? "border-green-200 bg-emerald-500/10"
                             : match.player1?.playerName && match.player1.playerName !== "TBD" && match.player2?.playerName && match.player2.playerName !== "TBD"
-                              ? "border-orange-200 bg-orange-50/30"
-                              : "border-gray-200 bg-gray-50/30 opacity-60"
+                              ? "border-orange-200 bg-orange-500/10"
+                              : "border-white/[0.06] bg-white/[0.04] opacity-60"
                           }`}
                         onClick={() => setDetailMatch(match)}
                       >
@@ -610,13 +761,13 @@ export default function MDirectKnockout() {
                         {/* Player 1 */}
                         <div className={`flex justify-between items-center py-1.5 ${match.result?.winner?.playerName === match.player1?.playerName ? "font-bold" : ""
                           }`}>
-                          <span className="text-sm text-gray-800 truncate flex-1">
+                          <span className="text-sm text-gray-100 truncate flex-1">
                             {match.result?.winner?.playerName === match.player1?.playerName && "🏆 "}
                             {match.player1?.playerName || "TBD"}
                           </span>
                           <div className="flex items-center gap-1 ml-1">
                             {match.status === "COMPLETED" && (
-                              <span className="text-sm font-bold text-gray-600">
+                              <span className="text-sm font-bold text-gray-400">
                                 {match.result?.finalScore?.player1Sets || 0}
                               </span>
                             )}
@@ -627,7 +778,7 @@ export default function MDirectKnockout() {
                                   handleGiveBye(match, match.player1.playerId?._id || match.player1.playerId, match.player1.playerName, match.player2.playerName);
                                 }}
                                 disabled={byeLoading === match.matchId}
-                                className="text-[9px] font-bold text-red-500 bg-red-50 hover:bg-red-100 px-1.5 py-0.5 rounded border border-red-200 w-auto"
+                                className="text-[9px] font-bold text-red-500 bg-red-500/10 hover:bg-red-500/20 px-1.5 py-0.5 rounded border border-red-200 w-auto"
                                 title={`Give BYE to ${match.player1?.playerName}`}
                               >
                                 {byeLoading === match.matchId ? "..." : "BYE"}
@@ -636,18 +787,18 @@ export default function MDirectKnockout() {
                           </div>
                         </div>
 
-                        <div className="h-px bg-gray-200 my-1" />
+                        <div className="h-px bg-white/[0.08] my-1" />
 
                         {/* Player 2 */}
                         <div className={`flex justify-between items-center py-1.5 ${match.result?.winner?.playerName === match.player2?.playerName ? "font-bold" : ""
                           }`}>
-                          <span className="text-sm text-gray-800 truncate flex-1">
+                          <span className="text-sm text-gray-100 truncate flex-1">
                             {match.result?.winner?.playerName === match.player2?.playerName && "🏆 "}
                             {match.player2?.playerName || "TBD"}
                           </span>
                           <div className="flex items-center gap-1 ml-1">
                             {match.status === "COMPLETED" && (
-                              <span className="text-sm font-bold text-gray-600">
+                              <span className="text-sm font-bold text-gray-400">
                                 {match.result?.finalScore?.player2Sets || 0}
                               </span>
                             )}
@@ -658,7 +809,7 @@ export default function MDirectKnockout() {
                                   handleGiveBye(match, match.player2.playerId?._id || match.player2.playerId, match.player2.playerName, match.player1.playerName);
                                 }}
                                 disabled={byeLoading === match.matchId}
-                                className="text-[9px] font-bold text-red-500 bg-red-50 hover:bg-red-100 px-1.5 py-0.5 rounded border border-red-200 w-auto"
+                                className="text-[9px] font-bold text-red-500 bg-red-500/10 hover:bg-red-500/20 px-1.5 py-0.5 rounded border border-red-200 w-auto"
                                 title={`Give BYE to ${match.player2?.playerName}`}
                               >
                                 {byeLoading === match.matchId ? "..." : "BYE"}
@@ -669,7 +820,7 @@ export default function MDirectKnockout() {
 
                         {/* BYE Note */}
                         {match.notes?.includes("BYE") && (
-                          <div className="mt-1 text-[9px] text-orange-600 bg-orange-50 rounded px-2 py-0.5 text-center font-medium">
+                          <div className="mt-1 text-[9px] text-orange-400 bg-orange-500/10 rounded px-2 py-0.5 text-center font-medium">
                             {match.notes}
                           </div>
                         )}
@@ -707,9 +858,9 @@ export default function MDirectKnockout() {
                           const isComp = match.status === "COMPLETED";
                           const playersReady = match.player1?.playerName && match.player1.playerName !== "TBD" && match.player2?.playerName && match.player2.playerName !== "TBD";
                           return (
-                            <div className="mt-2 pt-2 border-t border-gray-100 flex items-center justify-between">
+                            <div className="mt-2 pt-2 border-t border-white/[0.06] flex items-center justify-between">
                               {umpireName ? (
-                                <span className="flex items-center gap-1 text-[10px] text-gray-600">
+                                <span className="flex items-center gap-1 text-[10px] text-gray-400">
                                   <Shield className="w-3 h-3 text-blue-500" />
                                   <span className="font-semibold">Umpire:</span>
                                   <span className="truncate max-w-[80px]">{umpireName}</span>
@@ -723,7 +874,7 @@ export default function MDirectKnockout() {
                               {!umpireName && !isComp && playersReady && (
                                 <button
                                   onClick={(e) => { e.stopPropagation(); setAssignModalMatch(match); }}
-                                  className="flex items-center gap-0.5 text-[10px] font-bold text-orange-600 hover:text-orange-700 px-1.5 py-0.5 rounded hover:bg-orange-50 w-auto"
+                                  className="flex items-center gap-0.5 text-[10px] font-bold text-orange-400 hover:text-orange-300 px-1.5 py-0.5 rounded hover:bg-orange-500/10 w-auto"
                                 >
                                   <UserPlus className="w-3 h-3" />
                                   Assign
@@ -744,14 +895,14 @@ export default function MDirectKnockout() {
 
       {/* TAB: Setup Draw */}
       {activeTab === "setup" && (
-        <div className="bg-white rounded-2xl border border-gray-200 p-6">
-          <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+        <div className="bg-[#181A22] rounded-2xl border border-white/[0.06] p-6">
+          <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
             <Target size={20} /> Setup Knockout Draw
           </h3>
 
           {/* Draw Size Selector */}
           <div className="mb-6">
-            <label className="text-sm font-medium text-gray-600 mb-2 block">Draw Size</label>
+            <label className="text-sm font-medium text-gray-400 mb-2 block">Draw Size</label>
             <div className="flex gap-2 flex-wrap">
               {DRAW_SIZES.map((size) => {
                 const tooSmall = selectedPlayers.length > size;
@@ -761,10 +912,10 @@ export default function MDirectKnockout() {
                     onClick={() => { if (!tooSmall) { setDrawSize(size); if (drawMethod === "custom") initCustomSlots(size); } }}
                     disabled={tooSmall}
                     className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all w-auto ${tooSmall
-                        ? "bg-red-50 text-red-300 border-2 border-red-200 cursor-not-allowed"
+                        ? "bg-red-500/10 text-red-300 border-2 border-red-200 cursor-not-allowed"
                         : drawSize === size
                           ? "bg-orange-500 text-white shadow-md"
-                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                          : "bg-white/[0.06] text-gray-400 hover:bg-white/[0.08]"
                       }`}
                   >
                     {size} Draw
@@ -784,16 +935,16 @@ export default function MDirectKnockout() {
                   return <span className="text-orange-500 font-semibold">{count}/{drawSize} players — need at least {minNeeded} (missing {minNeeded - count})</span>;
                 }
                 if (count === drawSize) {
-                  return <span className="text-green-600 font-semibold">{count}/{drawSize} players placed ✓ Ready to generate</span>;
+                  return <span className="text-emerald-400 font-semibold">{count}/{drawSize} players placed ✓ Ready to generate</span>;
                 }
-                return <span className="text-green-600 font-semibold">{count}/{drawSize} players placed ✓ Ready ({byes} BYEs will be given automatically)</span>;
+                return <span className="text-emerald-400 font-semibold">{count}/{drawSize} players placed ✓ Ready ({byes} BYEs will be given automatically)</span>;
               })()}
             </p>
           </div>
 
           {/* Draw Method Selector */}
           <div className="mb-6">
-            <label className="text-sm font-medium text-gray-600 mb-2 block">Draw Method</label>
+            <label className="text-sm font-medium text-gray-400 mb-2 block">Draw Method</label>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {[
                 { value: "standard", label: "Standard Seeding", desc: "All players placed by seed rank. Top seeds separated.", icon: "🏆" },
@@ -811,13 +962,13 @@ export default function MDirectKnockout() {
                     else if (method.value === "custom") { initCustomSlots(drawSize); setNumberOfSeeds(Math.floor(drawSize / 4)); }
                   }}
                   className={`p-4 rounded-xl border-2 text-left transition-all w-auto ${drawMethod === method.value
-                      ? "border-orange-500 bg-orange-50"
-                      : "border-gray-200 hover:border-gray-300 bg-white"
+                      ? "border-orange-500 bg-orange-500/10"
+                      : "border-white/[0.06] hover:border-white/[0.10] bg-[#12141B]"
                     }`}
                 >
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-lg">{method.icon}</span>
-                    <span className={`text-sm font-bold ${drawMethod === method.value ? "text-orange-700" : "text-gray-800"}`}>{method.label}</span>
+                    <span className={`text-sm font-bold ${drawMethod === method.value ? "text-orange-300" : "text-gray-100"}`}>{method.label}</span>
                   </div>
                   <p className="text-[11px] text-gray-500 leading-tight">{method.desc}</p>
                 </button>
@@ -827,9 +978,9 @@ export default function MDirectKnockout() {
 
           {/* Number of Seeded Players — for Hybrid and Custom modes */}
           {(drawMethod === "hybrid" || drawMethod === "custom") && (
-            <div className="mb-6 bg-gray-50 rounded-xl p-4 border border-gray-200">
+            <div className="mb-6 bg-white/[0.04] rounded-xl p-4 border border-white/[0.06]">
               <div className="flex items-center justify-between mb-2">
-                <label className="text-sm font-medium text-gray-700">Number of Seeded Players</label>
+                <label className="text-sm font-medium text-gray-300">Number of Seeded Players</label>
                 <div className="flex items-center gap-2">
                   <input
                     type="number"
@@ -853,7 +1004,7 @@ export default function MDirectKnockout() {
                     onClick={() => setNumberOfSeeds(n)}
                     className={`px-3 py-1 rounded-md text-xs font-bold transition-all w-auto ${numberOfSeeds === n
                         ? "bg-orange-500 text-white"
-                        : "bg-white text-gray-600 border border-gray-300 hover:border-orange-300"
+                        : "bg-[#181A22] text-gray-400 border border-white/[0.10] hover:border-orange-300"
                       }`}
                   >
                     {n === 0 ? "None" : n}
@@ -882,11 +1033,11 @@ export default function MDirectKnockout() {
                     <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                     <input type="text" placeholder="Search players..." value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-orange-400 focus:border-orange-400" />
+                      className="w-full pl-9 pr-4 py-2.5 bg-[#12141B] text-white placeholder:text-gray-500 border border-white/[0.06] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400/40 focus:border-orange-400" />
                   </div>
                 </div>
-                <h4 className="text-sm font-bold text-gray-700 mb-2">Available Players</h4>
-                <div className="max-h-[500px] overflow-y-auto border border-gray-200 rounded-xl">
+                <h4 className="text-sm font-bold text-gray-300 mb-2">Available Players</h4>
+                <div className="max-h-[500px] overflow-y-auto border border-white/[0.06] rounded-xl">
                   {(() => {
                     // Custom Placement: show registeredPlayers minus those
                     // placed in customSlots. Ignore `matches` (existing bracket)
@@ -910,15 +1061,15 @@ export default function MDirectKnockout() {
                           const name = player.userName || player.playerName || player.name || `Player ${idx + 1}`;
                           return (
                             <div key={`${keyOfPlayer(player) || "p"}-${idx}`}
-                              className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-orange-50 transition-colors"
+                              className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-orange-500/10 transition-colors"
                               onClick={() => placePlayerInSlot(player)}>
                               <Plus size={16} className="text-orange-500 flex-shrink-0" />
-                              <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-600">
+                              <div className="w-7 h-7 rounded-full bg-white/[0.08] flex items-center justify-center text-xs font-bold text-gray-400">
                                 {name.charAt(0).toUpperCase()}
                               </div>
-                              <p className="text-sm font-medium text-gray-800 flex-1">{name}</p>
+                              <p className="text-sm font-medium text-gray-100 flex-1">{name}</p>
                               {activeSlot !== null && (
-                                <span className="text-[10px] bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full font-bold">
+                                <span className="text-[10px] bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded-full font-bold">
                                   → Seed {activeSlot + 1}
                                 </span>
                               )}
@@ -940,10 +1091,10 @@ export default function MDirectKnockout() {
               {/* Right: Bracket Slots */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <h4 className="text-sm font-bold text-gray-700">Bracket Positions</h4>
+                  <h4 className="text-sm font-bold text-gray-300">Bracket Positions</h4>
                   <span className="text-[10px] font-bold text-gray-400">{customSlots.filter(Boolean).length}/{drawSize} placed</span>
                 </div>
-                <div className="max-h-[500px] overflow-y-auto border border-gray-200 rounded-xl">
+                <div className="max-h-[500px] overflow-y-auto border border-white/[0.06] rounded-xl">
                   {(() => {
                     const seedOrder = getSeedOrder(drawSize);
                     const matchPairs = [];
@@ -951,7 +1102,7 @@ export default function MDirectKnockout() {
                       matchPairs.push({ m: Math.floor(i / 2) + 1, s1: { idx: i, seed: seedOrder[i] }, s2: { idx: i + 1, seed: seedOrder[i + 1] } });
                     }
                     return (
-                      <div className="divide-y divide-gray-200">
+                      <div className="divide-y divide-white/[0.06]">
                         {matchPairs.map((pair) => (
                           <div key={pair.m} className="px-3 py-2">
                             <p className="text-[9px] font-bold text-gray-400 uppercase mb-1">Match {pair.m}</p>
@@ -963,36 +1114,36 @@ export default function MDirectKnockout() {
                               return (
                                 <div key={slot.idx}
                                   className={`flex items-center gap-2 px-2 py-2 rounded-lg mb-1 cursor-pointer transition-all ${
-                                    isActive ? "bg-orange-100 border-2 border-orange-500"
-                                    : player ? (isSeededPos ? "bg-orange-50 border border-orange-200" : "bg-green-50 border border-green-200")
-                                    : isSeededPos ? "bg-yellow-50 border border-dashed border-yellow-300 hover:border-orange-400"
-                                    : "bg-gray-50 border border-dashed border-gray-300 hover:border-gray-400"
+                                    isActive ? "bg-orange-500/20 border-2 border-orange-500"
+                                    : player ? (isSeededPos ? "bg-orange-500/10 border border-orange-200" : "bg-emerald-500/10 border border-green-200")
+                                    : isSeededPos ? "bg-yellow-500/10 border border-dashed border-yellow-300 hover:border-orange-400"
+                                    : "bg-white/[0.04] border border-dashed border-white/[0.10] hover:border-white/[0.20]"
                                   }`}
                                   onClick={() => setActiveSlot(isActive ? null : slot.idx)}>
                                   {isSeededPos ? (
                                     <span className={`px-1.5 h-6 rounded flex items-center justify-center text-[10px] font-black flex-shrink-0 ${
-                                      player ? "bg-orange-500 text-white" : "bg-yellow-400 text-yellow-900"
+                                      player ? "bg-orange-500 text-white" : "bg-yellow-400 text-yellow-300"
                                     }`}>
                                       S{slot.seed}
                                     </span>
                                   ) : (
                                     <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${
-                                      player ? "bg-gray-500 text-white" : "bg-gray-200 text-gray-400"
+                                      player ? "bg-gray-500 text-white" : "bg-white/[0.08] text-gray-400"
                                     }`}>
                                       {slot.seed}
                                     </span>
                                   )}
                                   {player ? (
                                     <>
-                                      <p className="text-sm font-medium text-gray-800 flex-1 truncate">{name}</p>
-                                      {isSeededPos && <span className="text-[9px] font-bold text-orange-600 bg-orange-100 px-1.5 py-0.5 rounded">SEED {slot.seed}</span>}
+                                      <p className="text-sm font-medium text-gray-100 flex-1 truncate">{name}</p>
+                                      {isSeededPos && <span className="text-[9px] font-bold text-orange-400 bg-orange-500/20 px-1.5 py-0.5 rounded">SEED {slot.seed}</span>}
                                       <button onClick={(e) => { e.stopPropagation(); removeFromSlot(slot.idx); }}
                                         className="text-red-300 hover:text-red-500 w-auto p-0">
                                         <X size={14} />
                                       </button>
                                     </>
                                   ) : (
-                                    <p className={`text-sm flex-1 italic ${isActive ? "text-orange-600 font-medium" : "text-gray-400"}`}>
+                                    <p className={`text-sm flex-1 italic ${isActive ? "text-orange-400 font-medium" : "text-gray-400"}`}>
                                       {isActive ? "← Click a player to place here"
                                         : isSeededPos ? `Seed ${slot.seed} position — place seeded player here`
                                         : "Open slot — click to select"
@@ -1024,14 +1175,14 @@ export default function MDirectKnockout() {
                     <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                     <input type="text" placeholder="Search players..." value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-orange-400 focus:border-orange-400" />
+                      className="w-full pl-9 pr-4 py-2.5 bg-[#12141B] text-white placeholder:text-gray-500 border border-white/[0.06] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400/40 focus:border-orange-400" />
                   </div>
                   <button onClick={selectAll}
-                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 w-auto">
+                    className="px-4 py-2 bg-white/[0.06] text-gray-300 rounded-lg text-sm font-medium hover:bg-white/[0.08] w-auto">
                     {selectedPlayers.length === getFilteredPlayers().length ? "Deselect All" : "Select All"}
                   </button>
                 </div>
-                <div className="max-h-[400px] overflow-y-auto border border-gray-200 rounded-xl">
+                <div className="max-h-[400px] overflow-y-auto border border-white/[0.06] rounded-xl">
                   {getFilteredPlayers().length === 0 ? (
                     <div className="p-8 text-center text-gray-400">
                       <Users size={32} className="mx-auto mb-2" />
@@ -1045,17 +1196,17 @@ export default function MDirectKnockout() {
                         const name = player.userName || player.playerName || player.name || `Player ${idx + 1}`;
                         return (
                           <div key={id || idx}
-                            className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${isSelected ? "bg-orange-50" : "hover:bg-gray-50"}`}
+                            className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${isSelected ? "bg-orange-500/10" : "hover:bg-white/[0.04]"}`}
                             onClick={() => togglePlayer(player)}>
-                            <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${isSelected ? "bg-orange-500 border-orange-500" : "border-gray-300"}`}>
+                            <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${isSelected ? "bg-orange-500 border-orange-500" : "border-white/[0.10]"}`}>
                               {isSelected && <Check size={14} color="white" />}
                             </div>
-                            <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-600">
+                            <div className="w-8 h-8 rounded-full bg-white/[0.08] flex items-center justify-center text-xs font-bold text-gray-400">
                               {name.charAt(0).toUpperCase()}
                             </div>
-                            <p className="text-sm font-medium text-gray-800 flex-1">{name}</p>
+                            <p className="text-sm font-medium text-gray-100 flex-1">{name}</p>
                             {isSelected && (
-                              <span className="text-[10px] bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full font-bold">
+                              <span className="text-[10px] bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded-full font-bold">
                                 #{selectedPlayers.findIndex((p) => (p.playerId || p._id) === id) + 1}
                               </span>
                             )}
@@ -1070,7 +1221,7 @@ export default function MDirectKnockout() {
               {/* Right: Seed Order / Ranking */}
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-sm font-bold text-gray-700">
+                  <h4 className="text-sm font-bold text-gray-300">
                     {drawMethod === "random" ? "Selected Players" : "Player Order (use arrows to reorder)"}
                   </h4>
                   {selectedPlayers.length > 0 && (
@@ -1079,7 +1230,7 @@ export default function MDirectKnockout() {
                     </span>
                   )}
                 </div>
-                <div className="max-h-[400px] overflow-y-auto border border-gray-200 rounded-xl">
+                <div className="max-h-[400px] overflow-y-auto border border-white/[0.06] rounded-xl">
                   {selectedPlayers.length === 0 ? (
                     <div className="p-8 text-center text-gray-400">
                       <Target size={32} className="mx-auto mb-2" />
@@ -1095,25 +1246,25 @@ export default function MDirectKnockout() {
                         return (
                           <div key={id || idx}>
                             {showDivider && (
-                              <div className="bg-gray-100 px-3 py-1.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
-                                <div className="h-px bg-gray-300 flex-1" />Unseeded — placed randomly<div className="h-px bg-gray-300 flex-1" />
+                              <div className="bg-white/[0.06] px-3 py-1.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                                <div className="h-px bg-white/[0.10] flex-1" />Unseeded — placed randomly<div className="h-px bg-white/[0.10] flex-1" />
                               </div>
                             )}
-                            <div className={`flex items-center gap-2 px-3 py-2.5 ${isSeeded ? "bg-orange-50/50" : ""}`}>
-                              <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0 ${isSeeded ? "bg-orange-500 text-white" : "bg-gray-100 text-gray-400"}`}>
+                            <div className={`flex items-center gap-2 px-3 py-2.5 ${isSeeded ? "bg-orange-500/10" : ""}`}>
+                              <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0 ${isSeeded ? "bg-orange-500 text-white" : "bg-white/[0.06] text-gray-400"}`}>
                                 {idx + 1}
                               </span>
-                              <p className="text-sm font-medium text-gray-800 flex-1 truncate">{name}</p>
-                              {isSeeded && <span className="text-[9px] font-bold text-orange-600 bg-orange-100 px-1.5 py-0.5 rounded">SEED {idx + 1}</span>}
+                              <p className="text-sm font-medium text-gray-100 flex-1 truncate">{name}</p>
+                              {isSeeded && <span className="text-[9px] font-bold text-orange-400 bg-orange-500/20 px-1.5 py-0.5 rounded">SEED {idx + 1}</span>}
                               {isSeeded && (
                                 <div className="flex flex-col gap-0.5">
                                   <button onClick={() => idx > 0 && movePlayer(idx, idx - 1)} disabled={idx === 0}
-                                    className="text-gray-400 hover:text-gray-700 disabled:opacity-20 w-auto p-0">
+                                    className="text-gray-400 hover:text-gray-300 disabled:opacity-20 w-auto p-0">
                                     <ChevronRight size={14} className="rotate-[-90deg]" />
                                   </button>
                                   <button onClick={() => { const max = drawMethod === "standard" ? selectedPlayers.length - 1 : numberOfSeeds - 1; if (idx < max) movePlayer(idx, idx + 1); }}
                                     disabled={idx >= (drawMethod === "standard" ? selectedPlayers.length - 1 : numberOfSeeds - 1)}
-                                    className="text-gray-400 hover:text-gray-700 disabled:opacity-20 w-auto p-0">
+                                    className="text-gray-400 hover:text-gray-300 disabled:opacity-20 w-auto p-0">
                                     <ChevronRight size={14} className="rotate-90" />
                                   </button>
                                 </div>
@@ -1197,9 +1348,9 @@ export default function MDirectKnockout() {
       {activeTab === "scoring" && (
         <div className="grid grid-cols-3 gap-6">
           {/* Match List */}
-          <div className="col-span-1 bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-              <h4 className="font-bold text-gray-800 text-sm">Ready to Score</h4>
+          <div className="col-span-1 bg-[#181A22] rounded-xl border border-white/[0.06] overflow-hidden">
+            <div className="bg-white/[0.04] px-4 py-3 border-b border-white/[0.06]">
+              <h4 className="font-bold text-gray-100 text-sm">Ready to Score</h4>
             </div>
             <div className="max-h-[500px] overflow-y-auto divide-y divide-gray-100">
               {pendingMatches.length === 0 ? (
@@ -1210,7 +1361,7 @@ export default function MDirectKnockout() {
                 pendingMatches.map((match) => (
                   <div
                     key={match._id}
-                    className={`px-4 py-3 cursor-pointer transition-colors ${activeMatch?.matchId === match.matchId ? "bg-orange-50 border-l-4 border-l-orange-500" : "hover:bg-gray-50"
+                    className={`px-4 py-3 cursor-pointer transition-colors ${activeMatch?.matchId === match.matchId ? "bg-orange-500/10 border-l-4 border-l-orange-500" : "hover:bg-white/[0.04]"
                       }`}
                     onClick={async () => {
                       // Fetch fresh match data
@@ -1234,7 +1385,7 @@ export default function MDirectKnockout() {
                         {getRoundDisplayName(match.round)} • M{match.matchNumber}
                       </span>
                     </div>
-                    <p className="text-xs font-medium text-gray-700">
+                    <p className="text-xs font-medium text-gray-300">
                       {match.player1?.playerName} vs {match.player2?.playerName}
                     </p>
                   </div>
@@ -1244,7 +1395,7 @@ export default function MDirectKnockout() {
           </div>
 
           {/* Scoring Panel */}
-          <div className="col-span-2 bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="col-span-2 bg-[#181A22] rounded-xl border border-white/[0.06] overflow-hidden">
             {!activeMatch ? (
               <div className="text-center py-12 text-gray-400">
                 <Swords size={48} className="mx-auto mb-3" />
@@ -1278,7 +1429,7 @@ export default function MDirectKnockout() {
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className={`text-xs font-bold px-3 py-1 rounded-full ${activeMatch.status === "IN_PROGRESS" ? "bg-yellow-500 text-yellow-900" : "bg-orange-400/30 text-orange-100"
+                        <span className={`text-xs font-bold px-3 py-1 rounded-full ${activeMatch.status === "IN_PROGRESS" ? "bg-yellow-500 text-yellow-300" : "bg-orange-400/30 text-orange-100"
                           }`}>
                           {activeMatch.status === "IN_PROGRESS" ? "LIVE" : activeMatch.status}
                         </span>
@@ -1288,28 +1439,28 @@ export default function MDirectKnockout() {
 
                   {/* Scoreboard Table */}
                   <div className="px-6 pt-4">
-                    <div className="border border-gray-200 rounded-xl overflow-hidden">
+                    <div className="border border-white/[0.06] rounded-xl overflow-hidden">
                       {/* Header Row */}
-                      <div className="grid bg-gray-50 border-b border-gray-200" style={{ gridTemplateColumns: `1fr repeat(${maxSets}, 56px) 60px` }}>
+                      <div className="grid bg-white/[0.04] border-b border-white/[0.06]" style={{ gridTemplateColumns: `1fr repeat(${maxSets}, 56px) 60px` }}>
                         <div className="px-4 py-2.5 text-xs font-bold text-gray-500 uppercase">Player</div>
                         {Array.from({ length: maxSets }, (_, i) => (
-                          <div key={i} className={`text-center py-2.5 text-xs font-bold border-l border-gray-200 ${(activeMatch.currentSet || 1) === i + 1 ? "bg-orange-50 text-orange-600" : "text-gray-400"
+                          <div key={i} className={`text-center py-2.5 text-xs font-bold border-l border-white/[0.06] ${(activeMatch.currentSet || 1) === i + 1 ? "bg-orange-500/10 text-orange-400" : "text-gray-400"
                             }`}>
                             S{i + 1}
                           </div>
                         ))}
-                        <div className="text-center py-2.5 text-xs font-bold text-gray-700 border-l-2 border-gray-300 bg-gray-100">
+                        <div className="text-center py-2.5 text-xs font-bold text-gray-300 border-l-2 border-white/[0.10] bg-white/[0.06]">
                           SETS
                         </div>
                       </div>
 
                       {/* Player 1 Row */}
-                      <div className="grid border-b border-gray-100" style={{ gridTemplateColumns: `1fr repeat(${maxSets}, 56px) 60px` }}>
+                      <div className="grid border-b border-white/[0.06]" style={{ gridTemplateColumns: `1fr repeat(${maxSets}, 56px) 60px` }}>
                         <div className="px-4 py-3 flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center text-sm font-bold text-orange-600 flex-shrink-0">
+                          <div className="w-8 h-8 rounded-full bg-orange-500/20 flex items-center justify-center text-sm font-bold text-orange-400 flex-shrink-0">
                             {p1Name[0]}
                           </div>
-                          <span className="text-sm font-semibold text-gray-900 truncate">{p1Name}</span>
+                          <span className="text-sm font-semibold text-white truncate">{p1Name}</span>
                         </div>
                         {Array.from({ length: maxSets }, (_, i) => {
                           const set = sets[i];
@@ -1319,16 +1470,16 @@ export default function MDirectKnockout() {
                           const isLoser = set?.status === "COMPLETED" && !isWinner;
 
                           return (
-                            <div key={i} className={`text-center py-3 text-sm font-bold border-l border-gray-200 ${isCurrentSet ? "bg-orange-50 text-orange-600 animate-pulse" :
-                                isWinner ? "bg-green-50 text-green-700" :
+                            <div key={i} className={`text-center py-3 text-sm font-bold border-l border-white/[0.06] ${isCurrentSet ? "bg-orange-500/10 text-orange-400 animate-pulse" :
+                                isWinner ? "bg-emerald-500/10 text-emerald-300" :
                                   isLoser ? "text-red-400" :
-                                    !set ? "text-gray-300" : "text-gray-600"
+                                    !set ? "text-gray-300" : "text-gray-400"
                               }`}>
                               {set ? p1GamesWon : "-"}
                             </div>
                           );
                         })}
-                        <div className={`text-center py-3 text-lg font-black border-l-2 border-gray-300 ${p1SetsWon >= setsToWin ? "bg-green-100 text-green-700" : "text-gray-800"
+                        <div className={`text-center py-3 text-lg font-black border-l-2 border-white/[0.10] ${p1SetsWon >= setsToWin ? "bg-emerald-500/20 text-emerald-300" : "text-gray-100"
                           }`}>
                           {p1SetsWon}
                         </div>
@@ -1337,10 +1488,10 @@ export default function MDirectKnockout() {
                       {/* Player 2 Row */}
                       <div className="grid" style={{ gridTemplateColumns: `1fr repeat(${maxSets}, 56px) 60px` }}>
                         <div className="px-4 py-3 flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center text-sm font-bold text-orange-700 flex-shrink-0">
+                          <div className="w-8 h-8 rounded-full bg-orange-500/20 flex items-center justify-center text-sm font-bold text-orange-300 flex-shrink-0">
                             {p2Name[0]}
                           </div>
-                          <span className="text-sm font-semibold text-gray-900 truncate">{p2Name}</span>
+                          <span className="text-sm font-semibold text-white truncate">{p2Name}</span>
                         </div>
                         {Array.from({ length: maxSets }, (_, i) => {
                           const set = sets[i];
@@ -1350,16 +1501,16 @@ export default function MDirectKnockout() {
                           const isLoser = set?.status === "COMPLETED" && !isWinner;
 
                           return (
-                            <div key={i} className={`text-center py-3 text-sm font-bold border-l border-gray-200 ${isCurrentSet ? "bg-orange-50 text-orange-700 animate-pulse" :
-                                isWinner ? "bg-green-50 text-green-700" :
+                            <div key={i} className={`text-center py-3 text-sm font-bold border-l border-white/[0.06] ${isCurrentSet ? "bg-orange-500/10 text-orange-300 animate-pulse" :
+                                isWinner ? "bg-emerald-500/10 text-emerald-300" :
                                   isLoser ? "text-red-400" :
-                                    !set ? "text-gray-300" : "text-gray-600"
+                                    !set ? "text-gray-300" : "text-gray-400"
                               }`}>
                               {set ? p2GamesWon : "-"}
                             </div>
                           );
                         })}
-                        <div className={`text-center py-3 text-lg font-black border-l-2 border-gray-300 ${p2SetsWon >= setsToWin ? "bg-green-100 text-green-700" : "text-gray-800"
+                        <div className={`text-center py-3 text-lg font-black border-l-2 border-white/[0.10] ${p2SetsWon >= setsToWin ? "bg-emerald-500/20 text-emerald-300" : "text-gray-100"
                           }`}>
                           {p2SetsWon}
                         </div>
@@ -1373,17 +1524,17 @@ export default function MDirectKnockout() {
                         <div className="flex flex-wrap gap-2">
                           {sets.map((set) => (
                             <div key={set.setNumber} className={`border rounded-lg px-3 py-2 text-center min-w-[80px] ${set.status === "COMPLETED"
-                                ? set.winner?.playerName === p1Name ? "border-orange-200 bg-orange-50" : "border-orange-200 bg-orange-50"
-                                : "border-gray-200 bg-gray-50"
+                                ? set.winner?.playerName === p1Name ? "border-orange-200 bg-orange-500/10" : "border-orange-200 bg-orange-500/10"
+                                : "border-white/[0.06] bg-white/[0.04]"
                               }`}>
                               <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Set {set.setNumber}</p>
                               {set.games?.map((game) => (
-                                <p key={game.gameNumber} className="text-xs font-mono font-bold text-gray-700">
+                                <p key={game.gameNumber} className="text-xs font-mono font-bold text-gray-300">
                                   {game.finalScore?.player1 || 0} - {game.finalScore?.player2 || 0}
                                 </p>
                               ))}
                               {set.winner && (
-                                <p className={`text-[9px] font-bold mt-1 ${set.winner.playerName === p1Name ? "text-orange-500" : "text-orange-600"
+                                <p className={`text-[9px] font-bold mt-1 ${set.winner.playerName === p1Name ? "text-orange-500" : "text-orange-400"
                                   }`}>
                                   {set.winner.playerName?.split(" ")[0]}
                                 </p>
@@ -1397,7 +1548,7 @@ export default function MDirectKnockout() {
 
                   {/* Score Input */}
                   {activeMatch.status !== "COMPLETED" && (
-                    <div className="px-6 py-4 border-t border-gray-100 mt-4 bg-gray-50">
+                    <div className="px-6 py-4 border-t border-white/[0.06] mt-4 bg-white/[0.04]">
                       <p className="text-xs font-bold text-gray-500 uppercase mb-3">
                         Enter Game Score — Set {activeMatch.currentSet || 1}, Game {activeMatch.currentGame || 1}
                       </p>
@@ -1410,19 +1561,19 @@ export default function MDirectKnockout() {
                             value={p1Score}
                             onChange={(e) => setP1Score(e.target.value)}
                             placeholder="0"
-                            className="w-full text-center text-2xl font-bold py-3 border-2 border-orange-200 rounded-xl focus:border-orange-500 focus:ring-2 focus:ring-orange-200 bg-white"
+                            className="w-full text-center text-2xl font-bold py-3 border-2 border-orange-500/40 rounded-xl focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30 text-white bg-[#12141B]"
                           />
                         </div>
                         <div className="text-gray-400 font-bold text-lg pt-5">vs</div>
                         <div className="flex-1">
-                          <label className="text-[10px] font-bold text-orange-600 uppercase mb-1 block">{p2Name.split(" ")[0]}</label>
+                          <label className="text-[10px] font-bold text-orange-400 uppercase mb-1 block">{p2Name.split(" ")[0]}</label>
                           <input
                             type="number"
                             min="0"
                             value={p2Score}
                             onChange={(e) => setP2Score(e.target.value)}
                             placeholder="0"
-                            className="w-full text-center text-2xl font-bold py-3 border-2 border-orange-200 rounded-xl focus:border-orange-500 focus:ring-2 focus:ring-orange-200 bg-white"
+                            className="w-full text-center text-2xl font-bold py-3 border-2 border-orange-500/40 rounded-xl focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30 text-white bg-[#12141B]"
                           />
                         </div>
                         <button
@@ -1498,7 +1649,7 @@ export default function MDirectKnockout() {
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setDetailMatch(null)}>
-            <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-[#181A22] rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
               {/* Header */}
               <div className={`px-6 py-4 text-white ${isCompleted ? "bg-gradient-to-r from-green-600 to-emerald-600" : "bg-gradient-to-r from-orange-500 to-[#0059aa]"}`}>
                 <div className="flex justify-between items-start">
@@ -1513,7 +1664,7 @@ export default function MDirectKnockout() {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className={`text-xs font-bold px-3 py-1 rounded-full ${
-                      isCompleted ? "bg-white/20" : dm.status === "IN_PROGRESS" ? "bg-yellow-500 text-yellow-900" : "bg-white/20"
+                      isCompleted ? "bg-white/20" : dm.status === "IN_PROGRESS" ? "bg-yellow-500 text-yellow-300" : "bg-white/20"
                     }`}>
                       {isBye ? "BYE" : dm.status}
                     </span>
@@ -1527,20 +1678,20 @@ export default function MDirectKnockout() {
               <div className="overflow-y-auto flex-1 p-6 space-y-5">
                 {/* Match Info Cards */}
                 <div className="grid grid-cols-3 gap-3">
-                  <div className="bg-gray-50 rounded-lg p-3 text-center">
+                  <div className="bg-white/[0.04] rounded-lg p-3 text-center">
                     <p className="text-[10px] text-gray-400 uppercase font-bold">Court</p>
-                    <p className="text-lg font-bold text-gray-800">{dm.courtNumber || "TBD"}</p>
+                    <p className="text-lg font-bold text-gray-100">{dm.courtNumber || "TBD"}</p>
                   </div>
-                  <div className="bg-gray-50 rounded-lg p-3 text-center">
+                  <div className="bg-white/[0.04] rounded-lg p-3 text-center">
                     <p className="text-[10px] text-gray-400 uppercase font-bold">Time</p>
-                    <p className="text-sm font-bold text-gray-800">
+                    <p className="text-sm font-bold text-gray-100">
                       {dm.matchStartTime ? new Date(dm.matchStartTime).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "TBD"}
                       {dm.matchEndTime && ` → ${new Date(dm.matchEndTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`}
                     </p>
                   </div>
-                  <div className="bg-gray-50 rounded-lg p-3 text-center">
+                  <div className="bg-white/[0.04] rounded-lg p-3 text-center">
                     <p className="text-[10px] text-gray-400 uppercase font-bold">Bracket</p>
-                    <p className="text-lg font-bold text-gray-800">{dm.bracketPosition || "-"}</p>
+                    <p className="text-lg font-bold text-gray-100">{dm.bracketPosition || "-"}</p>
                   </div>
                 </div>
                 {[3, 5, 7].includes(dm.matchFormat?.totalSets) && (
@@ -1553,8 +1704,8 @@ export default function MDirectKnockout() {
 
                 {/* BYE Notice */}
                 {isBye && (
-                  <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 text-center">
-                    <p className="text-orange-700 font-semibold">{dm.notes}</p>
+                  <div className="bg-orange-500/10 border border-orange-200 rounded-xl p-4 text-center">
+                    <p className="text-orange-300 font-semibold">{dm.notes}</p>
                   </div>
                 )}
 
@@ -1562,15 +1713,15 @@ export default function MDirectKnockout() {
                 {isCompleted && dm.result?.winner && (
                   <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
-                        <Crown size={20} className="text-green-600" />
+                      <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                        <Crown size={20} className="text-emerald-400" />
                       </div>
                       <div>
-                        <p className="text-xs text-green-600 font-medium">Winner</p>
-                        <p className="font-bold text-green-800">{dm.result.winner.playerName}</p>
+                        <p className="text-xs text-emerald-400 font-medium">Winner</p>
+                        <p className="font-bold text-emerald-200">{dm.result.winner.playerName}</p>
                       </div>
                     </div>
-                    <div className="text-2xl font-black text-green-700">
+                    <div className="text-2xl font-black text-emerald-300">
                       {dm.result.finalScore?.player1Sets} - {dm.result.finalScore?.player2Sets}
                     </div>
                   </div>
@@ -1580,44 +1731,44 @@ export default function MDirectKnockout() {
                 {setsD.length > 0 && (
                   <div>
                     <h4 className="text-xs font-bold text-gray-500 uppercase mb-2">Scoreboard</h4>
-                    <div className="border border-gray-200 rounded-xl overflow-hidden">
+                    <div className="border border-white/[0.06] rounded-xl overflow-hidden">
                       {/* Header */}
-                      <div className="grid bg-gray-50 border-b border-gray-200" style={{ gridTemplateColumns: `1fr repeat(${maxSetsD}, 50px) 55px` }}>
+                      <div className="grid bg-white/[0.04] border-b border-white/[0.06]" style={{ gridTemplateColumns: `1fr repeat(${maxSetsD}, 50px) 55px` }}>
                         <div className="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase">Player</div>
                         {Array.from({ length: maxSetsD }, (_, i) => (
-                          <div key={i} className="text-center py-2 text-[10px] font-bold text-gray-400 border-l border-gray-200">S{i + 1}</div>
+                          <div key={i} className="text-center py-2 text-[10px] font-bold text-gray-400 border-l border-white/[0.06]">S{i + 1}</div>
                         ))}
-                        <div className="text-center py-2 text-[10px] font-bold text-gray-700 border-l-2 border-gray-300 bg-gray-100">SETS</div>
+                        <div className="text-center py-2 text-[10px] font-bold text-gray-300 border-l-2 border-white/[0.10] bg-white/[0.06]">SETS</div>
                       </div>
                       {/* Player 1 */}
-                      <div className="grid border-b border-gray-100" style={{ gridTemplateColumns: `1fr repeat(${maxSetsD}, 50px) 55px` }}>
-                        <div className="px-3 py-2.5 text-sm font-semibold text-gray-900 truncate">{p1}</div>
+                      <div className="grid border-b border-white/[0.06]" style={{ gridTemplateColumns: `1fr repeat(${maxSetsD}, 50px) 55px` }}>
+                        <div className="px-3 py-2.5 text-sm font-semibold text-white truncate">{p1}</div>
                         {Array.from({ length: maxSetsD }, (_, i) => {
                           const set = setsD[i];
                           const gw = set ? (set.games || []).filter(g => g.winner?.playerName === p1).length : 0;
                           const won = set?.winner?.playerName === p1;
                           return (
-                            <div key={i} className={`text-center py-2.5 text-sm font-bold border-l border-gray-200 ${won ? "bg-green-50 text-green-700" : set?.status === "COMPLETED" ? "text-red-400" : !set ? "text-gray-300" : "text-gray-600"}`}>
+                            <div key={i} className={`text-center py-2.5 text-sm font-bold border-l border-white/[0.06] ${won ? "bg-emerald-500/10 text-emerald-300" : set?.status === "COMPLETED" ? "text-red-400" : !set ? "text-gray-300" : "text-gray-400"}`}>
                               {set ? gw : "-"}
                             </div>
                           );
                         })}
-                        <div className={`text-center py-2.5 text-lg font-black border-l-2 border-gray-300 ${p1SW >= setsToWinD ? "bg-green-100 text-green-700" : "text-gray-800"}`}>{p1SW}</div>
+                        <div className={`text-center py-2.5 text-lg font-black border-l-2 border-white/[0.10] ${p1SW >= setsToWinD ? "bg-emerald-500/20 text-emerald-300" : "text-gray-100"}`}>{p1SW}</div>
                       </div>
                       {/* Player 2 */}
                       <div className="grid" style={{ gridTemplateColumns: `1fr repeat(${maxSetsD}, 50px) 55px` }}>
-                        <div className="px-3 py-2.5 text-sm font-semibold text-gray-900 truncate">{p2}</div>
+                        <div className="px-3 py-2.5 text-sm font-semibold text-white truncate">{p2}</div>
                         {Array.from({ length: maxSetsD }, (_, i) => {
                           const set = setsD[i];
                           const gw = set ? (set.games || []).filter(g => g.winner?.playerName === p2).length : 0;
                           const won = set?.winner?.playerName === p2;
                           return (
-                            <div key={i} className={`text-center py-2.5 text-sm font-bold border-l border-gray-200 ${won ? "bg-green-50 text-green-700" : set?.status === "COMPLETED" ? "text-red-400" : !set ? "text-gray-300" : "text-gray-600"}`}>
+                            <div key={i} className={`text-center py-2.5 text-sm font-bold border-l border-white/[0.06] ${won ? "bg-emerald-500/10 text-emerald-300" : set?.status === "COMPLETED" ? "text-red-400" : !set ? "text-gray-300" : "text-gray-400"}`}>
                               {set ? gw : "-"}
                             </div>
                           );
                         })}
-                        <div className={`text-center py-2.5 text-lg font-black border-l-2 border-gray-300 ${p2SW >= setsToWinD ? "bg-green-100 text-green-700" : "text-gray-800"}`}>{p2SW}</div>
+                        <div className={`text-center py-2.5 text-lg font-black border-l-2 border-white/[0.10] ${p2SW >= setsToWinD ? "bg-emerald-500/20 text-emerald-300" : "text-gray-100"}`}>{p2SW}</div>
                       </div>
                     </div>
                   </div>
@@ -1630,7 +1781,7 @@ export default function MDirectKnockout() {
                     <div className="grid grid-cols-5 gap-2">
                       {setsD.map((set) => (
                         <div key={set.setNumber} className={`border rounded-xl p-3 ${
-                          set.winner?.playerName === p1 ? "border-orange-200 bg-orange-50/50" : set.winner?.playerName === p2 ? "border-orange-200 bg-orange-50/50" : "border-gray-200 bg-gray-50"
+                          set.winner?.playerName === p1 ? "border-orange-200 bg-orange-500/10" : set.winner?.playerName === p2 ? "border-orange-200 bg-orange-500/10" : "border-white/[0.06] bg-white/[0.04]"
                         }`}>
                           <p className="text-[10px] font-bold text-gray-400 uppercase text-center mb-2">Set {set.setNumber}</p>
                           <div className="space-y-1">
@@ -1638,16 +1789,16 @@ export default function MDirectKnockout() {
                               const p1Won = game.winner?.playerName === p1;
                               return (
                                 <div key={game.gameNumber} className="flex justify-center items-center gap-1 text-xs font-mono">
-                                  <span className={`font-bold ${p1Won ? "text-green-700" : "text-red-400"}`}>{game.finalScore?.player1 ?? 0}</span>
+                                  <span className={`font-bold ${p1Won ? "text-emerald-300" : "text-red-400"}`}>{game.finalScore?.player1 ?? 0}</span>
                                   <span className="text-gray-300">-</span>
-                                  <span className={`font-bold ${!p1Won ? "text-green-700" : "text-red-400"}`}>{game.finalScore?.player2 ?? 0}</span>
+                                  <span className={`font-bold ${!p1Won ? "text-emerald-300" : "text-red-400"}`}>{game.finalScore?.player2 ?? 0}</span>
                                 </div>
                               );
                             })}
                           </div>
                           {set.winner && (
                             <p className={`text-[9px] font-bold mt-2 text-center ${
-                              set.winner.playerName === p1 ? "text-orange-500" : "text-orange-600"
+                              set.winner.playerName === p1 ? "text-orange-500" : "text-orange-400"
                             }`}>
                               {set.winner.playerName?.split(" ")[0]}
                             </p>
@@ -1669,15 +1820,15 @@ export default function MDirectKnockout() {
 
                 {/* Next Match Info */}
                 {dm.nextMatchId && (
-                  <div className="bg-gray-50 rounded-lg p-3 text-center">
+                  <div className="bg-white/[0.04] rounded-lg p-3 text-center">
                     <p className="text-[10px] text-gray-400 uppercase font-bold">Winner advances to</p>
-                    <p className="text-sm font-bold text-gray-700 mt-0.5">{dm.nextMatchId.replace(`DK-${tournamentId}-`, "").replace("R", "Round ").replace("M", " Match ")}</p>
+                    <p className="text-sm font-bold text-gray-300 mt-0.5">{dm.nextMatchId.replace(`DK-${tournamentId}-`, "").replace("R", "Round ").replace("M", " Match ")}</p>
                   </div>
                 )}
               </div>
 
               {/* Footer Actions */}
-              <div className="border-t border-gray-200 px-6 py-3 flex justify-between items-center bg-gray-50">
+              <div className="border-t border-white/[0.06] px-6 py-3 flex justify-between items-center bg-white/[0.04]">
                 {!isCompleted && !isBye && dm.player1?.playerName && dm.player1.playerName !== "TBD" && dm.player2?.playerName && dm.player2.playerName !== "TBD" && (
                   <button
                     onClick={() => {
@@ -1692,7 +1843,7 @@ export default function MDirectKnockout() {
                 )}
                 <button
                   onClick={() => setDetailMatch(null)}
-                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 w-auto ml-auto"
+                  className="px-4 py-2 bg-white/[0.08] text-gray-300 rounded-lg text-sm font-medium hover:bg-white/[0.12] w-auto ml-auto"
                 >
                   Close
                 </button>

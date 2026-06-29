@@ -9,6 +9,8 @@ import Psettings from "./Player/Psettings";
 import PTurfdetails from "./Player/PTurf-details";
 import PTurfbook from "./Player/PTurf-book";
 import PProfile from "./Player/PProfile";
+import PSocial from "./Player/PSocial";
+import PNews from "./Player/PNews";
 
 const PlayerApp = () => {
   return (
@@ -41,6 +43,8 @@ const PlayerApp = () => {
           />
           <Route path="/turfs/:turfId/book" element={<PTurfbook />} />
           <Route path="/pprofile" element={<PProfile />} />
+          <Route path="/psocial" element={<PSocial />} />
+          <Route path="/pnews" element={<PNews />} />
 
         </Route>
       </Route>

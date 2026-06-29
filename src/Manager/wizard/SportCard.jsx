@@ -366,6 +366,14 @@ export default function SportCard({
   const tournamentLevel = sport.tournamentLevel || "";
   const isTeam = isTeamOnlySport(sport.sportName);
   const isIndividual = isIndividualOnlySport(sport.sportName);
+  // Football (a team sport) offers real football formats: League (round-robin),
+  // Single Knockout, or Group + Knockout — not Davis Cup / Singles-Doubles.
+  const isFootball = /football|soccer/i.test(sport.sportName || "");
+  const footballCard = !isFootball ? null
+    : sport.type === "group stage" ? "league"
+    : sport.type === "knockout + group stage" ? "groupKO"
+    : sport.type === "knockout" ? "knockout"
+    : null;
 
   const selectedTypeCard = (() => {
     const t = sport.type || "";
@@ -706,42 +714,70 @@ export default function SportCard({
             {sport.sportName && (
               <div>
                 <FieldLabel>Tournament type</FieldLabel>
-                {isTeam && (
+                {isTeam && !isFootball && (
                   <p className="text-[12px] text-gray-300 bg-white/[0.03] border border-white/[0.08] rounded-lg p-2.5 mb-2">
                     {sport.sportName} uses Team Knockout format.
                   </p>
                 )}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                  {!isTeam && (
-                    <OptionCard
-                      icon="🏆"
-                      title="Group stage + knockout"
-                      description="Round-robin groups then elimination bracket"
-                      selected={selectedTypeCard === "groupKO"}
-                      onClick={() => selectTypeCard("groupKO")}
-                    />
-                  )}
-                  {!isTeam && (
-                    <OptionCard
-                      icon="⚡"
-                      title="Knockout only"
-                      description="Direct elimination bracket"
-                      selected={selectedTypeCard === "knockout"}
-                      onClick={() => selectTypeCard("knockout")}
-                    />
-                  )}
-                  {!isIndividual && (
-                    <OptionCard
-                      icon="🛡"
-                      title={isTeam ? "Teams knockout" : "Team knockout"}
-                      description={
-                        isTeam
-                          ? "Team-vs-team elimination bracket"
-                          : "Davis Cup singles + doubles format"
-                      }
-                      selected={selectedTypeCard === "team"}
-                      onClick={() => selectTypeCard("team")}
-                    />
+                  {isFootball ? (
+                    <>
+                      <OptionCard
+                        icon="📋"
+                        title="League"
+                        description="Round-robin — every team plays every team"
+                        selected={footballCard === "league"}
+                        onClick={() => onUpdate({ type: "group stage", knockoutFormat: null, groupStageFormat: "Singles" })}
+                      />
+                      <OptionCard
+                        icon="⚡"
+                        title="Single knockout"
+                        description="Direct team-vs-team elimination bracket"
+                        selected={footballCard === "knockout"}
+                        onClick={() => onUpdate({ type: "knockout", knockoutFormat: "Teams Knockout", groupStageFormat: null })}
+                      />
+                      <OptionCard
+                        icon="🏆"
+                        title="Group + knockout"
+                        description="Round-robin groups, then knockout bracket"
+                        selected={footballCard === "groupKO"}
+                        onClick={() => onUpdate({ type: "knockout + group stage", knockoutFormat: "Teams Knockout", groupStageFormat: "Singles" })}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      {!isTeam && (
+                        <OptionCard
+                          icon="🏆"
+                          title="Group stage + knockout"
+                          description="Round-robin groups then elimination bracket"
+                          selected={selectedTypeCard === "groupKO"}
+                          onClick={() => selectTypeCard("groupKO")}
+                        />
+                      )}
+                      {!isTeam && (
+                        <OptionCard
+                          icon="⚡"
+                          title="Knockout only"
+                          description="Direct elimination bracket"
+                          selected={selectedTypeCard === "knockout"}
+                          onClick={() => selectTypeCard("knockout")}
+                        />
+                      )}
+                      {!isIndividual && (
+                        <OptionCard
+                          icon="🛡"
+                          title={isTeam ? "Teams knockout" : "Team knockout"}
+                          description={
+                            isTeam
+                              ? "Team-vs-team elimination bracket"
+                              : "Davis Cup singles + doubles format"
+                          }
+                          selected={selectedTypeCard === "team"}
+                          onClick={() => selectTypeCard("team")}
+                        />
+                      )}
+                    </>
                   )}
                 </div>
                 {errors.type && (
@@ -899,7 +935,59 @@ export default function SportCard({
             </DashedAddButton>
           </div>
 
-          {!!(sport.sportName && selectedTypeCard) && (
+          {/* Football: format-specific config (no Singles/Doubles — it's teams). */}
+          {isFootball && footballCard && (
+            <div className="space-y-3.5 pt-1">
+              {footballCard === "league" && (
+                <div className="bg-white/[0.03] border border-white/[0.08] rounded-lg px-3 py-2.5">
+                  <p className="text-[11px] text-gray-300">
+                    Every team plays every other team once. Final standings by points
+                    (3 win / 1 draw / 0 loss), then head-to-head, then goal difference.
+                  </p>
+                </div>
+              )}
+              {footballCard === "groupKO" && (
+                <div>
+                  <FieldLabel htmlFor={`qpg-${sport._key}`}>Qualify per group</FieldLabel>
+                  <Select
+                    id={`qpg-${sport._key}`}
+                    value={String(sport.qualifyPerGroup ?? 2)}
+                    onChange={(e) => onUpdate({ qualifyPerGroup: Number(e.target.value) })}
+                    options={[
+                      { value: "1", label: "Top 1" },
+                      { value: "2", label: "Top 2" },
+                      { value: "3", label: "Top 3" },
+                      { value: "4", label: "Top 4" },
+                    ]}
+                  />
+                  <p className="text-[11px] text-gray-400 mt-1.5">
+                    Top N teams from each group advance to a team-vs-team knockout bracket.
+                  </p>
+                </div>
+              )}
+              {footballCard === "knockout" && (
+                <div>
+                  <FieldLabel htmlFor={`drawsize-fb-${sport._key}`}>Draw size</FieldLabel>
+                  <Select
+                    id={`drawsize-fb-${sport._key}`}
+                    value={sport.drawSize == null ? "" : String(sport.drawSize)}
+                    onChange={(e) => onUpdate({ drawSize: e.target.value === "" ? null : Number(e.target.value) })}
+                    options={[
+                      { value: "", label: "Auto" },
+                      { value: "8", label: "8" },
+                      { value: "16", label: "16" },
+                      { value: "32", label: "32" },
+                    ]}
+                  />
+                  <p className="text-[11px] text-gray-400 mt-1.5">
+                    Single-elimination bracket. A level knockout match is decided on penalties.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {!!(sport.sportName && selectedTypeCard && !isFootball) && (
             <div>
               {selectedTypeCard === "groupKO" && (
                 <div className="space-y-3.5 pt-1">

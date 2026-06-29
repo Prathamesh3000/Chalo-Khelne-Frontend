@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { AuthContext } from "../context/AuthContext";
 import {
   Plus,
   Search,
@@ -63,7 +64,38 @@ const emptyForm = {
   expiryDate: "",
 };
 
-export default function MNews() {
+/**
+ * Unified News module — used by every role.
+ *  - canManage=true  → full management (create / edit / publish / delete)
+ *  - canManage=false → read-only reader (published news only)
+ * createdByModel is derived from the signed-in role so the backend ref is valid
+ * for both User-collection roles and Managers.
+ */
+export default function MNews({ canManage = true, dark = false }) {
+  const { auth } = useContext(AuthContext);
+  const role = String(auth?.role || "").toLowerCase();
+  const creatorModel = role === "manager" ? "Manager" : "User";
+  const creatorName = auth?.name || "User";
+
+  // Theme tokens — light (default) or dark (dashboard shells), matching the
+  // Social module's dark surfaces. Colours unchanged otherwise.
+  const t = dark
+    ? {
+        title: "text-white", sub: "text-gray-400",
+        card: "bg-[#181A22] border border-white/[0.06] hover:border-white/[0.12]",
+        cardTitle: "text-white", cardBody: "text-gray-400", meta: "text-gray-500",
+        tabActive: "bg-orange-500 text-white", tabIdle: "bg-white/[0.06] text-gray-300 hover:bg-white/[0.1]",
+        empty: "bg-[#181A22] border border-white/[0.06]", emptyIcon: "text-gray-700", emptyTitle: "text-gray-300",
+        pageBtn: "bg-white/[0.06] text-gray-300 hover:bg-white/[0.1]", pageNum: "text-gray-400",
+      }
+    : {
+        title: "text-gray-900", sub: "text-gray-500",
+        card: "bg-white border border-gray-200 hover:shadow-md",
+        cardTitle: "text-gray-900", cardBody: "text-gray-500", meta: "text-gray-400",
+        tabActive: "bg-gray-900 text-white", tabIdle: "bg-gray-100 text-gray-500 hover:bg-gray-200",
+        empty: "bg-white border border-gray-200", emptyIcon: "text-gray-200", emptyTitle: "text-gray-400",
+        pageBtn: "bg-gray-100 text-gray-600 hover:bg-gray-200", pageNum: "text-gray-400",
+      };
   const [newsList, setNewsList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
@@ -78,13 +110,13 @@ export default function MNews() {
 
   const token = localStorage.getItem("token");
   const headers = { Authorization: `Bearer ${token}` };
-  const userName = localStorage.getItem("userName") || "Manager";
 
   const fetchNews = async (page = 1) => {
     setLoading(true);
     try {
       const params = new URLSearchParams({ page, limit: 12 });
       if (activeFilter) params.append("status", activeFilter);
+      else if (!canManage) params.append("status", "Published"); // readers see published only
 
       const res = await axios.get(`${API}/news?${params}`, { headers });
       setNewsList(res.data.data || []);
@@ -134,8 +166,8 @@ export default function MNews() {
     try {
       const payload = {
         ...form,
-        createdByModel: "Manager",
-        createdByName: userName,
+        createdByModel: creatorModel,
+        createdByName: creatorName,
       };
 
       if (modalMode === "create") {
@@ -192,37 +224,39 @@ export default function MNews() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-black italic uppercase tracking-tighter text-gray-900">
+          <h1 className={`text-2xl font-black italic uppercase tracking-tighter ${t.title}`}>
             News & Announcements
           </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Publish updates for your tournaments and events
+          <p className={`text-sm mt-1 ${t.sub}`}>
+            {canManage ? "Publish updates for your tournaments and events" : "Latest announcements and sports news"}
           </p>
         </div>
-        <button
-          onClick={openCreate}
-          className="flex items-center gap-2 px-5 py-2.5 bg-orange-500 text-white rounded-xl font-bold text-sm hover:bg-orange-600 transition-all shadow-md shadow-orange-500/15 active:scale-95"
-        >
-          <Plus className="w-4 h-4" /> Create News
-        </button>
+        {canManage && (
+          <button
+            onClick={openCreate}
+            className="flex items-center gap-2 px-5 py-2.5 bg-orange-500 text-white rounded-xl font-bold text-sm hover:bg-orange-600 transition-all shadow-md shadow-orange-500/15 active:scale-95 w-auto"
+          >
+            <Plus className="w-4 h-4" /> Create News
+          </button>
+        )}
       </div>
 
-      {/* Quick Filters */}
-      <div className="flex gap-2">
-        {["", "Draft", "Published", "Archived"].map((f) => (
-          <button
-            key={f}
-            onClick={() => setActiveFilter(f)}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-              activeFilter === f
-                ? "bg-gray-900 text-white"
-                : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-            }`}
-          >
-            {f || "All"}
-          </button>
-        ))}
-      </div>
+      {/* Quick Filters (manage only) */}
+      {canManage && (
+        <div className="flex gap-2">
+          {["", "Draft", "Published", "Archived"].map((f) => (
+            <button
+              key={f}
+              onClick={() => setActiveFilter(f)}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all w-auto ${
+                activeFilter === f ? t.tabActive : t.tabIdle
+              }`}
+            >
+              {f || "All"}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* News List */}
       {loading ? (
@@ -230,15 +264,17 @@ export default function MNews() {
           <Loader2 className="w-7 h-7 text-orange-500 animate-spin" />
         </div>
       ) : newsList.length === 0 ? (
-        <div className="text-center py-20 bg-white rounded-2xl border border-gray-200">
-          <FileText className="w-14 h-14 text-gray-200 mx-auto mb-4" />
-          <p className="text-gray-400 font-bold">No news articles yet</p>
-          <button
-            onClick={openCreate}
-            className="mt-4 px-5 py-2 bg-orange-500 text-white rounded-xl text-sm font-bold hover:bg-orange-600 transition-all"
-          >
-            Create First Article
-          </button>
+        <div className={`text-center py-20 rounded-2xl ${t.empty}`}>
+          <FileText className={`w-14 h-14 mx-auto mb-4 ${t.emptyIcon}`} />
+          <p className={`font-bold ${t.emptyTitle}`}>No news articles yet</p>
+          {canManage && (
+            <button
+              onClick={openCreate}
+              className="mt-4 px-5 py-2 bg-orange-500 text-white rounded-xl text-sm font-bold hover:bg-orange-600 transition-all w-auto"
+            >
+              Create First Article
+            </button>
+          )}
         </div>
       ) : (
         <div className="space-y-3">
@@ -248,7 +284,7 @@ export default function MNews() {
               layout
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md transition-all"
+              className={`rounded-xl p-5 transition-all ${t.card}`}
             >
               <div className="flex flex-col sm:flex-row justify-between gap-4">
                 <div className="flex-1 space-y-2">
@@ -269,15 +305,15 @@ export default function MNews() {
                     </span>
                   </div>
 
-                  <h3 className="text-lg font-bold text-gray-900 leading-tight">
+                  <h3 className={`text-lg font-bold leading-tight ${t.cardTitle}`}>
                     {news.title}
                   </h3>
 
-                  <p className="text-sm text-gray-500 line-clamp-1">
+                  <p className={`text-sm line-clamp-1 ${t.cardBody}`}>
                     {news.body}
                   </p>
 
-                  <div className="flex flex-wrap items-center gap-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                  <div className={`flex flex-wrap items-center gap-3 text-[10px] font-bold uppercase tracking-widest ${t.meta}`}>
                     <span className="flex items-center gap-1">
                       <Calendar className="w-3 h-3" />
                       {new Date(news.createdAt).toLocaleDateString("en-IN", {
@@ -296,31 +332,33 @@ export default function MNews() {
                   </div>
                 </div>
 
-                {/* Actions */}
-                <div className="flex sm:flex-col gap-2 shrink-0">
-                  <button
-                    onClick={() => openEdit(news)}
-                    className="px-3 py-2 rounded-lg text-xs font-bold bg-orange-50 text-orange-500 hover:bg-orange-100 border border-orange-200 transition-all active:scale-95"
-                  >
-                    <Edit3 className="w-3.5 h-3.5" />
-                  </button>
-                  {news.status === "Draft" && (
+                {/* Actions (manage only) */}
+                {canManage && (
+                  <div className="flex sm:flex-col gap-2 shrink-0">
                     <button
-                      onClick={() => handlePublish(news._id)}
-                      disabled={actionLoading === news._id}
-                      className="px-3 py-2 rounded-lg text-xs font-bold bg-green-50 text-green-700 hover:bg-green-100 border border-green-200 transition-all active:scale-95 disabled:opacity-50"
+                      onClick={() => openEdit(news)}
+                      className="px-3 py-2 rounded-lg text-xs font-bold bg-orange-50 text-orange-500 hover:bg-orange-100 border border-orange-200 transition-all active:scale-95 w-auto"
                     >
-                      <Send className="w-3.5 h-3.5" />
+                      <Edit3 className="w-3.5 h-3.5" />
                     </button>
-                  )}
-                  <button
-                    onClick={() => handleDelete(news._id)}
-                    disabled={actionLoading === news._id}
-                    className="px-3 py-2 rounded-lg text-xs font-bold bg-red-50 text-red-500 hover:bg-red-100 border border-red-200 transition-all active:scale-95 disabled:opacity-50"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
+                    {news.status === "Draft" && (
+                      <button
+                        onClick={() => handlePublish(news._id)}
+                        disabled={actionLoading === news._id}
+                        className="px-3 py-2 rounded-lg text-xs font-bold bg-green-50 text-green-700 hover:bg-green-100 border border-green-200 transition-all active:scale-95 disabled:opacity-50 w-auto"
+                      >
+                        <Send className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleDelete(news._id)}
+                      disabled={actionLoading === news._id}
+                      className="px-3 py-2 rounded-lg text-xs font-bold bg-red-50 text-red-500 hover:bg-red-100 border border-red-200 transition-all active:scale-95 disabled:opacity-50 w-auto"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
               </div>
             </motion.div>
           ))}
@@ -333,17 +371,17 @@ export default function MNews() {
           <button
             onClick={() => fetchNews(pagination.page - 1)}
             disabled={pagination.page <= 1}
-            className="p-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-30"
+            className={`p-2 rounded-lg disabled:opacity-30 w-auto ${t.pageBtn}`}
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
-          <span className="text-sm font-bold text-gray-400">
+          <span className={`text-sm font-bold ${t.pageNum}`}>
             {pagination.page} / {pagination.pages}
           </span>
           <button
             onClick={() => fetchNews(pagination.page + 1)}
             disabled={pagination.page >= pagination.pages}
-            className="p-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-30"
+            className={`p-2 rounded-lg disabled:opacity-30 w-auto ${t.pageBtn}`}
           >
             <ChevronRight className="w-4 h-4" />
           </button>
@@ -374,7 +412,7 @@ export default function MNews() {
                 </h2>
                 <button
                   onClick={() => setShowModal(false)}
-                  className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-all"
+                  className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-all w-auto"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -410,7 +448,7 @@ export default function MNews() {
                         key={t}
                         type="button"
                         onClick={() => setForm((p) => ({ ...p, type: t }))}
-                        className={`px-3 py-2 rounded-lg text-[11px] font-bold border transition-all ${
+                        className={`px-3 py-2 rounded-lg text-[11px] font-bold border transition-all w-auto ${
                           form.type === t
                             ? "bg-gray-900 text-white border-gray-900"
                             : "bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100"
@@ -449,7 +487,7 @@ export default function MNews() {
                         key={sport}
                         type="button"
                         onClick={() => toggleSport(sport)}
-                        className={`px-2.5 py-1 rounded-md text-[10px] font-bold border transition-all ${
+                        className={`px-2.5 py-1 rounded-md text-[10px] font-bold border transition-all w-auto ${
                           form.sports.includes(sport)
                             ? "bg-orange-500 text-white border-orange-500"
                             : "bg-gray-50 text-gray-400 border-gray-200 hover:bg-orange-50 hover:text-orange-500"
@@ -544,14 +582,14 @@ export default function MNews() {
               <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
                 <button
                   onClick={() => setShowModal(false)}
-                  className="px-5 py-2.5 rounded-xl text-sm font-bold text-gray-500 bg-white border border-gray-200 hover:bg-gray-100 transition-all active:scale-95"
+                  className="px-5 py-2.5 rounded-xl text-sm font-bold text-gray-500 bg-white border border-gray-200 hover:bg-gray-100 transition-all active:scale-95 w-auto"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSave}
                   disabled={saving || !form.title.trim() || !form.body.trim()}
-                  className="px-6 py-2.5 rounded-xl text-sm font-bold text-white bg-orange-500 hover:bg-orange-600 shadow-md shadow-orange-500/15 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2"
+                  className="px-6 py-2.5 rounded-xl text-sm font-bold text-white bg-orange-500 hover:bg-orange-600 shadow-md shadow-orange-500/15 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2 w-auto"
                 >
                   {saving ? (
                     <>

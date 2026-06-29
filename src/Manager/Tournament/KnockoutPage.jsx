@@ -31,8 +31,15 @@ export default function KnockoutPage() {
     );
   }
 
-  const kf = (getKnockoutFormat(tournament) || "").toLowerCase();
-  const dest = (kf.includes("team") || kf.includes("davis"))
+  // Route to the Davis-Cup team engine only if a real team-track exists that is
+  // NOT a time/innings sport. Football (time) / Cricket (innings) use the Direct
+  // engine even though their knockoutFormat is "Teams Knockout".
+  const _sports = Array.isArray(tournament?.sports) ? tournament.sports : [];
+  const hasDavisCupTrack = _sports.some((s) =>
+    ["Davis Cup", "Teams Knockout"].includes(s?.knockoutFormat) &&
+    !["time", "innings"].includes((s?.matchFormat?.scoringType || "").toLowerCase())
+  );
+  const dest = hasDavisCupTrack
     ? `/tournament-management/team-knockouts?tournamentId=${tournamentId}`
     : `/tournament-management/direct-knockout?tournamentId=${tournamentId}`;
   return <Navigate to={dest} replace />;

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { X, Trophy, Check, RefreshCcw, Edit } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import { Switch } from "@mui/material";
+import { getSportConfig } from "../features/scoring/sportUIConfig";
 
 const MGroupStageScoreBoard = () => {
     // Route parameters
@@ -35,6 +36,9 @@ const MGroupStageScoreBoard = () => {
 
     // Match Format Configuration (dynamically loaded from database)
     const [matchFormat, setMatchFormat] = useState(null);
+    // Sport name → drives sport-specific scoreboard terminology (Foosball=Goals,
+    // Cricket=Runs, Carrom=Boards, …) via the per-sport sportUIConfig registry.
+    const [sportName, setSportName] = useState("");
 
     // Games tracking
     const [currentSetGames, setCurrentSetGames] = useState({ playerA: 0, playerB: 0 });
@@ -161,6 +165,9 @@ const MGroupStageScoreBoard = () => {
 
                 const match = data.match;
                 if (match) {
+
+                    // Sport name for sport-specific scoreboard labels.
+                    setSportName(match.sportName || route.params.sportName || "");
 
                     // Load match format configuration - ALWAYS use database values!
                     const matchFormatFromDB = match.matchFormat || {};
@@ -742,6 +749,20 @@ const MGroupStageScoreBoard = () => {
         );
     }
 
+    // ── Sport-specific scoreboard terminology ──
+    // One registry (sportUIConfig) drives every sport's labels so each looks
+    // distinct: Foosball → "Goal"/"Game", Table Tennis → "Point"/"Set", etc.
+    const _cfg = getSportConfig(sportName);
+    const _pt = _cfg?.labels?.point || "Point";   // "Goal" | "Point"
+    const _set = _cfg?.labels?.set || "Set";      // "Game" | "Set"
+    const _ptPlural = `${_pt}s`;                   // "Goals" | "Points"
+    const _setPlural = `${_set}s`;                 // "Games" | "Sets"
+    // Show the "- Game N" sub-unit only for sports whose top unit ISN'T already a
+    // game (i.e. Table Tennis "Set" → "Set 1 - Game 1"; Foosball "Game" → "Game 1").
+    const _topLabel = _set === "Game"
+        ? `${_set} ${currentSetNumber}`
+        : `${_set} ${currentSetNumber} - Game ${currentGameNumber}`;
+
     return (
         <div className="fixed inset-0 bg-black">
             {/* Clean Header */}
@@ -749,15 +770,15 @@ const MGroupStageScoreBoard = () => {
                 <div className="flex items-center justify-between text-white">
                     {/* Match Status */}
                     <div className="text-lg md:text-xl font-semibold">
-                        Set {currentSetNumber} - Game {currentGameNumber}
+                        {_topLabel}
                     </div>
 
                     {/* Quick Rules - Only show when matchFormat is loaded */}
                     {matchFormat && (
                         <div className="hidden md:flex items-center gap-4 text-sm text-gray-300">
-                            <span>{matchFormat?.scoringType === "sets" ? `Best of ${matchFormat?.totalSets || 5}` : (matchFormat?.scoringType || "Match")}</span>
+                            <span>{`Best of ${matchFormat?.totalSets || 3} ${_setPlural}`}</span>
                             <span>•</span>
-                            <span>{matchFormat?.pointsToWinGame ? `${matchFormat.pointsToWinGame} pts/game` : ""}</span>
+                            <span>{matchFormat?.pointsToWinGame ? `${matchFormat.pointsToWinGame} ${_ptPlural.toLowerCase()}/game` : ""}</span>
                             {matchFormat?.deuceRule && (
                                 <>
                                     <span>•</span>
@@ -795,7 +816,7 @@ const MGroupStageScoreBoard = () => {
                             <div className="bg-black/80 rounded-lg p-3 text-center border border-white/20">
                                 <div className="grid grid-cols-2 gap-4 text-white">
                                     <div>
-                                        <div className="text-xs text-white/60 mb-1">Sets</div>
+                                        <div className="text-xs text-white/60 mb-1">{_setPlural}</div>
                                         <div className="text-2xl font-bold">{playerASetWins}/{matchFormat?.setsToWin || '?'}</div>
                                     </div>
                                     <div>
@@ -874,7 +895,7 @@ const MGroupStageScoreBoard = () => {
                                     <div className="text-white">{currentSetGames.playerA} - {currentSetGames.playerB}</div>
                                 </div>
                                 <div>
-                                    <div className="font-semibold">Sets</div>
+                                    <div className="font-semibold">{_setPlural}</div>
                                     <div className="text-white">{playerASetWins} - {playerBSetWins}</div>
                                 </div>
                             </div>
@@ -924,7 +945,7 @@ const MGroupStageScoreBoard = () => {
                                         <div className="text-2xl font-bold">{currentSetGames.playerB}/{matchFormat?.gamesToWin || '?'}</div>
                                     </div>
                                     <div>
-                                        <div className="text-xs text-white/60 mb-1">Sets</div>
+                                        <div className="text-xs text-white/60 mb-1">{_setPlural}</div>
                                         <div className="text-2xl font-bold">{playerBSetWins}/{matchFormat?.setsToWin || '?'}</div>
                                     </div>
                                 </div>
@@ -1002,7 +1023,7 @@ const MGroupStageScoreBoard = () => {
                             <div className="bg-gray-800 p-6 rounded-xl border border-gray-700">
                                 <div className="flex justify-between items-center mb-4">
                                     <h3 className="text-lg font-semibold text-orange-400">Game Scores</h3>
-                                    <span className="text-xs text-gray-400">Set {currentSetNumber}</span>
+                                    <span className="text-xs text-gray-400">{_set} {currentSetNumber}</span>
                                 </div>
 
                                 <div className="space-y-4">
@@ -1018,7 +1039,7 @@ const MGroupStageScoreBoard = () => {
                                             <div className="col-span-3">
                                                 <input
                                                     type="number"
-                                                    placeholder="Points"
+                                                    placeholder={_ptPlural}
                                                     value={game.a}
                                                     onChange={(e) => handleManualGameChange(index, 'a', e.target.value)}
                                                     className="w-full bg-gray-800 text-white text-center px-2 py-2 rounded border border-gray-700 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 focus:outline-none transition-all placeholder:text-gray-600"
@@ -1028,7 +1049,7 @@ const MGroupStageScoreBoard = () => {
                                             <div className="col-span-3">
                                                 <input
                                                     type="number"
-                                                    placeholder="Points"
+                                                    placeholder={_ptPlural}
                                                     value={game.b}
                                                     onChange={(e) => handleManualGameChange(index, 'b', e.target.value)}
                                                     className="w-full bg-gray-800 text-white text-center px-2 py-2 rounded border border-gray-700 focus:border-red-500 focus:ring-1 focus:ring-red-500 focus:outline-none transition-all placeholder:text-gray-600"
@@ -1084,10 +1105,10 @@ const MGroupStageScoreBoard = () => {
                                         <div className="grid grid-cols-2 gap-4">
                                             <div className="bg-gray-900/50 p-3 rounded-lg text-center">
                                                 <div className="text-[10px] text-gray-500 uppercase font-bold mb-1">Format</div>
-                                                <div className="text-white text-sm font-medium">{matchFormat?.scoringType === "sets" ? `Best of ${matchFormat?.totalSets || 5}` : (matchFormat?.scoringType || "Match")}</div>
+                                                <div className="text-white text-sm font-medium">{`Best of ${matchFormat?.totalSets || 3} ${_setPlural}`}</div>
                                             </div>
                                             <div className="bg-gray-900/50 p-3 rounded-lg text-center">
-                                                <div className="text-[10px] text-gray-500 uppercase font-bold mb-1">Set Score</div>
+                                                <div className="text-[10px] text-gray-500 uppercase font-bold mb-1">{_set} Score</div>
                                                 <div className="text-white text-sm font-medium">{currentSetGames.playerA} - {currentSetGames.playerB}</div>
                                             </div>
                                         </div>
@@ -1098,13 +1119,13 @@ const MGroupStageScoreBoard = () => {
                                 <div className="bg-gray-800 p-6 rounded-xl border border-gray-700">
                                     <h3 className="text-lg font-semibold text-green-400 mb-4 flex items-center gap-2">
                                         <RefreshCcw className="w-5 h-5" />
-                                        Set History
+                                        {_set} History
                                     </h3>
                                     <div className="flex flex-wrap gap-3">
                                         {completedSets.length > 0 ? (
                                             completedSets.map((set, index) => (
                                                 <div key={index} className="bg-gray-900 px-4 py-3 rounded-lg border border-gray-700 text-center min-w-[70px]">
-                                                    <div className="text-xs text-gray-500 mb-1">Set {index + 1}</div>
+                                                    <div className="text-xs text-gray-500 mb-1">{_set} {index + 1}</div>
                                                     <div className="text-lg font-bold">
                                                         <span className="text-orange-400">{set[0]}</span>
                                                         <span className="text-white/20 mx-1">-</span>
@@ -1113,7 +1134,7 @@ const MGroupStageScoreBoard = () => {
                                                 </div>
                                             ))
                                         ) : (
-                                            <div className="text-gray-500 text-sm italic py-2">No completed sets yet</div>
+                                            <div className="text-gray-500 text-sm italic py-2">No completed {_setPlural.toLowerCase()} yet</div>
                                         )}
                                     </div>
 
@@ -1123,7 +1144,7 @@ const MGroupStageScoreBoard = () => {
                                             className="w-full mt-6 py-2 rounded-lg border border-gray-600 text-gray-400 text-sm hover:bg-gray-700 hover:text-white transition-all flex items-center justify-center gap-2"
                                         >
                                             <RefreshCcw className="w-4 h-4" />
-                                            Reset Current Points
+                                            Reset Current {_ptPlural}
                                         </button>
                                     )}
                                 </div>

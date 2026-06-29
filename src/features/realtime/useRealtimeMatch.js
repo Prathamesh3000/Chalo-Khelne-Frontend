@@ -30,6 +30,8 @@ export default function useRealtimeMatch(matchId) {
           // STEP 17b.iii — emit canonical sportName (not legacy sportsType).
           ...(data.scoringType && { matchFormat: { ...(data.matchFormat || {}), scoringType: data.scoringType } }),
           ...(data.sportName && { sportName: data.sportName }),
+          // Cricket/carrom carry the latest result subdoc so finalScore renders live
+          ...(data.result && { result: data.result }),
         };
 
         queryClient.setQueryData(["liveMatch", matchId], (old) => {

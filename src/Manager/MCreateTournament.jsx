@@ -848,8 +848,16 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
                 : "any",
             };
           }),
-          groupStageFormat: String(s.type || "").includes("group stage") ? s.groupStageFormat : null,
-          knockoutFormat: String(s.type || "").includes("knockout") ? s.knockoutFormat : null,
+          // Default to "Singles" (the same fallback the format-picker uses) so a
+          // group-stage / knockout tournament can never save with a null format
+          // just because the manager didn't touch the dropdown. Only null it out
+          // when the format genuinely doesn't apply to the chosen type.
+          groupStageFormat: String(s.type || "").includes("group stage")
+            ? (s.groupStageFormat || "Singles")
+            : null,
+          knockoutFormat: String(s.type || "").includes("knockout")
+            ? (s.knockoutFormat || "Singles")
+            : null,
           davisCupFormatId: s.davisCupFormatId || null,
           qualifyPerGroup: Number(s.qualifyPerGroup || 2),
           drawSize: s.drawSize ? Number(s.drawSize) : null,
