@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 import {
@@ -10,24 +10,55 @@ const initialForm = {
   name: "", email: "", phone: "", designation: "Admin",
   orgType: "club",
   clubName: "", sports: "", city: "", area: "", address: "",
+  agencyId: "", // Event OS: optionally place this account under an agency
 };
 
 export default function CreateClubAdmin() {
   const [formData, setFormData] = useState(initialForm);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [generatedCredentials, setGeneratedCredentials] = useState(null);
+  const [agencies, setAgencies] = useState([]);
+
+  useEffect(() => {
+    axios.get("/api/agency").then((r) => setAgencies(r.data.agencies || [])).catch(() => {});
+  }, []);
 
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+
+  // Corporate + Agency + facility Club use a minimal org form (no area/address/sports required).
+  const minimalOrg = formData.orgType === "corporate" || formData.orgType === "agency" || formData.orgType === "facility";
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
     try {
       const isCorporate = formData.orgType === "corporate";
-      // A corporate admin is a different role (corporate_admin) with its own
-      // onboarding + profile — route there and map the form fields.
-      const url = isCorporate ? "/api/corporate/onboard" : "/api/clubadminprofile/onboard";
-      const payload = isCorporate
+      const isAgency = formData.orgType === "agency";
+      const isFacility = formData.orgType === "facility";
+      // Route by account type. Agency = tournament-agency (AgencyAdmin → Event OS);
+      // facility = facility-business Club (club_admin → Club OS); corporate = corporate_admin;
+      // else club/school/organization (academy ClubAdmin).
+      const url = isAgency
+        ? "/api/agency/onboard"
+        : isFacility ? "/api/club-facility/onboard"
+        : isCorporate ? "/api/corporate/onboard" : "/api/clubadminprofile/onboard";
+      const payload = isAgency
+        ? {
+            name: formData.name,
+            email: formData.email,
+            phone: formData.phone,
+            agencyName: formData.clubName,
+            city: formData.city,
+          }
+        : isFacility
+        ? {
+            name: formData.name,
+            email: formData.email,
+            phone: formData.phone,
+            clubName: formData.clubName,
+            city: formData.city,
+          }
+        : isCorporate
         ? {
             name: formData.name,
             email: formData.email,
@@ -35,8 +66,9 @@ export default function CreateClubAdmin() {
             designation: formData.designation,
             companyName: formData.clubName,
             location: formData.city,
+            agencyId: formData.agencyId || undefined,
           }
-        : formData;
+        : formData; // club/school/organization — carries agencyId from the form
       const res = await axios.post(url, payload);
       setGeneratedCredentials(
         res.data.credentials || {
@@ -44,7 +76,7 @@ export default function CreateClubAdmin() {
           password: res.data.tempPassword || res.data.password || "Sent via email",
         }
       );
-      toast.success(`${isCorporate ? "Corporate" : "Club"} admin account created successfully!`);
+      toast.success(`${isAgency ? "Agency" : isFacility ? "Club (facility)" : isCorporate ? "Corporate" : "Club"} admin account created successfully!`);
     } catch (error) {
       toast.error(error.response?.data?.message || "Failed to create account");
     } finally {
@@ -144,10 +176,24 @@ export default function CreateClubAdmin() {
                   <option value="school">School</option>
                   <option value="organization">Organization</option>
                   <option value="corporate">Corporate club admin</option>
+                  <option value="agency">Tournament agency (Event OS)</option>
+                  <option value="facility">Sports Club (facility) — Club OS</option>
                 </select>
               </div>
-              <DarkInput label="Name *" name="clubName" value={formData.clubName} onChange={handleChange} placeholder="e.g. S. B. Patil School" required icon={Building2} />
+              <DarkInput label={formData.orgType === "agency" ? "Agency name *" : formData.orgType === "facility" ? "Club name *" : "Name *"} name="clubName" value={formData.clubName} onChange={handleChange} placeholder={formData.orgType === "agency" ? "e.g. IONIX Sports Events" : formData.orgType === "facility" ? "e.g. Oasis Multi-Sports Club" : "e.g. S. B. Patil School"} required icon={Building2} />
             </div>
+            {formData.orgType !== "agency" && agencies.length > 0 && (
+              <div className="mt-3">
+                <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-500 mb-1.5">Assign to agency (optional)</label>
+                <select name="agencyId" value={formData.agencyId} onChange={handleChange}
+                  className="w-full h-9 px-3 rounded-md text-[13px] text-gray-200 focus:outline-none"
+                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", colorScheme: "dark" }}>
+                  <option value="">— No agency (independent) —</option>
+                  {agencies.map((a) => <option key={a._id} value={a._id}>{a.clubName || a.name} ({a.email})</option>)}
+                </select>
+                <p className="text-[11px] text-emerald-300/70 mt-1.5">Places this account under the agency's Event OS (Schools / Corporate / Clubs directory).</p>
+              </div>
+            )}
             {(formData.orgType === "school" || formData.orgType === "organization") && (
               <p className="text-[11px] text-orange-300/80 mt-2">
                 Unlocks the Trainer module (trainers, sport assignments, students, schedule & attendance).
@@ -158,18 +204,23 @@ export default function CreateClubAdmin() {
                 Creates a Corporate workspace account (corporate_admin) with its own dashboard. “Name” = company name; City = location.
               </p>
             )}
+            {formData.orgType === "agency" && (
+              <p className="text-[11px] text-emerald-300/80 mt-2">
+                Creates a Tournament Agency account (AgencyAdmin). On login they land in the IONIX Sports Events — Event OS. “Name” = agency name.
+              </p>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
-              <DarkInput label={formData.orgType === "corporate" ? "Location *" : "City *"} name="city" value={formData.city} onChange={handleChange} placeholder="Mumbai" required />
-              <DarkInput label="Area"  name="area"  value={formData.area}  onChange={handleChange} placeholder="Andheri West"  required={formData.orgType !== "corporate"} />
-              <DarkInput label={`Sports${formData.orgType === "corporate" ? "" : " *"} (comma separated)`} name="sports" value={formData.sports} onChange={handleChange} placeholder="Cricket, Football" required={formData.orgType !== "corporate"} icon={Trophy} />
+              <DarkInput label={minimalOrg ? "Location *" : "City *"} name="city" value={formData.city} onChange={handleChange} placeholder="Mumbai" required />
+              <DarkInput label="Area"  name="area"  value={formData.area}  onChange={handleChange} placeholder="Andheri West"  required={!minimalOrg} />
+              <DarkInput label={`Sports${minimalOrg ? "" : " *"} (comma separated)`} name="sports" value={formData.sports} onChange={handleChange} placeholder="Cricket, Football" required={!minimalOrg} icon={Trophy} />
             </div>
 
             <div className="mt-3">
-              <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-500 mb-1.5">Detailed address {formData.orgType !== "corporate" && "*"}</label>
+              <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-500 mb-1.5">Detailed address {!minimalOrg && "*"}</label>
               <div className="relative">
                 <MapPin className="absolute left-3 top-2.5 w-3.5 h-3.5 text-gray-500" />
-                <textarea name="address" required={formData.orgType !== "corporate"} rows={2} value={formData.address} onChange={handleChange}
+                <textarea name="address" required={!minimalOrg} rows={2} value={formData.address} onChange={handleChange}
                   placeholder="123 Main Street, Building, Landmark…"
                   className="w-full pl-9 pr-3 py-2.5 rounded-md text-[13px] text-gray-200 placeholder:text-gray-500 focus:outline-none resize-none"
                   style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }} />

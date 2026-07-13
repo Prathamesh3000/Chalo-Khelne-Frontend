@@ -18,6 +18,7 @@ export default function TeamKnockoutFormatSelector({ value, onChange, className 
   const twoPlayerSingles = formats.filter((f) => !f.hasDoubles && f.minPlayers === 2);
   const twoPlayerDoubles = formats.filter((f) => f.hasDoubles && f.minPlayers === 2);
   const threePlayerFormats = formats.filter((f) => f.minPlayers === 3);
+  const fivePlayerFormats = formats.filter((f) => f.minPlayers >= 5);
 
   return (
     <div className={className}>
@@ -53,7 +54,7 @@ export default function TeamKnockoutFormatSelector({ value, onChange, className 
       </div>
 
       {/* 3-Player Formats */}
-      <div>
+      <div className="mb-4">
         <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">
           3-Player Teams
         </h4>
@@ -65,6 +66,22 @@ export default function TeamKnockoutFormatSelector({ value, onChange, className 
           ))}
         </div>
       </div>
+
+      {/* 5-Player Formats (Rapid Rallies) */}
+      {fivePlayerFormats.length > 0 && (
+        <div>
+          <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">
+            5-Player Teams — Dynamic Selection
+          </h4>
+          <div className="space-y-2">
+            {fivePlayerFormats.map((fmt) => (
+              <FormatCard key={fmt.id} format={fmt} selected={value === fmt.id} expanded={expandedId === fmt.id}
+                onSelect={() => onChange(fmt.id)}
+                onToggle={() => setExpandedId(expandedId === fmt.id ? null : fmt.id)} />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -151,14 +168,25 @@ function FormatCard({ format, selected, expanded, onSelect, onToggle }) {
             {/* Show selectable options inline */}
             {format.sets.filter((s) => s.requiresSelection).map((s) => (
               <div key={`opts-${s.setNumber}`} className="mt-2 ml-8 pl-3 border-l-2 border-emerald-200">
-                <p className="text-[10px] font-bold text-emerald-600 mb-1">Set {s.setNumber} — Captain picks pairing:</p>
+                <p className="text-[10px] font-bold text-emerald-600 mb-1">Set {s.setNumber} — Captain picks:</p>
                 <div className="space-y-0.5">
-                  {s.options.map((opt) => (
-                    <div key={opt.id} className="text-[10px] text-gray-500 flex items-center gap-1.5">
+                  {s.options && s.options.length > 0 ? (
+                    s.options.map((opt) => (
+                      <div key={opt.id} className="text-[10px] text-gray-500 flex items-center gap-1.5">
+                        <span className="w-1 h-1 rounded-full bg-emerald-300" />
+                        {opt.label}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-[10px] text-gray-500 flex items-center gap-1.5">
                       <span className="w-1 h-1 rounded-full bg-emerald-300" />
-                      {opt.label}
+                      {s.partnerPool
+                        ? `Partner chosen from ${s.partnerPool.join(" / ")}`
+                        : s.eligibility === "notPlayedSingles"
+                        ? "Any player who hasn't played a singles rubber"
+                        : "Captain's choice"}
                     </div>
-                  ))}
+                  )}
                 </div>
               </div>
             ))}
@@ -170,8 +198,13 @@ function FormatCard({ format, selected, expanded, onSelect, onToggle }) {
             <div className="flex items-center justify-center gap-8 py-2">
               <div className="text-center">
                 <div className="flex gap-1 justify-center mb-1">
-                  {["A", "B", ...(format.minPlayers >= 3 ? ["C"] : [])].map((p) => (
-                    <div key={p} className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center text-orange-600 font-black text-xs">{p}</div>
+                  {(format.minPlayers >= 5
+                    ? ["P1", "P2", "P3", "P4", "P5"]
+                    : ["A", "B", ...(format.minPlayers >= 3 ? ["C"] : [])]
+                  ).map((p) => (
+                    <div key={p} className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-xs ${
+                      p === format.femaleSlot ? "bg-pink-100 text-pink-600" : "bg-orange-100 text-orange-600"
+                    }`}>{p}</div>
                   ))}
                 </div>
                 <span className="text-[10px] text-gray-500 font-medium">Home</span>
@@ -182,13 +215,23 @@ function FormatCard({ format, selected, expanded, onSelect, onToggle }) {
               </div>
               <div className="text-center">
                 <div className="flex gap-1 justify-center mb-1">
-                  {["X", "Y", ...(format.minPlayers >= 3 ? ["Z"] : [])].map((p) => (
-                    <div key={p} className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center text-red-700 font-black text-xs">{p}</div>
+                  {(format.minPlayers >= 5
+                    ? ["P1", "P2", "P3", "P4", "P5"]
+                    : ["X", "Y", ...(format.minPlayers >= 3 ? ["Z"] : [])]
+                  ).map((p) => (
+                    <div key={p} className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-xs ${
+                      p === format.femaleSlot ? "bg-pink-100 text-pink-600" : "bg-red-100 text-red-700"
+                    }`}>{p}</div>
                   ))}
                 </div>
                 <span className="text-[10px] text-gray-500 font-medium">Away</span>
               </div>
             </div>
+            {format.femaleSlot && (
+              <p className="text-[10px] text-pink-600 text-center mt-1 font-medium">
+                {format.femaleSlot} must be female · plays the female singles rubber
+              </p>
+            )}
           </div>
         </div>
       )}

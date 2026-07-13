@@ -7,6 +7,7 @@ import {
   ArrowRight, Gavel, BarChart3, Inbox, Loader2, ShieldCheck,
 } from "lucide-react";
 import { ClubAdminShell } from "../shared/layout";
+import SchoolDashboard from "./SchoolDashboard";
 
 const ClubAdminDashboard = () => {
   const { auth } = useContext(AuthContext);
@@ -14,14 +15,27 @@ const ClubAdminDashboard = () => {
   const token = localStorage.getItem("token");
   const headers = { Authorization: `Bearer ${token}` };
 
+  const [orgType, setOrgType] = useState(null); // null = still resolving
   const [profileData, setProfileData] = useState(null);
   const [overview, setOverview] = useState(null);
   const [recentPayments, setRecentPayments] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Resolve the admin's org type first — schools/organizations get a different,
+  // school-focused dashboard instead of the club revenue/turf overview.
   useEffect(() => {
-    if (auth?._id) fetchAll();
-  }, [auth]);
+    const uid = auth?._id;
+    if (!uid) return;
+    axios.get(`/api/clubadminprofile/${uid}`, { headers })
+      .then((r) => setOrgType(r.data?.clubProfile?.orgType || r.data?.orgType || "club"))
+      .catch(() => setOrgType("club"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auth?._id]);
+
+  useEffect(() => {
+    if (auth?._id && orgType === "club") fetchAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auth, orgType]);
 
   const fetchAll = async () => {
     setLoading(true);
@@ -42,6 +56,21 @@ const ClubAdminDashboard = () => {
   };
 
   const formatCurrency = (n) => `₹${(n || 0).toLocaleString("en-IN")}`;
+
+  // While org type is resolving, hold on a loader (avoids flashing the club
+  // dashboard to a school admin).
+  if (orgType === null) {
+    return (
+      <ClubAdminShell searchPlaceholder="Search dashboard…">
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="w-6 h-6 text-gray-500 animate-spin" />
+        </div>
+      </ClubAdminShell>
+    );
+  }
+  if (orgType === "school" || orgType === "organization") {
+    return <SchoolDashboard />;
+  }
 
   if (loading) {
     return (

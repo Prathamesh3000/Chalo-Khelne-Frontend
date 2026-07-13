@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { Check, RefreshCcw, Plus, Minus, Clock, Undo2 } from "lucide-react";
+import { toast } from "react-toastify";
+import { scoreErrorMessage } from "./scoreError";
 
 /**
  * Scorer for time-based sports: Football, Basketball, Hockey, Kabaddi.
@@ -63,8 +65,12 @@ export default function TimeBasedScorer({
   };
 
   const handleSubmit = async () => {
-    await onSubmitScores([{ a: String(player1Score), b: String(player2Score) }]);
-    setPlayer1Score(0); setPlayer2Score(0); setEvents([]); setCurrentPeriod(1); setMinute("");
+    try {
+      await onSubmitScores([{ a: String(player1Score), b: String(player2Score) }]);
+      setPlayer1Score(0); setPlayer2Score(0); setEvents([]); setCurrentPeriod(1); setMinute("");
+    } catch (e) {
+      toast.error(scoreErrorMessage(e));
+    }
   };
 
   const card = "bg-[#181A22] rounded-2xl border border-white/[0.06]";

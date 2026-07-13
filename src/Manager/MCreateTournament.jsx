@@ -325,7 +325,7 @@ function newSportEntry({ expanded = false } = {}) {
 }
 
 
-const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialData = null, onSuccess }) => {
+const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialData = null, onSuccess, redirectOnSuccess = true }) => {
   const isEditMode = mode === "edit";
   const [image, setImage] = useState(null);
   const [imageFile, setImageFile] = useState(null);
@@ -866,6 +866,7 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
       });
       tournamentFormData.append("sports", JSON.stringify(sportsPayload));
 
+      let createdTournament = null;
       if (isEditMode && initialData?._id) {
         // EDIT MODE — update existing tournament
         await axios.put(`/api/tournaments/edit/${initialData._id}`, tournamentFormData, {
@@ -877,19 +878,23 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
         setSuccess("Tournament updated successfully!");
       } else {
         // CREATE MODE — create new tournament
-        await axios.post(`/api/tournaments/createTournament`, tournamentFormData, {
+        const createRes = await axios.post(`/api/tournaments/createTournament`, tournamentFormData, {
           headers: {
             "Content-Type": "multipart/form-data",
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         });
+        createdTournament = createRes?.data?.tournament || null;
         setSuccess("Tournament created successfully!");
       }
 
       setTimeout(() => {
         setShowPopup(false);
-        onSuccess?.();
-        if (!isEditMode) window.location.href = "/mtournament-management";
+        // Pass the created tournament so callers (e.g. Event OS) can wrap it.
+        onSuccess?.(createdTournament);
+        // Default: managers land on tournament management. Event OS passes
+        // redirectOnSuccess={false} to stay in its own shell.
+        if (!isEditMode && redirectOnSuccess) window.location.href = "/mtournament-management";
       }, 1500);
     } catch (err) {
       console.error(`Error ${isEditMode ? "updating" : "creating"} tournament:`, err);

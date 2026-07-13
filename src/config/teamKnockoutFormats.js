@@ -272,6 +272,50 @@ const TEAM_KNOCKOUT_FORMATS = [
       { setNumber: 7, type: "singles", label: "Singles B vs Z", home: ["B"], away: ["Z"], isDecider: true },
     ],
   },
+
+  // ═══════════════════════════════════════════
+  // RAPID RALLIES S1 (Kharadi TT) — 5-player, 5-rubber team tie.
+  // Dynamic Selection System: doubles partners (rubbers 2 & 4) and the
+  // rubber-5 singles player are captain's choice. Valid choices are computed
+  // from the shared rules (female@P3, partner pool P3-P5, all-5-play,
+  // rubber-5 not-played-singles) — NOT from fixed `options`. All 5 rubbers
+  // always played (playAllSets). See RAPID_RALLIES_PLAN.md.
+  // ═══════════════════════════════════════════
+  {
+    id: "rapid_rallies_s1",
+    name: "Rapid Rallies S1 — 5-Player Dynamic",
+    shortName: "Rapid Rallies",
+    description: "5-player team tie: 3 singles + 2 doubles. Female plays rubber 3. Captain picks doubles partners + rubber-5 player live. All 5 rubbers played.",
+    totalSets: 5,
+    setsToWin: 3,
+    hasDoubles: true,
+    minPlayers: 5,
+    sport: "Table Tennis",
+    pointsToWin: 11,
+    playAllSets: true,      // no dead rubbers
+    femaleSlot: "P3",       // P3 must be female (plays rubber 3)
+    noSubstitutes: true,    // exactly 5, no subs
+    sets: [
+      { setNumber: 1, type: "singles", label: "Singles P1 vs P2", home: ["P1"], away: ["P2"], isDecider: false },
+      {
+        setNumber: 2, type: "doubles", label: "Doubles — P2 + partner (Captain's Choice)",
+        requiresSelection: true, homeAnchor: "P2", awayAnchor: "P1", partnerPool: ["P3", "P4", "P5"],
+        options: [], home: ["P2", "P3"], away: ["P1", "P3"], isDecider: false,
+      },
+      { setNumber: 3, type: "singles", label: "Singles (Female) P3 vs P3", home: ["P3"], away: ["P3"], female: true, isDecider: false },
+      {
+        setNumber: 4, type: "doubles", label: "Doubles — P1 + partner (Captain's Choice)",
+        requiresSelection: true, homeAnchor: "P1", awayAnchor: "P2", partnerPool: ["P3", "P4", "P5"],
+        options: [], home: ["P1", "P3"], away: ["P2", "P3"], isDecider: false,
+      },
+      {
+        setNumber: 5, type: "singles", label: "Singles — remaining player (Captain's Choice)",
+        requiresSelection: true, homeAnchor: "P2", awayAnchor: "P1",
+        homeEligible: ["P2", "P4", "P5"], awayEligible: ["P1", "P4", "P5"], eligibility: "notPlayedSingles",
+        options: [], home: ["P2"], away: ["P1"], isDecider: true,
+      },
+    ],
+  },
 ];
 
 /**

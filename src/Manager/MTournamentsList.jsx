@@ -312,14 +312,10 @@ const TournamentList = ({ onTournamentSelect, selectedTournament }) => {
                     }
                   : null
               }
-              onBulkRegister={
-                tournament.isPrivate
-                  ? (e) => {
-                      e.stopPropagation();
-                      navigate(`/bulk-booking?tournamentId=${tournament._id}`);
-                    }
-                  : null
-              }
+              onBulkRegister={(e) => {
+                e.stopPropagation();
+                navigate(`/bulk-booking?tournamentId=${tournament._id}`);
+              }}
               onCourts={(e) => {
                 e.stopPropagation();
                 navigate(`/tournaments/${tournament._id}/courts`);

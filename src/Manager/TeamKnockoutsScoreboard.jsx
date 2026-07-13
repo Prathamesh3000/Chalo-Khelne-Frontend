@@ -191,6 +191,44 @@ const TeamKnockoutsScoreboard = () => {
     setupMatchFormat();
   }, []);
 
+  // Config-driven team formats (e.g. Rapid Rallies — 5 rubbers, dynamic doubles)
+  // aren't in the legacy A/B/C switch, so setupMatchFormat() leaves matchFormat
+  // null. Build the rubber sequence from the real server sets, which carry the
+  // authoritative singles + doubles player names. Only fires when matchFormat is
+  // null → never touches legacy formats (they get a non-null format on mount).
+  useEffect(() => {
+    if (matchFormat || !Array.isArray(setsData) || setsData.length === 0) return;
+    const sequence = setsData.map((s) => {
+      const awayPartner = s.awayPlayerB || s.awayPlayerZ || null;
+      const isDoubles =
+        String(s.type || "").toLowerCase().includes("doubles") ||
+        !!s.homePlayerB ||
+        !!awayPartner;
+      if (isDoubles) {
+        return {
+          type: s.type || "Doubles",
+          home: [s.homePlayer, s.homePlayerB].filter(Boolean).join(" & ") || "Home",
+          away: [s.awayPlayer, awayPartner].filter(Boolean).join(" & ") || "Away",
+          players: {
+            home: s.homePlayer,
+            away: s.awayPlayer,
+            home1: s.homePlayer,
+            home2: s.homePlayerB,
+            away1: s.awayPlayer,
+            away2: awayPartner,
+          },
+        };
+      }
+      return {
+        type: s.type || "Singles",
+        home: s.homePlayer || "Home",
+        away: s.awayPlayer || "Away",
+        players: { home: s.homePlayer, away: s.awayPlayer },
+      };
+    });
+    setMatchFormat({ type: matchType || "Team", sequence });
+  }, [matchFormat, setsData, matchType]);
+
   useEffect(() => {
     if (matchId) {
       initializeMatch();
@@ -1134,10 +1172,10 @@ const TeamKnockoutsScoreboard = () => {
 
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-        <div className="bg-white rounded-lg w-full max-w-3xl max-h-[90vh] overflow-hidden">
+        <div className="bg-[#181A22] rounded-lg w-full max-w-3xl max-h-[90vh] overflow-hidden">
           {/* Header */}
           <div className="px-6 py-4 border-b flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-gray-900">
+            <h2 className="text-xl font-semibold text-white">
               Player Substitution
             </h2>
             <button
@@ -1150,8 +1188,8 @@ const TeamKnockoutsScoreboard = () => {
 
           {/* Error Message */}
           {error && (
-            <div className="px-6 py-3 bg-red-50 border-l-4 border-red-500">
-              <p className="text-red-700">{error}</p>
+            <div className="px-6 py-3 bg-red-500/10 border-l-4 border-red-500">
+              <p className="text-red-300">{error}</p>
             </div>
           )}
 
@@ -1161,20 +1199,20 @@ const TeamKnockoutsScoreboard = () => {
             style={{ maxHeight: "calc(90vh - 150px)" }}
           >
             {/* Current Match Info */}
-            <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-              <h3 className="font-medium text-gray-900 mb-2">
+            <div className="mb-6 p-4 bg-white/[0.03] rounded-lg">
+              <h3 className="font-medium text-white mb-2">
                 Current Match Information
               </h3>
               {getCurrentMatchInfo() && (
                 <div className="space-y-1">
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-gray-300">
                     Match Type: {getCurrentMatchInfo().type}
                   </p>
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-gray-300">
                     Current Game: {currentGame + 1} of{" "}
                     {matchFormat.sequence.length}
                   </p>
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-gray-300">
                     Players:{" "}
                     {selectedTeam === "team1"
                       ? getCurrentMatchInfo().home
@@ -1188,14 +1226,14 @@ const TeamKnockoutsScoreboard = () => {
             <div className="space-y-6">
               {/* Current Player Selector */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-200 mb-2">
                   Current Player
                 </label>
                 <select
                   value={selectedPlayer}
                   onChange={(e) => setSelectedPlayer(e.target.value)}
                   disabled={loading}
-                  className="w-full border border-gray-300 rounded-md py-2 px-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className="w-full border border-white/[0.12] rounded-md py-2 px-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
                 >
                   <option value="">Select player to substitute</option>
                   {getCurrentPlayers().map((player) => (
@@ -1208,14 +1246,14 @@ const TeamKnockoutsScoreboard = () => {
 
               {/* Substitute Player Selector */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-200 mb-2">
                   Substitute Player
                 </label>
                 <select
                   value={selectedSubstitute}
                   onChange={(e) => setSelectedSubstitute(e.target.value)}
                   disabled={loading || !selectedPlayer}
-                  className="w-full border border-gray-300 rounded-md py-2 px-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className="w-full border border-white/[0.12] rounded-md py-2 px-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
                 >
                   <option value="">Select substitute player</option>
                   {getAvailableSubstitutes().map((player) => (
@@ -1235,7 +1273,7 @@ const TeamKnockoutsScoreboard = () => {
               {/* Substitution History */}
               {substitutionHistory.length > 0 && (
                 <div className="mt-6">
-                  <h3 className="font-medium text-gray-900 mb-3">
+                  <h3 className="font-medium text-white mb-3">
                     Recent Substitutions
                   </h3>
                   <div className="space-y-2">
@@ -1245,7 +1283,7 @@ const TeamKnockoutsScoreboard = () => {
                       .map((sub, index) => (
                         <div
                           key={index}
-                          className="flex justify-between items-center p-3 bg-gray-50 rounded"
+                          className="flex justify-between items-center p-3 bg-white/[0.03] rounded"
                         >
                           <span className="text-sm">
                             {sub.outgoingPlayer} → {sub.incomingPlayer}
@@ -1262,11 +1300,11 @@ const TeamKnockoutsScoreboard = () => {
           </div>
 
           {/* Footer */}
-          <div className="px-6 py-4 border-t bg-gray-50 flex justify-end gap-3">
+          <div className="px-6 py-4 border-t bg-white/[0.03] flex justify-end gap-3">
             <button
               onClick={onClose}
               disabled={loading}
-              className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
+              className="px-4 py-2 border border-white/[0.12] rounded-md text-gray-200 hover:bg-white/[0.03] transition-colors"
             >
               Cancel
             </button>
@@ -1815,8 +1853,11 @@ const TeamKnockoutsScoreboard = () => {
                       let awayPlayerName = "Away";
 
                       if (currentSetInfo && currentSetInfo.homePlayer && currentSetInfo.awayPlayer) {
-                        homePlayerName = currentSetInfo.homePlayer;
-                        awayPlayerName = currentSetInfo.awayPlayer;
+                        // Show the doubles pair when a partner exists (Rapid Rallies
+                        // rubbers 2 & 4), else just the singles player.
+                        const awayPartner = currentSetInfo.awayPlayerB || currentSetInfo.awayPlayerZ;
+                        homePlayerName = [currentSetInfo.homePlayer, currentSetInfo.homePlayerB].filter(Boolean).join(" & ");
+                        awayPlayerName = [currentSetInfo.awayPlayer, awayPartner].filter(Boolean).join(" & ");
                       } else {
                         // Fallback to matchFormat logic
                         const players = matchFormat?.sequence?.[currentSetNumber - 1];
@@ -1844,7 +1885,7 @@ const TeamKnockoutsScoreboard = () => {
                                 placeholder={homePlayerName}
                                 value={game.a}
                                 onChange={(e) => handleManualGameChange(index, "a", e.target.value)}
-                                className="w-full bg-gray-800 text-white text-center px-1 py-3 rounded border border-gray-700 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 focus:outline-none transition-all placeholder:text-gray-600 font-mono text-lg"
+                                className="w-full bg-gray-800 text-white text-center px-1 py-3 rounded border border-gray-700 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 focus:outline-none transition-all placeholder:text-gray-300 font-mono text-lg"
                                 disabled={winner || isButtonDisabled}
                               />
                             </div>
@@ -1854,7 +1895,7 @@ const TeamKnockoutsScoreboard = () => {
                                 placeholder={awayPlayerName}
                                 value={game.b}
                                 onChange={(e) => handleManualGameChange(index, "b", e.target.value)}
-                                className="w-full bg-gray-800 text-white text-center px-1 py-3 rounded border border-gray-700 focus:border-red-500 focus:ring-1 focus:ring-red-500 focus:outline-none transition-all placeholder:text-gray-600 font-mono text-lg"
+                                className="w-full bg-gray-800 text-white text-center px-1 py-3 rounded border border-gray-700 focus:border-red-500 focus:ring-1 focus:ring-red-500 focus:outline-none transition-all placeholder:text-gray-300 font-mono text-lg"
                                 disabled={winner || isButtonDisabled}
                               />
                             </div>
@@ -1898,7 +1939,7 @@ const TeamKnockoutsScoreboard = () => {
                           <div className="text-3xl font-bold text-orange-400">{teamASetWins}</div>
                           <div className="text-xs text-gray-500 mt-1 truncate">{teamAName}</div>
                         </div>
-                        <div className="px-4 text-gray-600 font-bold text-xl">VS</div>
+                        <div className="px-4 text-gray-300 font-bold text-xl">VS</div>
                         <div className="text-center flex-1">
                           <div className="text-sm text-gray-400 mb-1">Score</div>
                           <div className="text-3xl font-bold text-red-400">{teamBSetWins}</div>
@@ -1979,9 +2020,9 @@ const TeamKnockoutsScoreboard = () => {
       {/* Modal Overlay */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4">
+          <div className="bg-[#181A22] rounded-lg p-6 max-w-sm w-full mx-4">
             <h2 className="text-xl font-bold mb-4">{modalTitle}</h2>
-            <p className="text-gray-700 mb-6 whitespace-pre-line">
+            <p className="text-gray-200 mb-6 whitespace-pre-line">
               {modalMessage}
             </p>
             <div className="flex justify-end">
@@ -1999,8 +2040,8 @@ const TeamKnockoutsScoreboard = () => {
       {/* Loading Message */}
       {message && (
         <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-40">
-          <div className="bg-white px-6 py-4 rounded-lg">
-            <p className="text-gray-800">{message}</p>
+          <div className="bg-[#181A22] px-6 py-4 rounded-lg">
+            <p className="text-gray-100">{message}</p>
           </div>
         </div>
       )}

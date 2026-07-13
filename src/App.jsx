@@ -5,10 +5,12 @@ import ManagerApp from "./ManagerApp";
 import PlayerApp from "./PlayerApp";
 import LandingApp from "./LandingApp";
 import ClubAdminApp from "./ClubAdminApp";
+import ClubApp from "./ClubApp";
 import CorporateApp from "./CorporateApp";
 import SuperAdminapp from "./SuperAdminapp";
 import TrainerApp from "./TrainerApp";
 import VendorApp from "./VendorApp";
+import AgencyApp from "./AgencyApp";
 import RegisterTurf from "./pages/RegisterTurf";
 import LAboutus from './Landing-Page/LAboutus';
 import LPrivacyPolicy from './Landing-Page/LPrivacyPolicy';
@@ -21,6 +23,8 @@ import { useContext } from "react";
 const App = () => {
   const { auth, isAuthenticated } = useContext(AuthContext);
   const role = auth?.role?.toLowerCase() || "player";
+  // IONIX Event OS — office agency roles land in the AgencyApp shell.
+  const isAgency = ["agencyadmin", "event_manager", "eventmanager", "coordinator"].includes(role);
 
   return (
     <Routes>
@@ -37,6 +41,8 @@ const App = () => {
               <Navigate to="/home" />
             ) : role === "manager" ? (
               <Navigate to="/mdashboard" />
+            ) : role === "club_admin" ? (
+              <Navigate to="/club/dashboard" />
             ) : role === "clubadmin" ? (
               <Navigate to="/club-dashboard" />
             ) : role === "corporate_admin" ? (
@@ -45,6 +51,8 @@ const App = () => {
               <Navigate to="/trainer-dashboard" />
             ) : role === "vendor" ? (
               <Navigate to="/vendor-dashboard" />
+            ) : isAgency ? (
+              <Navigate to="/agency/dashboard" />
             ) : (
               <Navigate to="/phome" />
             )
@@ -69,6 +77,8 @@ const App = () => {
             ) :
               role === "manager" ? (
                 <Navigate to="/mdashboard" />
+              ) : role === "club_admin" ? (
+                <Navigate to="/club/dashboard" />
               ) : role === "clubadmin" ? (
                 <Navigate to="/club-dashboard" />
               ) : role === "corporate_admin" ? (
@@ -77,6 +87,8 @@ const App = () => {
                 <Navigate to="/trainer-dashboard" />
               ) : role === "vendor" ? (
                 <Navigate to="/vendor-dashboard" />
+              ) : isAgency ? (
+                <Navigate to="/agency/dashboard" />
               ) : (
                 <Navigate to="/phome" />
               )
@@ -102,6 +114,8 @@ const App = () => {
             ) :
               role === "manager" ? (
                 <ManagerApp />
+              ) : role === "club_admin" ? (
+                <ClubApp />
               ) : role === "clubadmin" ? (
                 <ClubAdminApp />
               ) : role === "corporate_admin" ? (
@@ -110,6 +124,8 @@ const App = () => {
                 <TrainerApp />
               ) : role === "vendor" ? (
                 <VendorApp />
+              ) : isAgency ? (
+                <AgencyApp />
               ) : (
                 <PlayerApp />
               )

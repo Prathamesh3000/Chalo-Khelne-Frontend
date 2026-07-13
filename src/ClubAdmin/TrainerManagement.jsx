@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import axios from "axios";
 import { toast } from "react-toastify";
 import { ClubAdminShell } from "../shared/layout";
@@ -9,21 +10,25 @@ import AttendanceView from "./AttendanceView";
 import SubstitutesAdmin from "./SubstitutesAdmin";
 import SyllabusAdmin from "./SyllabusAdmin";
 import ProgressAdmin from "./ProgressAdmin";
+import LeaveRequestsAdmin from "./LeaveRequestsAdmin";
 import {
   Users, Dumbbell, GraduationCap, Calendar, ClipboardList, UserCheck, BookOpen, TrendingUp,
-  UserPlus, Shuffle, Loader2, Trash2, Power, Mail,
+  UserPlus, Shuffle, Loader2, Trash2, Power, Mail, CalendarRange, Trophy,
 } from "lucide-react";
 
 const TABS = [
-  { key: "trainers",   label: "Trainers",         icon: Users },
-  { key: "sports",     label: "Sports & Trainers", icon: Dumbbell },
-  { key: "students",   label: "Students",          icon: GraduationCap },
-  { key: "schedule",   label: "Schedule",          icon: Calendar },
-  { key: "syllabus",   label: "Syllabus",          icon: BookOpen },
-  { key: "progress",   label: "Progress",          icon: TrendingUp },
+  { key: "trainers",   label: "Coach Management",  icon: Users },
+  { key: "leave",      label: "Leave Requests",    icon: CalendarRange },
+  { key: "students",   label: "Student Management", icon: GraduationCap },
+  { key: "batches",    label: "Batch Management",  icon: Trophy },
+  { key: "schedule",   label: "Schedule Management", icon: Calendar },
   { key: "attendance", label: "Attendance",        icon: ClipboardList },
+  { key: "progress",   label: "Assessment Reports", icon: TrendingUp },
+  { key: "sports",     label: "Academic Setup",    icon: Dumbbell },
+  { key: "syllabus",   label: "Syllabus Planning", icon: BookOpen },
   { key: "substitutes", label: "Substitutes",      icon: UserCheck },
 ];
+const TAB_LABEL = Object.fromEntries(TABS.map((t) => [t.key, t.label]));
 
 const inputStyle = { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", colorScheme: "dark" };
 const field = "w-full h-9 px-3 rounded-md text-[13px] text-gray-200 placeholder:text-gray-500 focus:outline-none";
@@ -35,6 +40,14 @@ export default function TrainerManagement() {
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({ name: "", email: "", password: "", staffRole: "trainer" });
   const [adding, setAdding] = useState(false);
+
+  const location = useLocation();
+  // The school sidebar drives the section via ?tab=…; keep activeTab in sync.
+  useEffect(() => {
+    const t = new URLSearchParams(location.search).get("tab");
+    if (t) setActiveTab(t);
+  }, [location.search]);
+  const sidebarDriven = new URLSearchParams(location.search).has("tab");
 
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const clubId = user?._id;
@@ -111,10 +124,14 @@ export default function TrainerManagement() {
         <p className="inline-flex items-center gap-1.5 text-[12px] text-gray-400">
           <Dumbbell className="w-3.5 h-3.5" /> Management · Trainer
         </p>
-        <h1 className="mt-2 text-[26px] font-medium text-white leading-tight">Trainer management</h1>
-        <p className="mt-1 text-[13px] text-gray-400">
-          Trainers & coaches, sport assignments, student rosters, schedule and attendance.
-        </p>
+        <h1 className="mt-2 text-[26px] font-medium text-white leading-tight">
+          {sidebarDriven ? (TAB_LABEL[activeTab] || "School") : "Trainer management"}
+        </h1>
+        {!sidebarDriven && (
+          <p className="mt-1 text-[13px] text-gray-400">
+            Trainers & coaches, sport assignments, student rosters, schedule and attendance.
+          </p>
+        )}
       </header>
 
       {!isSchoolOrg ? (
@@ -125,20 +142,22 @@ export default function TrainerManagement() {
         </div>
       ) : (
         <>
-          {/* Tabs */}
-          <div className="inline-flex items-center gap-1 bg-white/[0.04] p-1 rounded-md border border-white/[0.06] mb-5 flex-wrap">
-            {TABS.map((tab) => {
-              const active = activeTab === tab.key;
-              return (
-                <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-                  className={`inline-flex items-center gap-1.5 h-7 px-3 rounded-[5px] text-[12px] font-medium transition w-auto ${
-                    active ? "bg-[#181A22] text-white shadow-[0_1px_2px_rgba(0,0,0,0.3)]" : "text-gray-400 hover:text-white"
-                  }`}>
-                  <tab.icon className="w-3.5 h-3.5" /> {tab.label}
-                </button>
-              );
-            })}
-          </div>
+          {/* Inline tabs — only when NOT driven by the school sidebar. */}
+          {!sidebarDriven && (
+            <div className="inline-flex items-center gap-1 bg-white/[0.04] p-1 rounded-md border border-white/[0.06] mb-5 flex-wrap">
+              {TABS.map((tab) => {
+                const active = activeTab === tab.key;
+                return (
+                  <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+                    className={`inline-flex items-center gap-1.5 h-7 px-3 rounded-[5px] text-[12px] font-medium transition w-auto ${
+                      active ? "bg-[#181A22] text-white shadow-[0_1px_2px_rgba(0,0,0,0.3)]" : "text-gray-400 hover:text-white"
+                    }`}>
+                    <tab.icon className="w-3.5 h-3.5" /> {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           {/* ── Trainers tab ── */}
           {activeTab === "trainers" && (
@@ -230,8 +249,21 @@ export default function TrainerManagement() {
           {activeTab === "progress" && <ProgressAdmin />}
           {activeTab === "attendance" && <AttendanceView trainers={trainers} />}
           {activeTab === "substitutes" && <SubstitutesAdmin />}
+          {activeTab === "leave" && <LeaveRequestsAdmin />}
+          {activeTab === "batches" && <ComingSoon title="Batch Management" desc="Group students into sport batches — coming soon." />}
+          {activeTab === "session" && <ComingSoon title="Session Planning" desc="Plan individual coaching sessions — coming soon." />}
         </>
       )}
     </ClubAdminShell>
+  );
+}
+
+function ComingSoon({ title, desc }) {
+  return (
+    <div className="rounded-xl bg-[#181A22] border border-white/[0.06] p-10 text-center">
+      <GraduationCap className="w-10 h-10 text-gray-700 mx-auto mb-3" />
+      <p className="text-[15px] text-white font-semibold">{title}</p>
+      <p className="text-[13px] text-gray-500 mt-1">{desc}</p>
+    </div>
   );
 }

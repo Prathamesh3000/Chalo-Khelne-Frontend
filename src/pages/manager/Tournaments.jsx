@@ -5,7 +5,7 @@ import axios from "axios";
 import { toast } from "react-toastify";
 import {
   ShieldCheck, Plus, Search, Filter, Trophy, Calendar, MapPin,
-  ArrowRight, Users, Edit2, FileSpreadsheet, Download, FileText, Target, X,
+  ArrowRight, Users, Edit2, FileSpreadsheet, Download, FileText, Target, X, Trash2,
 } from "lucide-react";
 import { getTournamentType } from "../../utils/sportTrack";
 import { ManagerShell } from "../../shared/layout";
@@ -48,7 +48,7 @@ async function downloadTournamentExport(tournamentId, kind) {
     });
     if (!res.ok) {
       let msg = `Export failed (${res.status})`;
-      try { const body = await res.json(); if (body?.message) msg = body.message; } catch (_) {}
+      try { const body = await res.json(); if (body?.message) msg = body.message; } catch (_) { /* keep default msg */ }
       toast.error(msg);
       return;
     }
@@ -155,6 +155,20 @@ export default function ManagerTournaments() {
     } catch (err) {
       console.error("Error fetching tournament details:", err);
       toast.error("Failed to load tournament details");
+    }
+  };
+
+  const handleDelete = async (t, e) => {
+    e?.stopPropagation();
+    const name = t.title || t.name || "this tournament";
+    if (!window.confirm(`Delete "${name}"? This permanently removes the tournament and cannot be undone.`)) return;
+    try {
+      await axios.delete(`/api/tournaments/${t._id}`);
+      toast.success("Tournament deleted.");
+      queryClient.invalidateQueries({ queryKey: ["tournaments"] });
+    } catch (err) {
+      console.error("Error deleting tournament:", err);
+      toast.error(err?.response?.data?.message || "Failed to delete tournament");
     }
   };
 
@@ -304,14 +318,11 @@ export default function ManagerTournaments() {
               tournament={t}
               onClick={() => handleManage(t)}
               onEdit={(e) => handleEdit(t._id, e)}
-              onBulkUpload={
-                t.isPrivate
-                  ? (e) => {
-                      e.stopPropagation();
-                      navigate(`/bulk-booking?tournamentId=${t._id}`);
-                    }
-                  : null
-              }
+              onDelete={(e) => handleDelete(t, e)}
+              onBulkUpload={(e) => {
+                e.stopPropagation();
+                navigate(`/bulk-booking?tournamentId=${t._id}`);
+              }}
             />
           ))}
         </div>
@@ -391,7 +402,7 @@ export default function ManagerTournaments() {
 
 // ── Tournament card (grid variant) ──────────────────────────────────────────
 
-function TournamentGridCard({ tournament, onClick, onEdit, onBulkUpload }) {
+function TournamentGridCard({ tournament, onClick, onEdit, onDelete, onBulkUpload }) {
   const t = tournament;
   const accent = SPORT_ACCENT[t.sport] || t.bannerColor || "#F97316";
   const status = STATUS_TONES[t.status] || STATUS_TONES.upcoming;
@@ -480,6 +491,17 @@ function TournamentGridCard({ tournament, onClick, onEdit, onBulkUpload }) {
                 className="inline-flex items-center justify-center w-6 h-6 rounded-md text-gray-400 hover:text-white hover:bg-white/[0.08] transition"
               >
                 <Edit2 className="w-3.5 h-3.5" />
+              </button>
+            )}
+            {onDelete && (
+              <button
+                type="button"
+                onClick={onDelete}
+                title="Delete tournament"
+                aria-label="Delete tournament"
+                className="inline-flex items-center justify-center w-6 h-6 rounded-md text-gray-400 hover:text-red-400 hover:bg-red-500/[0.12] transition"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
               </button>
             )}
           </div>

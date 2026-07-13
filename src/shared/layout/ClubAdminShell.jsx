@@ -1,8 +1,10 @@
 import { useContext, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import axios from "axios";
 import {
   LayoutDashboard, MapPin, Users, ShieldCheck, MessageSquare, MessageCircle,
   Newspaper, TrendingUp, CreditCard, UserCog, LogOut, Search, Bell, Dumbbell,
+  CalendarRange, GraduationCap, Trophy, Calendar, ClipboardList, BookOpen,
 } from "lucide-react";
 import { AuthContext } from "../../context/AuthContext";
 import { cn } from "../lib";
@@ -72,6 +74,43 @@ const NAV_SECTIONS = [
   },
 ];
 
+// School / organization admins get a school-focused nav (the school tools live
+// as tabs on /trainer-management, driven by ?tab=).
+const SCHOOL_NAV_SECTIONS = [
+  {
+    label: "Overview",
+    items: [{ label: "Dashboard", icon: LayoutDashboard, to: "/club-dashboard" }],
+  },
+  {
+    label: "School",
+    items: [
+      { label: "Coach Management",   icon: Users,         to: "/trainer-management?tab=trainers" },
+      { label: "Leave Request",      icon: CalendarRange, to: "/trainer-management?tab=leave" },
+      { label: "Student Management", icon: GraduationCap, to: "/trainer-management?tab=students" },
+      { label: "Batch Management",   icon: Trophy,        to: "/trainer-management?tab=batches" },
+      { label: "Schedule Management", icon: Calendar,     to: "/trainer-management?tab=schedule" },
+      { label: "Attendance",         icon: ClipboardList, to: "/trainer-management?tab=attendance" },
+      { label: "Assessment Reports", icon: TrendingUp,    to: "/trainer-management?tab=progress" },
+    ],
+  },
+  {
+    label: "Setup",
+    items: [
+      { label: "Academic Setup",   icon: Dumbbell,      to: "/trainer-management?tab=sports" },
+      { label: "Syllabus Planning", icon: BookOpen,     to: "/trainer-management?tab=syllabus" },
+      { label: "Session Planning", icon: ClipboardList, to: "/trainer-management?tab=session" },
+    ],
+  },
+  {
+    label: "Community",
+    items: [{ label: "Chat", icon: MessageCircle, to: "/group-chat" }],
+  },
+  {
+    label: "Account",
+    items: [{ label: "Profile", icon: UserCog, to: "/ClubAdminProfile" }],
+  },
+];
+
 function ClubAdminSidebar() {
   const auth = useContext(AuthContext);
   const navigate = useNavigate();
@@ -80,11 +119,28 @@ function ClubAdminSidebar() {
   const initial = (name.trim()[0] || "C").toUpperCase();
   const role = user?.role || "clubadmin";
   const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
+  const currentSearch = typeof window !== "undefined" ? window.location.search : "";
+
+  const [orgType, setOrgType] = useState("club");
+  useEffect(() => {
+    const uid = user?._id;
+    if (!uid) return;
+    axios.get(`/api/clubadminprofile/${uid}`)
+      .then((r) => {
+        const ot = r.data?.clubProfile?.orgType || r.data?.orgType;
+        if (ot) setOrgType(ot);
+      })
+      .catch(() => {});
+  }, [user?._id]);
+  const isSchool = orgType === "school" || orgType === "organization";
+  const sections = isSchool ? SCHOOL_NAV_SECTIONS : NAV_SECTIONS;
 
   const isActive = (to) => {
     if (!to) return false;
-    const [pathOnly] = to.split("?");
-    return currentPath === pathOnly;
+    const [pathOnly, query] = to.split("?");
+    if (currentPath !== pathOnly) return false;
+    if (query) return currentSearch === `?${query}`;
+    return !currentSearch;
   };
 
   const logout = () => {
@@ -105,7 +161,7 @@ function ClubAdminSidebar() {
 
       {/* Nav */}
       <nav className="flex-1 px-3 pb-4 overflow-y-auto">
-        {NAV_SECTIONS.map((section) => (
+        {sections.map((section) => (
           <div key={section.label} className="mt-5 first:mt-3">
             <p
               className="text-[10px] uppercase text-gray-500 px-3 mb-1.5"

@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { Check, RefreshCcw } from "lucide-react";
+import { toast } from "react-toastify";
+import { scoreErrorMessage } from "./scoreError";
 
 /**
  * Scorer for single-result sports: Chess, Carrom.
@@ -26,16 +28,20 @@ export default function SingleResultScorer({
   const [score2, setScore2] = useState("");
 
   const handleSubmit = async () => {
-    if (hasResults) {
-      if (!selectedResult) return;
-      const [a, b] = selectedResult.split("-");
-      await onSubmitScores([{ a, b }]);
-      setSelectedResult(null);
-    } else {
-      if (!score1 || !score2) return;
-      await onSubmitScores([{ a: score1, b: score2 }]);
-      setScore1("");
-      setScore2("");
+    try {
+      if (hasResults) {
+        if (!selectedResult) return;
+        const [a, b] = selectedResult.split("-");
+        await onSubmitScores([{ a, b }]);
+        setSelectedResult(null);
+      } else {
+        if (!score1 || !score2) return;
+        await onSubmitScores([{ a: score1, b: score2 }]);
+        setScore1("");
+        setScore2("");
+      }
+    } catch (e) {
+      toast.error(scoreErrorMessage(e));
     }
   };
 

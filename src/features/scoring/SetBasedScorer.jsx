@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { Check, RefreshCcw } from "lucide-react";
+import { toast } from "react-toastify";
+import { scoreErrorMessage } from "./scoreError";
 
 /**
  * Detects whether the match format uses nested games (Tennis) or flat sets (TT, Badminton).
@@ -60,8 +62,12 @@ export default function SetBasedScorer({
   };
 
   const handleSubmit = async () => {
-    await onSubmitScores(manualGames);
-    setManualGames(Array(gamesPerSet).fill(null).map(() => ({ a: "", b: "" })));
+    try {
+      await onSubmitScores(manualGames);
+      setManualGames(Array(gamesPerSet).fill(null).map(() => ({ a: "", b: "" })));
+    } catch (e) {
+      toast.error(scoreErrorMessage(e));
+    }
   };
 
   const p1Short = player1Name?.split(" ")[0] || "P1";

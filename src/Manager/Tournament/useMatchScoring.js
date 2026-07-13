@@ -17,7 +17,11 @@ const completeGameApi = async ({ matchId, player1Score, player2Score, penaltyWin
 };
 
 const syncPointsTableApi = async (matchId) => {
-  await axios.post(`/api/tournaments/scores/${matchId}`, {});
+  // Sync this match's result into the group points table via the dedicated
+  // sync-scores endpoint (group-stage only; the backend no-ops safely for
+  // knockout). The old /tournaments/scores/:id (createScore) requires explicit
+  // score fields and 400s on an empty body, so it never actually synced.
+  await axios.post(`/api/tournaments/matches/${matchId}/sync-scores`, {});
 };
 
 // ── Cricket (innings) incremental endpoints ──
@@ -105,11 +109,25 @@ export default function useMatchScoring(matchId) {
     const toSubmit = games.filter((g) => g.a !== "" && g.b !== "");
     if (toSubmit.length === 0) throw new Error("No scores to submit");
 
+    let submitted = 0;
     for (const game of toSubmit) {
       const scoreA = parseInt(game.a, 10);
       const scoreB = parseInt(game.b, 10);
       if (isNaN(scoreA) || isNaN(scoreB)) continue;
-      await completeGameApi({ matchId, player1Score: scoreA, player2Score: scoreB, penaltyWinner: opts.penaltyWinner || null });
+      try {
+        await completeGameApi({ matchId, player1Score: scoreA, player2Score: scoreB, penaltyWinner: opts.penaltyWinner || null });
+        submitted++;
+      } catch (err) {
+        // Best-of-N matches finish once a player wins enough sets; the backend
+        // then rejects further games as "already completed". If the deciding
+        // games were already submitted, that's the correct end state — stop
+        // rather than surfacing a spurious error for the dead-rubber games.
+        const msg = String(err?.response?.data?.message || "").toLowerCase();
+        const matchDone = err?.response?.status === 400 &&
+          (msg.includes("completed") || msg.includes("already finished") || msg.includes("not in progress"));
+        if (matchDone && submitted > 0) break;
+        throw err; // genuine error (or completed before any game) → caller handles
+      }
       await new Promise((r) => setTimeout(r, 300));
     }
 

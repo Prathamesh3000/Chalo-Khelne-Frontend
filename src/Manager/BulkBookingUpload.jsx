@@ -165,7 +165,7 @@ const BulkBookingUpload = () => {
           <AlertCircle className="w-3.5 h-3.5 text-amber-400" />
         </span>
         <div>
-          <p className="text-[13px] font-medium text-amber-200">Private tournament — manager upload</p>
+          <p className="text-[13px] font-medium text-amber-200">Manager bulk upload</p>
           <p className="text-[12px] text-amber-200/80 mt-0.5">
             Upload an Excel sheet with player details to register them directly. No player accounts required.
             Email will be auto-generated for players who don't have one.

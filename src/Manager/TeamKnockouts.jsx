@@ -18,6 +18,9 @@ const TK_LABEL_TO_URL = {
 import { FaUsers, FaCrown, FaUser, FaSyncAlt } from "react-icons/fa";
 import { Star, StarIcon, Loader2, Trophy, RefreshCcw, Play, CheckCircle2, Clock } from "lucide-react";
 import TeamKnockoutMatches from "./TeamKnockoutMatches";
+import RapidRalliesRegisterModal from "./RapidRalliesRegisterModal";
+import RapidRalliesLineupModal from "./RapidRalliesLineupModal";
+import AssignUmpireModal from "./Tournament/AssignUmpireModal";
 import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
@@ -28,6 +31,10 @@ import dayjs from "dayjs";
 
 const TeamKnockouts = () => {
   const navigate = useNavigate();
+  // Declared up top: effects below (tournament-info fetch) reference it in their
+  // dependency arrays, which are evaluated during render — a later `const`
+  // declaration would put it in the temporal dead zone and crash the component.
+  const tournamentId = new URLSearchParams(location.search).get("tournamentId");
   const [selectedTournament, setSelectedTournament] = useState(null);
   const [hasGeneratedMatches, setHasGeneratedMatches] = useState(false);
   const [showStructureAlert, setShowStructureAlert] = useState(false);
@@ -82,6 +89,7 @@ const TeamKnockouts = () => {
           title: t.title || "Tournament",
           sportName: teamTrack?.sportName || "",
           sportId: teamTrack?.sportId || teamTrack?._id || null,
+          davisCupFormatId: teamTrack?.davisCupFormatId || t.davisCupFormatId || null,
           currentStage: t.currentStage || "knockout",
         });
       }
@@ -89,6 +97,12 @@ const TeamKnockouts = () => {
     return () => { cancelled = true; };
   }, [tournamentId]);
   const [teams, setTeams] = useState([]);
+  // Rapid Rallies: 5-slot team registration (self-contained, roster-based)
+  const isRapidRallies = tournamentInfo?.davisCupFormatId === "rapid_rallies_s1";
+  const [showRegisterModal, setShowRegisterModal] = useState(false);
+  const [editingTeam, setEditingTeam] = useState(null);
+  const [lineupMatchId, setLineupMatchId] = useState(null);
+  const [assignModalMatch, setAssignModalMatch] = useState(null);
   const [showSubstituteModal, setShowSubstituteModal] = useState(false);
   const [currentMatchForSub, setCurrentMatchForSub] = useState(null);
   // NEW: State for post-generation doubles configuration
@@ -97,7 +111,6 @@ const TeamKnockouts = () => {
   const [configuringIndex, setConfiguringIndex] = useState(0);
   // NEW: Knockout vs Round Robin generation choice modal
   const [showGenerationChoiceModal, setShowGenerationChoiceModal] = useState(false);
-  const tournamentId = new URLSearchParams(location.search).get("tournamentId");
 
   // Round Robin state
   const [rrMatches, setRrMatches] = useState([]);
@@ -252,6 +265,15 @@ const TeamKnockouts = () => {
     }
   }, [tournamentId]);
 
+  // Rapid Rallies teams live in a different collection (TeamKnockoutTeams), so
+  // refetch once the format is known — tournamentInfo loads after the first fetch.
+  useEffect(() => {
+    if (tournamentId && tournamentInfo?.davisCupFormatId === "rapid_rallies_s1") {
+      fetchRegisteredTeams();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tournamentInfo?.davisCupFormatId]);
+
   const cleanTeamData = (teams) => {
     return teams.map((team) => ({
       ...team,
@@ -322,6 +344,28 @@ const TeamKnockouts = () => {
   const fetchRegisteredTeams = async () => {
     try {
       setLoading(true);
+
+      // Rapid Rallies teams are stored as TeamKnockoutTeams (roster P1..P5 +
+      // gender), not bookings. Fetch and map them into the booking-ish shape the
+      // team list renders.
+      if (tournamentInfo?.davisCupFormatId === "rapid_rallies_s1") {
+        const rrRes = await axios.get(`/api/tournaments/team-knockout/teams/${tournamentId}`);
+        const list = rrRes.data?.teams || [];
+        setTeams(
+          list.map((t) => ({
+            _id: t._id,
+            team: {
+              name: t.teamName,
+              players: (t.roster || []).map((r) => r.name),
+              captain: t.roster?.[0]?.name || t.teamName,
+            },
+            roster: t.roster || [],
+            teamName: t.teamName,
+            isRapidRallies: true,
+          }))
+        );
+        return;
+      }
 
       const url = `/api/players/bookings/tournament-teams/${tournamentId}`;
 
@@ -652,7 +696,7 @@ const TeamKnockouts = () => {
 
     return (
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+        <div className="bg-[#181A22] rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
           {/* Header */}
           <div className="bg-gradient-to-r from-orange-500 to-orange-600 px-6 py-5 flex justify-between items-center">
             <div>
@@ -680,7 +724,7 @@ const TeamKnockouts = () => {
                     roundSchedules?.[currentSchedulingRound]?.matchDateTime ||
                     null
                   }
-                  className="w-full bg-gray-50 rounded-xl"
+                  className="w-full bg-white/[0.03] rounded-xl"
                   onChange={(newValue) => {
                     setRoundSchedules((prev) => ({
                       ...prev,
@@ -694,7 +738,7 @@ const TeamKnockouts = () => {
                     <TextField
                       {...props}
                       fullWidth
-                      className="bg-gray-50 rounded-xl"
+                      className="bg-white/[0.03] rounded-xl"
                     />
                   )}
                 />
@@ -723,7 +767,7 @@ const TeamKnockouts = () => {
                   }}
                   min="0"
                   placeholder="30"
-                  className="w-full h-12 px-4 py-2 rounded-xl bg-gray-50 border border-gray-200 text-sm text-gray-700 focus:bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition"
+                  className="w-full h-12 px-4 py-2 rounded-xl bg-white/[0.03] border border-white/[0.08] text-sm text-gray-200 focus:bg-[#181A22] focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition"
                   required
                 />
               </div>
@@ -749,17 +793,17 @@ const TeamKnockouts = () => {
                   }}
                   min="1"
                   placeholder="1"
-                  className="w-full h-12 px-4 py-2 rounded-xl bg-gray-50 border border-gray-200 text-sm text-gray-700 focus:bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition"
+                  className="w-full h-12 px-4 py-2 rounded-xl bg-white/[0.03] border border-white/[0.08] text-sm text-gray-200 focus:bg-[#181A22] focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition"
                   required
                 />
               </div>
             </div>
 
             {/* Action Buttons */}
-            <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+            <div className="flex justify-end gap-3 pt-4 border-t border-white/[0.06]">
               <button
                 onClick={() => setShowSchedulingModal(false)}
-                className="px-5 py-2.5 text-gray-600 font-semibold text-sm hover:bg-gray-100 rounded-xl transition w-auto"
+                className="px-5 py-2.5 text-gray-300 font-semibold text-sm hover:bg-white/[0.06] rounded-xl transition w-auto"
               >
                 Cancel
               </button>
@@ -831,7 +875,7 @@ const TeamKnockouts = () => {
 
     return (
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+        <div className="bg-[#181A22] rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
           <div className="bg-gradient-to-r from-orange-500 to-orange-600 px-6 py-4 flex justify-between items-center">
             <h3 className="text-base font-bold text-white">Edit Doubles Lineup</h3>
             <button
@@ -851,7 +895,7 @@ const TeamKnockouts = () => {
                 type="text"
                 value={subData.homePlayerB}
                 onChange={(e) => setSubData(prev => ({ ...prev, homePlayerB: e.target.value }))}
-                className="w-full h-11 px-4 py-2 rounded-xl bg-gray-50 border border-gray-200 text-sm text-gray-700 focus:bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition"
+                className="w-full h-11 px-4 py-2 rounded-xl bg-white/[0.03] border border-white/[0.08] text-sm text-gray-200 focus:bg-[#181A22] focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition"
                 placeholder="Enter player name"
               />
             </div>
@@ -864,15 +908,15 @@ const TeamKnockouts = () => {
                 type="text"
                 value={subData.awayPlayerZ}
                 onChange={(e) => setSubData(prev => ({ ...prev, awayPlayerZ: e.target.value }))}
-                className="w-full h-11 px-4 py-2 rounded-xl bg-gray-50 border border-gray-200 text-sm text-gray-700 focus:bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition"
+                className="w-full h-11 px-4 py-2 rounded-xl bg-white/[0.03] border border-white/[0.08] text-sm text-gray-200 focus:bg-[#181A22] focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition"
                 placeholder="Enter player name"
               />
             </div>
 
-            <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+            <div className="flex justify-end gap-3 pt-4 border-t border-white/[0.06]">
               <button
                 onClick={() => setShowSubstituteModal(false)}
-                className="px-5 py-2.5 text-gray-600 font-semibold text-sm hover:bg-gray-100 rounded-xl transition w-auto"
+                className="px-5 py-2.5 text-gray-300 font-semibold text-sm hover:bg-white/[0.06] rounded-xl transition w-auto"
               >
                 Cancel
               </button>
@@ -968,14 +1012,14 @@ const TeamKnockouts = () => {
 
     return (
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+        <div className="bg-[#181A22] rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
           <div className="bg-gradient-to-r from-orange-500 to-orange-600 px-6 py-5">
             <h3 className="text-base font-bold text-white">Doubles Lineup Configuration</h3>
             <div className="flex items-center justify-between mt-2">
               <p className="text-xs text-white/80">Match {configuringIndex + 1} of {matchesToConfigure.length}</p>
               <div className="w-32 h-1.5 bg-white/20 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-white rounded-full transition-all"
+                  className="h-full bg-[#181A22] rounded-full transition-all"
                   style={{ width: `${((configuringIndex + 1) / matchesToConfigure.length) * 100}%` }}
                 />
               </div>
@@ -983,10 +1027,10 @@ const TeamKnockouts = () => {
           </div>
 
           <div className="p-6 space-y-5">
-            <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 flex items-center justify-center gap-3">
-              <span className="font-bold text-gray-800 text-sm truncate">{team1Name}</span>
-              <span className="text-[10px] font-bold text-gray-400 bg-white px-2 py-1 rounded-full border border-gray-200">VS</span>
-              <span className="font-bold text-gray-800 text-sm truncate">{team2Name}</span>
+            <div className="bg-white/[0.03] p-4 rounded-2xl border border-white/[0.06] flex items-center justify-center gap-3">
+              <span className="font-bold text-gray-100 text-sm truncate">{team1Name}</span>
+              <span className="text-[10px] font-bold text-gray-400 bg-[#181A22] px-2 py-1 rounded-full border border-white/[0.08]">VS</span>
+              <span className="font-bold text-gray-100 text-sm truncate">{team2Name}</span>
             </div>
 
             <div>
@@ -999,7 +1043,7 @@ const TeamKnockouts = () => {
                   type="text"
                   value={nominationData.homePlayerB}
                   onChange={(e) => setNominationData(prev => ({ ...prev, homePlayerB: e.target.value }))}
-                  className="w-full h-11 pl-10 pr-4 py-2 rounded-xl bg-gray-50 border border-gray-200 text-sm text-gray-700 focus:bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition"
+                  className="w-full h-11 pl-10 pr-4 py-2 rounded-xl bg-white/[0.03] border border-white/[0.08] text-sm text-gray-200 focus:bg-[#181A22] focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition"
                   placeholder="Enter partner name"
                 />
               </div>
@@ -1015,16 +1059,16 @@ const TeamKnockouts = () => {
                   type="text"
                   value={nominationData.awayPlayerZ}
                   onChange={(e) => setNominationData(prev => ({ ...prev, awayPlayerZ: e.target.value }))}
-                  className="w-full h-11 pl-10 pr-4 py-2 rounded-xl bg-gray-50 border border-gray-200 text-sm text-gray-700 focus:bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition"
+                  className="w-full h-11 pl-10 pr-4 py-2 rounded-xl bg-white/[0.03] border border-white/[0.08] text-sm text-gray-200 focus:bg-[#181A22] focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition"
                   placeholder="Enter partner name"
                 />
               </div>
             </div>
 
-            <div className="flex justify-between gap-3 pt-4 border-t border-gray-100">
+            <div className="flex justify-between gap-3 pt-4 border-t border-white/[0.06]">
               <button
                 onClick={handleSkip}
-                className="px-5 py-2.5 text-gray-500 font-semibold text-sm hover:bg-gray-100 rounded-xl transition w-auto"
+                className="px-5 py-2.5 text-gray-500 font-semibold text-sm hover:bg-white/[0.06] rounded-xl transition w-auto"
               >
                 Skip
               </button>
@@ -1157,33 +1201,43 @@ const TeamKnockouts = () => {
               {/* Header */}
               <div className="flex items-center justify-between mb-3 px-1">
                 <div>
-                  <h2 className="text-base font-bold text-gray-900">Registered Teams</h2>
+                  <h2 className="text-base font-bold text-white">Registered Teams</h2>
                   <p className="text-xs text-gray-400">{teams?.length || 0} teams available</p>
                 </div>
-                {teams?.length >= 2 && (
-                  <button
-                    onClick={() => {
-                      if (selectedTeams.length === teams.length) {
-                        setSelectedTeams([]);
-                      } else {
-                        setSelectedTeams([...teams]);
-                      }
-                    }}
-                    className="text-xs font-semibold text-orange-500 hover:text-orange-600 transition w-auto bg-transparent"
-                  >
-                    {selectedTeams.length === teams.length ? "Deselect All" : "Select All"}
-                  </button>
-                )}
+                <div className="flex items-center gap-2">
+                  {isRapidRallies && (
+                    <button
+                      onClick={() => { setEditingTeam(null); setShowRegisterModal(true); }}
+                      className="text-xs font-bold text-white bg-orange-500 hover:bg-orange-600 transition px-3 py-1.5 rounded-lg w-auto"
+                    >
+                      + Register team
+                    </button>
+                  )}
+                  {teams?.length >= 2 && (
+                    <button
+                      onClick={() => {
+                        if (selectedTeams.length === teams.length) {
+                          setSelectedTeams([]);
+                        } else {
+                          setSelectedTeams([...teams]);
+                        }
+                      }}
+                      className="text-xs font-semibold text-orange-500 hover:text-orange-400 transition w-auto bg-transparent"
+                    >
+                      {selectedTeams.length === teams.length ? "Deselect All" : "Select All"}
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Selection counter */}
               {selectedTeams.length > 0 && (
-                <div className="mb-3 px-3 py-2 bg-orange-50 border border-orange-100 rounded-xl flex items-center justify-between">
+                <div className="mb-3 px-3 py-2 bg-orange-500/10 border border-orange-100 rounded-xl flex items-center justify-between">
                   <span className="text-xs font-semibold text-orange-700">
                     {selectedTeams.length} of {teams.length} selected
                   </span>
                   {byeTeams.length > 0 && (
-                    <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+                    <span className="text-[10px] font-bold text-amber-300 bg-amber-500/15 px-2 py-0.5 rounded-full">
                       {byeTeams.length} BYE
                     </span>
                   )}
@@ -1191,14 +1245,14 @@ const TeamKnockouts = () => {
               )}
 
               {/* Team list */}
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className="flex flex-col divide-y divide-gray-50 overflow-y-auto max-h-[480px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
+              <div className="bg-[#181A22] rounded-2xl border border-white/[0.06] shadow-sm overflow-hidden">
+                <div className="flex flex-col divide-y divide-white/[0.05] overflow-y-auto max-h-[480px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
                   {teams?.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-16 text-center">
-                      <div className="w-14 h-14 rounded-2xl bg-orange-50 flex items-center justify-center mb-3">
+                      <div className="w-14 h-14 rounded-2xl bg-orange-500/10 flex items-center justify-center mb-3">
                         <FaUsers className="w-6 h-6 text-orange-300" />
                       </div>
-                      <p className="text-sm font-semibold text-gray-700">No teams yet</p>
+                      <p className="text-sm font-semibold text-gray-200">No teams yet</p>
                       <p className="text-xs text-gray-400 mt-1">Teams will appear here once registered</p>
                     </div>
                   ) : (
@@ -1210,16 +1264,16 @@ const TeamKnockouts = () => {
                         <div
                           key={booking._id}
                           className={`flex items-center justify-between gap-3 px-4 py-3 cursor-pointer transition
-                            ${isFocused ? "bg-orange-50/60" : "hover:bg-gray-50"}
+                            ${isFocused ? "bg-orange-500/10/60" : "hover:bg-white/[0.03]"}
                           `}
                           onClick={() => setSelectedTournament(booking)}
                         >
                           <div className="flex items-center gap-3 min-w-0 flex-1">
                             <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm flex-shrink-0
-                              ${isSelected ? "bg-orange-500 text-white" : "bg-gray-100 text-gray-500"}`}>
+                              ${isSelected ? "bg-orange-500 text-white" : "bg-white/[0.06] text-gray-500"}`}>
                               {booking.team.name.charAt(0).toUpperCase()}
                             </div>
-                            <span className="text-sm font-semibold text-gray-800 truncate">
+                            <span className="text-sm font-semibold text-gray-100 truncate">
                               {booking.team.name}
                             </span>
                           </div>
@@ -1231,7 +1285,7 @@ const TeamKnockouts = () => {
                                 handleSelectFavorite(booking);
                               }}
                               title={isSelected ? "Mark as bye" : "Select team first"}
-                              className="focus:outline-none bg-transparent hover:bg-amber-50 p-1.5 rounded-lg transition w-auto mt-0"
+                              className="focus:outline-none bg-transparent hover:bg-amber-500/10 p-1.5 rounded-lg transition w-auto mt-0"
                             >
                               {isBye ? (
                                 <StarIcon className="text-amber-500 w-4 h-4 fill-amber-500" />
@@ -1245,7 +1299,7 @@ const TeamKnockouts = () => {
                                 type="checkbox"
                                 checked={isSelected}
                                 onChange={(e) => handleTeamSelection(e, booking)}
-                                className="w-4 h-4 rounded border-gray-300 text-orange-500 focus:ring-orange-500/20 cursor-pointer accent-orange-500"
+                                className="w-4 h-4 rounded border-white/[0.12] text-orange-500 focus:ring-orange-500/20 cursor-pointer accent-orange-500"
                                 onClick={(e) => e.stopPropagation()}
                               />
                             </label>
@@ -1271,20 +1325,20 @@ const TeamKnockouts = () => {
             {/* Team Details */}
             {selectedTournament ? (
               <div className="flex-1">
-                <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 text-black">
+                <div className="bg-[#181A22] rounded-2xl p-6 shadow-sm border border-white/[0.06] text-black">
                   <div className="flex justify-between items-start mb-5">
                     <div className="flex items-center gap-3">
                       <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center text-white text-lg font-bold shadow-sm shadow-orange-200">
                         {selectedTournament.team.name.charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <h2 className="text-lg font-bold text-gray-900">{selectedTournament.team.name}</h2>
+                        <h2 className="text-lg font-bold text-white">{selectedTournament.team.name}</h2>
                         <p className="text-xs text-gray-400">Team details</p>
                       </div>
                     </div>
                     <div className="text-right">
                       <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Registered</p>
-                      <p className="text-xs text-gray-600 font-semibold mt-0.5">
+                      <p className="text-xs text-gray-300 font-semibold mt-0.5">
                         {new Date(
                           selectedTournament.createdAt
                         ).toLocaleDateString("en-US", {
@@ -1299,20 +1353,20 @@ const TeamKnockouts = () => {
                   {/* Cards Section */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Captain & Players */}
-                    <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100">
+                    <div className="bg-white/[0.03] rounded-2xl p-5 border border-white/[0.06]">
                       <div className="flex items-center gap-2 mb-3">
-                        <div className="w-7 h-7 rounded-lg bg-orange-100 flex items-center justify-center">
+                        <div className="w-7 h-7 rounded-lg bg-orange-500/15 flex items-center justify-center">
                           <FaCrown className="w-3 h-3 text-orange-500" />
                         </div>
                         <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Captain</h3>
                       </div>
-                      <p className="text-sm font-semibold text-gray-800 mb-4 pl-1">
+                      <p className="text-sm font-semibold text-gray-100 mb-4 pl-1">
                         {selectedTournament.team.captain}
                       </p>
 
-                      <div className="flex items-center gap-2 mb-3 pt-3 border-t border-gray-100">
-                        <div className="w-7 h-7 rounded-lg bg-emerald-100 flex items-center justify-center">
-                          <FaUser className="w-3 h-3 text-emerald-600" />
+                      <div className="flex items-center gap-2 mb-3 pt-3 border-t border-white/[0.06]">
+                        <div className="w-7 h-7 rounded-lg bg-emerald-500/15 flex items-center justify-center">
+                          <FaUser className="w-3 h-3 text-emerald-400" />
                         </div>
                         <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
                           Players ({selectedTournament.team.players?.length || 0})
@@ -1320,7 +1374,7 @@ const TeamKnockouts = () => {
                       </div>
                       <ul className="space-y-1.5">
                         {selectedTournament.team.players.map((player, index) => (
-                          <li key={index} className="text-sm text-gray-700 flex items-center gap-2 pl-1">
+                          <li key={index} className="text-sm text-gray-200 flex items-center gap-2 pl-1">
                             <span className="w-1 h-1 rounded-full bg-gray-300" />
                             {player.name}
                           </li>
@@ -1329,9 +1383,9 @@ const TeamKnockouts = () => {
                     </div>
 
                     {/* Substitutes */}
-                    <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100">
+                    <div className="bg-white/[0.03] rounded-2xl p-5 border border-white/[0.06]">
                       <div className="flex items-center gap-2 mb-3">
-                        <div className="w-7 h-7 rounded-lg bg-amber-100 flex items-center justify-center">
+                        <div className="w-7 h-7 rounded-lg bg-amber-500/15 flex items-center justify-center">
                           <FaSyncAlt className="w-3 h-3 text-amber-600" />
                         </div>
                         <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
@@ -1341,7 +1395,7 @@ const TeamKnockouts = () => {
                       {selectedTournament.team.substitutes?.length > 0 ? (
                         <ul className="space-y-1.5">
                           {selectedTournament.team.substitutes.map((substitute, index) => (
-                            <li key={index} className="text-sm text-gray-700 flex items-center gap-2 pl-1">
+                            <li key={index} className="text-sm text-gray-200 flex items-center gap-2 pl-1">
                               <span className="w-1 h-1 rounded-full bg-gray-300" />
                               {substitute.name}
                             </li>
@@ -1355,9 +1409,9 @@ const TeamKnockouts = () => {
                 </div>
               </div>
             ) : (
-              <div className="flex-1 hidden lg:flex items-center justify-center bg-white rounded-2xl border border-dashed border-gray-200 min-h-[400px]">
+              <div className="flex-1 hidden lg:flex items-center justify-center bg-[#181A22] rounded-2xl border border-dashed border-white/[0.08] min-h-[400px]">
                 <div className="text-center">
-                  <div className="w-16 h-16 rounded-2xl bg-gray-50 flex items-center justify-center mx-auto mb-3">
+                  <div className="w-16 h-16 rounded-2xl bg-white/[0.03] flex items-center justify-center mx-auto mb-3">
                     <FaUsers className="w-7 h-7 text-gray-300" />
                   </div>
                   <p className="text-sm font-semibold text-gray-500">Select a team</p>
@@ -1373,7 +1427,7 @@ const TeamKnockouts = () => {
               // Tab-switch skeleton — replaces the ~500ms blank flash while
               // /round-robin/list is in flight.
               <div className="space-y-4">
-                <div className="bg-white rounded-2xl border border-gray-100 p-5">
+                <div className="bg-[#181A22] rounded-2xl border border-white/[0.06] p-5">
                   <Skeleton className="h-5 w-40 mb-3" />
                   <Skeleton className="h-3 w-64" />
                 </div>
@@ -1385,12 +1439,12 @@ const TeamKnockouts = () => {
               </div>
             ) : !rrGenerated ? (
               // Generate Round Robin Form
-              <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 max-w-2xl mx-auto">
+              <div className="bg-[#181A22] rounded-2xl p-8 shadow-sm border border-white/[0.06] max-w-2xl mx-auto">
                 <div className="text-center mb-6">
-                  <div className="w-16 h-16 bg-orange-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <div className="w-16 h-16 bg-orange-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
                     <Trophy className="w-8 h-8 text-orange-500" />
                   </div>
-                  <h3 className="text-xl font-bold text-gray-900">Generate Round Robin Matches</h3>
+                  <h3 className="text-xl font-bold text-white">Generate Round Robin Matches</h3>
                   <p className="text-gray-500 text-sm mt-1">
                     Every team plays every other team. Total matches: <strong>{teams.length > 0 ? (teams.length * (teams.length - 1)) / 2 : 0}</strong>
                   </p>
@@ -1403,7 +1457,7 @@ const TeamKnockouts = () => {
                       type="datetime-local"
                       value={rrSchedule.matchStartTime}
                       onChange={(e) => setRrSchedule({ ...rrSchedule, matchStartTime: e.target.value })}
-                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-orange-500"
+                      className="w-full px-4 py-3 bg-white/[0.03] border border-white/[0.08] rounded-xl text-sm text-white placeholder:text-gray-500 [color-scheme:dark] focus:outline-none focus:border-orange-500"
                     />
                   </div>
                   <div>
@@ -1412,7 +1466,7 @@ const TeamKnockouts = () => {
                       type="number"
                       value={rrSchedule.matchInterval}
                       onChange={(e) => setRrSchedule({ ...rrSchedule, matchInterval: e.target.value })}
-                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-orange-500"
+                      className="w-full px-4 py-3 bg-white/[0.03] border border-white/[0.08] rounded-xl text-sm text-white placeholder:text-gray-500 [color-scheme:dark] focus:outline-none focus:border-orange-500"
                       placeholder="30"
                     />
                   </div>
@@ -1422,7 +1476,7 @@ const TeamKnockouts = () => {
                       type="text"
                       value={rrSchedule.courtNumber}
                       onChange={(e) => setRrSchedule({ ...rrSchedule, courtNumber: e.target.value })}
-                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-orange-500"
+                      className="w-full px-4 py-3 bg-white/[0.03] border border-white/[0.08] rounded-xl text-sm text-white placeholder:text-gray-500 [color-scheme:dark] focus:outline-none focus:border-orange-500"
                       placeholder="1"
                     />
                   </div>
@@ -1449,7 +1503,7 @@ const TeamKnockouts = () => {
                 {/* Header */}
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-lg font-bold text-gray-900">Round Robin League</h3>
+                    <h3 className="text-lg font-bold text-white">Round Robin League</h3>
                     <p className="text-xs text-gray-500">
                       {rrMatches.length} matches • {rrMatches.filter((m) => m.status === "COMPLETED").length} completed • {rrMatches.filter((m) => m.status !== "COMPLETED").length} pending
                     </p>
@@ -1457,13 +1511,13 @@ const TeamKnockouts = () => {
                   <div className="flex gap-2">
                     <button
                       onClick={fetchRoundRobin}
-                      className="px-3 py-2 bg-white hover:bg-gray-50 text-gray-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition w-auto border border-gray-200"
+                      className="px-3 py-2 bg-[#181A22] hover:bg-white/[0.03] text-gray-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition w-auto border border-white/[0.08]"
                     >
                       <RefreshCcw className="w-3.5 h-3.5" /> Refresh
                     </button>
                     <button
                       onClick={handleDeleteRoundRobin}
-                      className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-semibold transition w-auto border border-red-100"
+                      className="px-3 py-2 bg-red-500/10 hover:bg-red-500/15 text-red-600 rounded-xl text-xs font-semibold transition w-auto border border-red-100"
                     >
                       Reset
                     </button>
@@ -1474,14 +1528,14 @@ const TeamKnockouts = () => {
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
                   {/* LEFT — Points Table (sticky on desktop) */}
                   <div className="lg:col-span-2">
-                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden lg:sticky lg:top-4">
-                      <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
-                        <h4 className="text-sm font-bold text-gray-900">Points Table</h4>
+                    <div className="bg-[#181A22] rounded-2xl shadow-sm border border-white/[0.06] overflow-hidden lg:sticky lg:top-4">
+                      <div className="px-5 py-3 border-b border-white/[0.06] flex items-center justify-between">
+                        <h4 className="text-sm font-bold text-white">Points Table</h4>
                         <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{rrStandings.length} teams</span>
                       </div>
                       <div className="overflow-x-auto max-h-[70vh]">
                         <table className="w-full text-xs">
-                          <thead className="bg-gray-50 sticky top-0 z-10">
+                          <thead className="bg-white/[0.03] sticky top-0 z-10">
                             <tr>
                               <th className="text-left px-3 py-2.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider">#</th>
                               <th className="text-left px-2 py-2.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Team</th>
@@ -1493,7 +1547,7 @@ const TeamKnockouts = () => {
                               <th className="text-center px-2 py-2.5 text-[10px] font-bold text-orange-500 uppercase tracking-wider">Pts</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-gray-50">
+                          <tbody className="divide-y divide-white/[0.05]">
                             {rrStandings.length === 0 ? (
                               <tr>
                                 <td colSpan={8} className="px-4 py-8 text-center text-xs text-gray-400">
@@ -1502,22 +1556,22 @@ const TeamKnockouts = () => {
                               </tr>
                             ) : (
                               rrStandings.map((team, i) => (
-                                <tr key={team.teamId} className={`hover:bg-orange-50/30 transition ${i < 2 ? "bg-emerald-50/40" : ""}`}>
+                                <tr key={team.teamId} className={`hover:bg-orange-500/10/30 transition ${i < 2 ? "bg-emerald-500/10/40" : ""}`}>
                                   <td className="px-3 py-2.5">
                                     <span className={`inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-bold ${
-                                      i === 0 ? "bg-amber-100 text-amber-700" :
-                                      i === 1 ? "bg-gray-200 text-gray-700" :
-                                      i === 2 ? "bg-orange-100 text-orange-700" :
+                                      i === 0 ? "bg-amber-500/15 text-amber-300" :
+                                      i === 1 ? "bg-gray-200 text-gray-200" :
+                                      i === 2 ? "bg-orange-500/15 text-orange-700" :
                                       "text-gray-400"
                                     }`}>
                                       {i + 1}
                                     </span>
                                   </td>
                                   <td className="px-2 py-2.5">
-                                    <div className="font-semibold text-gray-900 text-xs truncate max-w-[120px]" title={team.teamName}>{team.teamName}</div>
+                                    <div className="font-semibold text-white text-xs truncate max-w-[120px]" title={team.teamName}>{team.teamName}</div>
                                   </td>
-                                  <td className="text-center px-1.5 py-2.5 text-gray-600">{team.played}</td>
-                                  <td className="text-center px-1.5 py-2.5 font-semibold text-emerald-600">{team.won}</td>
+                                  <td className="text-center px-1.5 py-2.5 text-gray-300">{team.played}</td>
+                                  <td className="text-center px-1.5 py-2.5 font-semibold text-emerald-400">{team.won}</td>
                                   <td className="text-center px-1.5 py-2.5 font-semibold text-red-400">{team.lost}</td>
                                   <td className="text-center px-1.5 py-2.5 text-gray-500">{team.setsWon}</td>
                                   <td className="text-center px-1.5 py-2.5 text-gray-500">{team.setsLost}</td>
@@ -1528,7 +1582,7 @@ const TeamKnockouts = () => {
                           </tbody>
                         </table>
                       </div>
-                      <div className="px-4 py-2 bg-gray-50 border-t border-gray-100 text-[10px] text-gray-400">
+                      <div className="px-4 py-2 bg-white/[0.03] border-t border-white/[0.06] text-[10px] text-gray-400">
                         <span className="font-semibold">P</span> Played · <span className="font-semibold">W</span> Won · <span className="font-semibold">L</span> Lost · <span className="font-semibold">SW/SL</span> Sets · <span className="font-semibold">Pts</span> Points
                       </div>
                     </div>
@@ -1538,24 +1592,24 @@ const TeamKnockouts = () => {
                   <div className="lg:col-span-3 space-y-4">
                     {/* Pending matches */}
                     {rrMatches.filter((m) => m.status !== "COMPLETED").length > 0 && (
-                      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                        <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+                      <div className="bg-[#181A22] rounded-2xl shadow-sm border border-white/[0.06] overflow-hidden">
+                        <div className="px-5 py-3 border-b border-white/[0.06] flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <Clock className="w-4 h-4 text-amber-500" />
-                            <h4 className="text-sm font-bold text-gray-900">Pending Matches</h4>
+                            <h4 className="text-sm font-bold text-white">Pending Matches</h4>
                           </div>
-                          <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">
+                          <span className="text-[10px] font-bold text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded-full">
                             {rrMatches.filter((m) => m.status !== "COMPLETED").length}
                           </span>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-gray-50 max-h-[35vh] overflow-y-auto">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-white/[0.03] max-h-[35vh] overflow-y-auto">
                           {rrMatches.filter((m) => m.status !== "COMPLETED").map((match) => {
                             const t1 = match.team1Id?.teamName || "Team 1";
                             const t2 = match.team2Id?.teamName || "Team 2";
                             return (
-                              <div key={match._id} className="bg-white p-3 hover:bg-orange-50/30 transition group">
+                              <div key={match._id} className="bg-[#181A22] p-3 hover:bg-orange-500/[0.06] transition group">
                                 <div className="flex items-center justify-between mb-2">
-                                  <span className="text-[9px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                                  <span className="text-[9px] font-bold text-amber-300 bg-amber-500/10 px-1.5 py-0.5 rounded uppercase tracking-wider">
                                     Pending
                                   </span>
                                   {match.courtNumber && match.courtNumber !== "TBD" && (
@@ -1563,10 +1617,29 @@ const TeamKnockouts = () => {
                                   )}
                                 </div>
                                 <div className="flex items-center justify-between gap-2 mb-2">
-                                  <span className="font-semibold text-xs text-gray-900 truncate flex-1" title={t1}>{t1}</span>
+                                  <span className="font-semibold text-xs text-white truncate flex-1" title={t1}>{t1}</span>
                                   <span className="text-[10px] text-gray-300 font-bold">VS</span>
-                                  <span className="font-semibold text-xs text-gray-900 truncate flex-1 text-right" title={t2}>{t2}</span>
+                                  <span className="font-semibold text-xs text-white truncate flex-1 text-right" title={t2}>{t2}</span>
                                 </div>
+                                {(() => {
+                                  const ump = match.referee && (match.referee.name || (typeof match.referee === "string" ? "Assigned" : null));
+                                  return (
+                                    <button
+                                      onClick={() => setAssignModalMatch(match)}
+                                      className={`w-full mt-1 py-1.5 border text-[11px] font-bold rounded-lg flex items-center justify-center gap-1 transition ${ump ? "bg-white/[0.03] border-white/[0.08] text-gray-300 hover:bg-white/[0.06]" : "bg-[#181A22] border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"}`}
+                                    >
+                                      {ump ? `Umpire: ${ump}` : "+ Assign umpire"}
+                                    </button>
+                                  );
+                                })()}
+                                {isRapidRallies && (
+                                  <button
+                                    onClick={() => setLineupMatchId(match._id)}
+                                    className="w-full mt-1 py-1.5 bg-[#181A22] border border-orange-300 text-orange-400 hover:bg-orange-500/10 text-[11px] font-bold rounded-lg flex items-center justify-center gap-1 transition active:scale-[0.97]"
+                                  >
+                                    Set lineup
+                                  </button>
+                                )}
                                 <button
                                   onClick={() => openMatchScoreboard(match)}
                                   className="w-full mt-1 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-[11px] font-bold rounded-lg flex items-center justify-center gap-1 transition active:scale-[0.97]"
@@ -1582,17 +1655,17 @@ const TeamKnockouts = () => {
 
                     {/* Completed matches */}
                     {rrMatches.filter((m) => m.status === "COMPLETED").length > 0 && (
-                      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                        <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+                      <div className="bg-[#181A22] rounded-2xl shadow-sm border border-white/[0.06] overflow-hidden">
+                        <div className="px-5 py-3 border-b border-white/[0.06] flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                            <h4 className="text-sm font-bold text-gray-900">Completed</h4>
+                            <h4 className="text-sm font-bold text-white">Completed</h4>
                           </div>
-                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
+                          <span className="text-[10px] font-bold text-emerald-300 bg-emerald-500/10 px-2 py-0.5 rounded-full">
                             {rrMatches.filter((m) => m.status === "COMPLETED").length}
                           </span>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-gray-50 max-h-[35vh] overflow-y-auto">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-white/[0.03] max-h-[35vh] overflow-y-auto">
                           {rrMatches.filter((m) => m.status === "COMPLETED").map((match) => {
                             const t1 = match.team1Id?.teamName || "Team 1";
                             const t2 = match.team2Id?.teamName || "Team 2";
@@ -1602,10 +1675,10 @@ const TeamKnockouts = () => {
                               <div
                                 key={match._id}
                                 onClick={() => openMatchScoreboard(match)}
-                                className="bg-white p-3 hover:bg-emerald-50/30 transition cursor-pointer"
+                                className="bg-[#181A22] p-3 hover:bg-emerald-500/10/30 transition cursor-pointer"
                               >
                                 <div className="flex items-center justify-between mb-2">
-                                  <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                                  <span className="text-[9px] font-bold text-emerald-300 bg-emerald-500/10 px-1.5 py-0.5 rounded uppercase tracking-wider">
                                     Completed
                                   </span>
                                   {match.courtNumber && match.courtNumber !== "TBD" && (
@@ -1614,18 +1687,18 @@ const TeamKnockouts = () => {
                                 </div>
                                 <div className="space-y-1">
                                   <div className="flex items-center justify-between gap-2">
-                                    <span className={`font-semibold text-xs truncate flex-1 ${homeWon ? "text-emerald-600" : "text-gray-700"}`} title={t1}>
+                                    <span className={`font-semibold text-xs truncate flex-1 ${homeWon ? "text-emerald-400" : "text-gray-200"}`} title={t1}>
                                       {t1}
                                     </span>
-                                    <span className={`text-xs font-black ${homeWon ? "text-emerald-600" : "text-gray-400"}`}>
+                                    <span className={`text-xs font-black ${homeWon ? "text-emerald-400" : "text-gray-400"}`}>
                                       {match.setsWon?.home || 0}
                                     </span>
                                   </div>
                                   <div className="flex items-center justify-between gap-2">
-                                    <span className={`font-semibold text-xs truncate flex-1 ${awayWon ? "text-emerald-600" : "text-gray-700"}`} title={t2}>
+                                    <span className={`font-semibold text-xs truncate flex-1 ${awayWon ? "text-emerald-400" : "text-gray-200"}`} title={t2}>
                                       {t2}
                                     </span>
-                                    <span className={`text-xs font-black ${awayWon ? "text-emerald-600" : "text-gray-400"}`}>
+                                    <span className={`text-xs font-black ${awayWon ? "text-emerald-400" : "text-gray-400"}`}>
                                       {match.setsWon?.away || 0}
                                     </span>
                                   </div>
@@ -1638,8 +1711,8 @@ const TeamKnockouts = () => {
                     )}
 
                     {rrMatches.length === 0 && (
-                      <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-12 text-center">
-                        <div className="w-14 h-14 rounded-2xl bg-gray-50 flex items-center justify-center mx-auto mb-3">
+                      <div className="bg-[#181A22] rounded-2xl border border-dashed border-white/[0.08] p-12 text-center">
+                        <div className="w-14 h-14 rounded-2xl bg-white/[0.03] flex items-center justify-center mx-auto mb-3">
                           <Trophy className="w-6 h-6 text-gray-300" />
                         </div>
                         <p className="text-sm font-semibold text-gray-500">No matches yet</p>
@@ -1666,6 +1739,37 @@ const TeamKnockouts = () => {
 
       {showDoublesNominationModal && <DoublesNominationModal />}
 
+      {showRegisterModal && (
+        <RapidRalliesRegisterModal
+          open={showRegisterModal}
+          onClose={() => { setShowRegisterModal(false); setEditingTeam(null); }}
+          tournamentId={tournamentId}
+          sportId={tournamentInfo?.sportId || null}
+          editingTeam={editingTeam}
+          onSaved={fetchRegisteredTeams}
+        />
+      )}
+
+      {lineupMatchId && (
+        <RapidRalliesLineupModal
+          open={!!lineupMatchId}
+          onClose={() => setLineupMatchId(null)}
+          matchId={lineupMatchId}
+          onSaved={fetchRoundRobin}
+        />
+      )}
+
+      {assignModalMatch && (
+        <AssignUmpireModal
+          isOpen={!!assignModalMatch}
+          onClose={() => setAssignModalMatch(null)}
+          matchId={assignModalMatch._id}
+          tournamentId={tournamentId}
+          matchLabel={`${assignModalMatch.team1Id?.teamName || "Team 1"} vs ${assignModalMatch.team2Id?.teamName || "Team 2"}`}
+          onAssigned={() => { setAssignModalMatch(null); fetchRoundRobin(); }}
+        />
+      )}
+
       {showGenerationChoiceModal && (() => {
         const allSelected = teams.length > 0 && selectedTeams.length === teams.length;
         const totalRR = (selectedTeams.length * (selectedTeams.length - 1)) / 2;
@@ -1673,7 +1777,7 @@ const TeamKnockouts = () => {
           Math.log2(selectedTeams.length) === Math.floor(Math.log2(selectedTeams.length));
         return (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden">
+            <div className="bg-[#181A22] rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden">
               <div className="bg-gradient-to-r from-orange-500 to-orange-600 px-6 py-5 flex justify-between items-center">
                 <div>
                   <h2 className="text-lg font-bold text-white">Choose Match Format</h2>
@@ -1694,23 +1798,23 @@ const TeamKnockouts = () => {
                 {/* Knockout Card */}
                 <button
                   onClick={proceedWithKnockout}
-                  className="text-left bg-white border-2 border-gray-100 hover:border-orange-500 hover:shadow-lg rounded-2xl p-5 transition-all group w-auto"
+                  className="text-left bg-[#181A22] border-2 border-white/[0.06] hover:border-orange-500 hover:shadow-lg rounded-2xl p-5 transition-all group w-auto"
                 >
-                  <div className="w-12 h-12 rounded-2xl bg-orange-50 group-hover:bg-orange-100 flex items-center justify-center mb-3 transition">
+                  <div className="w-12 h-12 rounded-2xl bg-orange-500/10 group-hover:bg-orange-500/15 flex items-center justify-center mb-3 transition">
                     <Trophy className="w-6 h-6 text-orange-500" />
                   </div>
-                  <h3 className="font-bold text-gray-900 text-base mb-1">Knockout Tournament</h3>
+                  <h3 className="font-bold text-white text-base mb-1">Knockout Tournament</h3>
                   <p className="text-xs text-gray-500 leading-relaxed mb-3">
                     Single elimination bracket. Loser is out, winner advances to next round.
                   </p>
-                  <div className="space-y-1 pt-3 border-t border-gray-100">
+                  <div className="space-y-1 pt-3 border-t border-white/[0.06]">
                     <div className="flex justify-between text-[11px]">
                       <span className="text-gray-400">Rounds</span>
-                      <span className="font-semibold text-gray-700">{calculateTotalRounds(selectedTeams.length)}</span>
+                      <span className="font-semibold text-gray-200">{calculateTotalRounds(selectedTeams.length)}</span>
                     </div>
                     <div className="flex justify-between text-[11px]">
                       <span className="text-gray-400">Byes needed</span>
-                      <span className="font-semibold text-gray-700">{byesNeeded}</span>
+                      <span className="font-semibold text-gray-200">{byesNeeded}</span>
                     </div>
                     {!isPowerOf2 && (
                       <p className="text-[10px] text-amber-600 mt-2 font-medium">
@@ -1723,34 +1827,34 @@ const TeamKnockouts = () => {
                 {/* Round Robin Card */}
                 <button
                   onClick={proceedWithRoundRobin}
-                  className={`text-left bg-white border-2 rounded-2xl p-5 transition-all group w-auto ${
+                  className={`text-left bg-[#181A22] border-2 rounded-2xl p-5 transition-all group w-auto ${
                     allSelected
                       ? "border-emerald-500 shadow-md hover:shadow-lg ring-2 ring-emerald-100"
-                      : "border-gray-100 hover:border-emerald-500 hover:shadow-lg"
+                      : "border-white/[0.06] hover:border-emerald-500 hover:shadow-lg"
                   }`}
                 >
                   <div className="flex items-start justify-between mb-3">
-                    <div className="w-12 h-12 rounded-2xl bg-emerald-50 group-hover:bg-emerald-100 flex items-center justify-center transition">
-                      <FaUsers className="w-5 h-5 text-emerald-600" />
+                    <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 group-hover:bg-emerald-500/15 flex items-center justify-center transition">
+                      <FaUsers className="w-5 h-5 text-emerald-400" />
                     </div>
                     {allSelected && (
-                      <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 px-2 py-1 rounded-full uppercase tracking-wider">
+                      <span className="text-[9px] font-bold text-emerald-300 bg-emerald-500/15 px-2 py-1 rounded-full uppercase tracking-wider">
                         Recommended
                       </span>
                     )}
                   </div>
-                  <h3 className="font-bold text-gray-900 text-base mb-1">Round Robin League</h3>
+                  <h3 className="font-bold text-white text-base mb-1">Round Robin League</h3>
                   <p className="text-xs text-gray-500 leading-relaxed mb-3">
                     Every team plays every other team. Points table decides the winner.
                   </p>
-                  <div className="space-y-1 pt-3 border-t border-gray-100">
+                  <div className="space-y-1 pt-3 border-t border-white/[0.06]">
                     <div className="flex justify-between text-[11px]">
                       <span className="text-gray-400">Total matches</span>
-                      <span className="font-semibold text-gray-700">{totalRR}</span>
+                      <span className="font-semibold text-gray-200">{totalRR}</span>
                     </div>
                     <div className="flex justify-between text-[11px]">
                       <span className="text-gray-400">No byes needed</span>
-                      <span className="font-semibold text-emerald-600">✓</span>
+                      <span className="font-semibold text-emerald-400">✓</span>
                     </div>
                     {!allSelected && (
                       <p className="text-[10px] text-amber-600 mt-2 font-medium">
@@ -1764,7 +1868,7 @@ const TeamKnockouts = () => {
               <div className="px-6 pb-5">
                 <button
                   onClick={() => setShowGenerationChoiceModal(false)}
-                  className="w-full py-2.5 text-gray-500 hover:text-gray-700 text-sm font-semibold transition"
+                  className="w-full py-2.5 text-gray-500 hover:text-gray-200 text-sm font-semibold transition"
                 >
                   Cancel
                 </button>
@@ -1777,30 +1881,30 @@ const TeamKnockouts = () => {
       {showSubstituteModal && <SubstituteModal />}
       {showStructureAlert && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+          <div className="bg-[#181A22] rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
             <div className="bg-gradient-to-r from-amber-500 to-amber-600 px-6 py-5">
               <h2 className="text-base font-bold text-white">Bye Assignment Required</h2>
               <p className="text-xs text-white/80 mt-0.5">Balance the bracket before generating</p>
             </div>
 
             <div className="p-6">
-              <p className="text-sm text-gray-600 text-center mb-5">
-                You have selected <strong className="text-gray-900">{selectedTeams.length}</strong> teams.
+              <p className="text-sm text-gray-300 text-center mb-5">
+                You have selected <strong className="text-white">{selectedTeams.length}</strong> teams.
                 A knockout bracket needs exactly{" "}
-                <strong className="text-orange-600">
+                <strong className="text-orange-400">
                   {byesNeeded} bye{byesNeeded > 1 ? "s" : ""}
                 </strong>{" "}
                 to be balanced.
               </p>
 
               <div className="grid grid-cols-2 gap-3 mb-5">
-                <div className="bg-gray-50 rounded-2xl p-4 text-center border border-gray-100">
+                <div className="bg-white/[0.03] rounded-2xl p-4 text-center border border-white/[0.06]">
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Required</p>
                   <p className="text-2xl font-black text-orange-500 mt-1">{byesNeeded}</p>
                 </div>
-                <div className="bg-gray-50 rounded-2xl p-4 text-center border border-gray-100">
+                <div className="bg-white/[0.03] rounded-2xl p-4 text-center border border-white/[0.06]">
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Assigned</p>
-                  <p className={`text-2xl font-black mt-1 ${byeTeams.length === byesNeeded ? "text-emerald-500" : "text-gray-700"}`}>
+                  <p className={`text-2xl font-black mt-1 ${byeTeams.length === byesNeeded ? "text-emerald-500" : "text-gray-200"}`}>
                     {String(byeTeams.length).padStart(2, "0")}
                   </p>
                 </div>
