@@ -122,6 +122,20 @@ const TeamKnockouts = () => {
     matchInterval: "30",
     courtNumber: "1",
   });
+  // Courts hosting the league — ties are distributed across these; the manager
+  // can deselect courts to reserve them for the knockout.
+  const [rrCourts, setRrCourts] = useState([]);
+  const [rrCourtSel, setRrCourtSel] = useState([]);
+  useEffect(() => {
+    if (!tournamentId) return;
+    axios.get(`/api/tournaments/${tournamentId}/courts`).then((r) => {
+      const names = (r.data?.courts || r.data || [])
+        .filter((c) => c && c.isActive !== false && c.name)
+        .map((c) => c.name);
+      setRrCourts(names);
+      setRrCourtSel(names); // default: all courts host the league
+    }).catch(() => {});
+  }, [tournamentId]);
 
   const fetchRoundRobin = async () => {
     if (!tournamentId) return;
@@ -155,6 +169,7 @@ const TeamKnockouts = () => {
           matchStartTime: rrSchedule.matchStartTime,
           matchInterval: rrSchedule.matchInterval,
           courtNumber: rrSchedule.courtNumber,
+          ...(rrCourtSel.length ? { courtNames: rrCourtSel } : {}),
         },
         tournamentType: tournamentType || "Singles",
         setCount: setCount || 3,
@@ -1107,15 +1122,24 @@ const TeamKnockouts = () => {
     { label: _currentTabLabel },
   ];
   const _tabBar = (
-    <TabBar
-      urlKey="tab"
-      defaultKey="teams"
-      tabs={[
-        { key: "teams",   label: "Teams",   count: teams.length || undefined },
-        { key: "league",  label: "League",  count: rrMatches.length || undefined },
-        { key: "matches", label: "Matches" },
-      ]}
-    />
+    <div className="flex items-center justify-between gap-3 flex-wrap">
+      <TabBar
+        urlKey="tab"
+        defaultKey="teams"
+        tabs={[
+          { key: "teams",   label: "Teams",   count: teams.length || undefined },
+          { key: "league",  label: "League",  count: rrMatches.length || undefined },
+          { key: "matches", label: "Matches" },
+        ]}
+      />
+      <button
+        onClick={() => navigate(`/tournaments/${tournamentId}/courts`)}
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-orange-400 border border-orange-500/40 bg-orange-500/10 hover:bg-orange-500/20 transition w-auto"
+        title="Manage courts & assign umpires"
+      >
+        <FaUsers className="w-3.5 h-3.5" /> Courts &amp; Umpires
+      </button>
+    </div>
   );
 
   if (loading) {
@@ -1482,9 +1506,40 @@ const TeamKnockouts = () => {
                   </div>
                 </div>
 
+                {rrCourts.length > 0 && (
+                  <div className="mb-4">
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 block">
+                      Courts for the league{" "}
+                      <span className="text-gray-600 normal-case font-normal">(deselect to reserve for knockout)</span>
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {rrCourts.map((name) => {
+                        const on = rrCourtSel.includes(name);
+                        return (
+                          <button
+                            key={name}
+                            type="button"
+                            onClick={() => setRrCourtSel((sel) => (on ? sel.filter((n) => n !== name) : [...sel, name]))}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition ${
+                              on
+                                ? "bg-orange-500 border-orange-500 text-white"
+                                : "bg-white/[0.03] border-white/[0.08] text-gray-400 hover:bg-white/[0.06]"
+                            }`}
+                          >
+                            {name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {rrCourtSel.length === 0 && (
+                      <p className="text-[11px] text-amber-400 mt-1.5">Select at least one court for the league.</p>
+                    )}
+                  </div>
+                )}
+
                 <button
                   onClick={handleGenerateRoundRobin}
-                  disabled={rrLoading || teams.length < 2}
+                  disabled={rrLoading || teams.length < 2 || (rrCourts.length > 0 && rrCourtSel.length === 0)}
                   className="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-xl shadow-sm shadow-orange-200 transition disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98]"
                 >
                   {rrLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Trophy className="w-5 h-5" />}

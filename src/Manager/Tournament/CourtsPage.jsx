@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams } from "react-router-dom";
-import { LayoutGrid, Plus, Trash2, Check, X, Pencil, Undo2, AlertTriangle, Upload } from "lucide-react";
+import { LayoutGrid, Plus, Trash2, Check, X, Pencil, Undo2, AlertTriangle, Upload, Shuffle } from "lucide-react";
 import axios from "axios";
 import { toast } from "react-toastify";
 import useTournament from "./useTournament";
 import Breadcrumbs from "./Breadcrumbs";
 import TournamentStepper from "./TournamentStepper";
+import refereeApi from "../../features/referee/refereeApi";
 
 const SIG = "#5E6AD2";
 
@@ -38,6 +39,65 @@ export default function CourtsPage() {
   // Sub-step 6 — utilization summary (per-court status counts + unassigned).
   // Auto-refreshed after every catalog mutation (Q4) so counts stay in sync.
   const [utilization, setUtilization] = useState({ courts: [], unassigned: { all: 0 } });
+
+  // Accepted umpires available to assign to courts (one umpire per court).
+  const [umpires, setUmpires] = useState([]);
+  useEffect(() => {
+    if (!tournamentId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const all = await refereeApi.fetchTournamentApplicants(tournamentId, { includeAll: true });
+        if (!cancelled) setUmpires((all || []).filter((a) => a.status === "accepted"));
+      } catch { /* non-fatal — the umpire dropdown just stays empty */ }
+    })();
+    return () => { cancelled = true; };
+  }, [tournamentId]);
+
+  const assignUmpireToCourt = async (courtId, refereeUserId) => {
+    const before = courts.find((c) => c._id === courtId);
+    const ump = umpires.find((u) => String(u.referee?.userId) === String(refereeUserId));
+    // Optimistic (mirrors patchCourt): update UI, roll back on failure.
+    setCourts((prev) => prev.map((c) => (c._id === courtId
+      ? { ...c, assignedUmpire: refereeUserId
+          ? { refereeId: refereeUserId, name: ump?.referee?.name || "Assigned" }
+          : { refereeId: null, name: null } }
+      : c)));
+    try {
+      const res = await axios.patch(ENDPOINT(tournamentId, `/${courtId}/umpire`), {
+        refereeUserId: refereeUserId || null,
+      });
+      if (res.data?.court) {
+        setCourts((prev) => prev.map((c) => (c._id === courtId ? res.data.court : c)));
+      }
+    } catch (e) {
+      if (before) setCourts((prev) => prev.map((c) => (c._id === courtId ? before : c)));
+      toast.error(e?.response?.data?.message || "Failed to assign umpire to court");
+    }
+  };
+
+  // Round-robin existing matches across the active courts. Fixes the common
+  // "created courts after generating fixtures" case where matches carry a
+  // legacy court label that doesn't match the catalog names.
+  const [distributing, setDistributing] = useState(false);
+  const distributeMatches = async () => {
+    if (distributing) return;
+    setDistributing(true);
+    try {
+      const res = await axios.post(ENDPOINT(tournamentId, "/distribute"), {
+        onlyUnassigned: true,
+        includeCompleted: false,
+      });
+      const n = res.data?.totalUpdated || 0;
+      if (n > 0) toast.success(res.data?.message || `Distributed ${n} matches across courts`);
+      else toast.info(res.data?.message || "Nothing to distribute");
+      refreshUtilization();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to distribute matches");
+    } finally {
+      setDistributing(false);
+    }
+  };
 
   const refreshUtilization = useCallback(async () => {
     if (!tournamentId) return;
@@ -251,6 +311,8 @@ export default function CourtsPage() {
               <CourtRow
                 key={court._id}
                 court={court}
+                umpires={umpires}
+                onAssignUmpire={(refId) => assignUmpireToCourt(court._id, refId)}
                 onRename={(newName) => patchCourt(court._id, { name: newName })}
                 onTypeChange={(newType) => patchCourt(court._id, { type: newType || null })}
                 onSoftDelete={() => softDeleteCourt(court._id)}
@@ -297,7 +359,12 @@ export default function CourtsPage() {
           to make sense; orphan-only state is handled by the unassigned
           row inside the section. */}
       {!loading && activeCourts.length > 0 && (
-        <UtilizationSection utilization={utilization} />
+        <UtilizationSection
+          utilization={utilization}
+          onDistribute={distributeMatches}
+          distributing={distributing}
+          hasActiveCourts={activeCourts.length > 0}
+        />
       )}
     </div>
   );
@@ -405,7 +472,7 @@ function EmptyState() {
 // CourtRow — one active court. Inline rename (click name → input, Enter to
 // save, Esc to cancel). Type dropdown saves on change. Trash icon soft-deletes.
 // ────────────────────────────────────────────────────────────────────────────
-function CourtRow({ court, onRename, onTypeChange, onSoftDelete }) {
+function CourtRow({ court, umpires = [], onAssignUmpire, onRename, onTypeChange, onSoftDelete }) {
   const [editing, setEditing] = useState(false);
   const [draftName, setDraftName] = useState(court.name);
   const [usingCustomType, setUsingCustomType] = useState(
@@ -536,6 +603,28 @@ function CourtRow({ court, onRename, onTypeChange, onSoftDelete }) {
         )}
       </div>
 
+      {/* Umpire assignment — one umpire per court, covers every match on it */}
+      {onAssignUmpire && (
+        <select
+          value={court.assignedUmpire?.refereeId || ""}
+          onChange={(e) => onAssignUmpire(e.target.value || null)}
+          className="h-8 px-2 rounded-md border border-neutral-200 bg-white text-[12px] text-neutral-700 max-w-[150px] focus:outline-none focus:border-[#5E6AD2] focus:ring-2 focus:ring-[#5E6AD2]/20 transition"
+          title="Umpire responsible for this court"
+        >
+          <option value="">— umpire —</option>
+          {umpires.map((u) => (
+            <option key={u.referee?.userId || u.applicationId} value={u.referee?.userId || ""}>
+              {u.referee?.name || "Unknown"}
+            </option>
+          ))}
+          {/* Keep the current umpire selectable even if not in the accepted list */}
+          {court.assignedUmpire?.refereeId &&
+            !umpires.some((u) => String(u.referee?.userId) === String(court.assignedUmpire.refereeId)) && (
+              <option value={court.assignedUmpire.refereeId}>{court.assignedUmpire.name || "Assigned"}</option>
+            )}
+        </select>
+      )}
+
       {/* Status + actions */}
       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">
         Active
@@ -571,15 +660,28 @@ function CourtRow({ court, onRename, onTypeChange, onSoftDelete }) {
 // pending stripes), and a status text summary. Footer shows an orphan-match
 // warning when the unassigned bucket is non-zero.
 // ────────────────────────────────────────────────────────────────────────────
-function UtilizationSection({ utilization }) {
+function UtilizationSection({ utilization, onDistribute, distributing, hasActiveCourts }) {
   const { courts = [], unassigned = { all: 0 } } = utilization || {};
 
   return (
     <div className="bg-white border border-neutral-200 rounded-xl overflow-hidden mt-4">
-      <div className="px-4 py-2.5 border-b border-neutral-100">
+      <div className="px-4 py-2.5 border-b border-neutral-100 flex items-center justify-between gap-2">
         <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500">
           Match assignments per court
         </h2>
+        {onDistribute && hasActiveCourts && (
+          <button
+            type="button"
+            onClick={onDistribute}
+            disabled={distributing}
+            className="h-7 px-2.5 rounded-md text-[11px] font-semibold text-white inline-flex items-center gap-1.5 transition disabled:cursor-not-allowed disabled:bg-neutral-300 w-auto"
+            style={{ backgroundColor: distributing ? undefined : SIG }}
+            title="Round-robin all matches across the active courts"
+          >
+            <Shuffle className="w-3.5 h-3.5" />
+            {distributing ? "Distributing…" : "Distribute matches"}
+          </button>
+        )}
       </div>
       <ul className="divide-y divide-neutral-100">
         {courts.length === 0 ? (
@@ -599,7 +701,7 @@ function UtilizationSection({ utilization }) {
               {unassigned.all} match{unassigned.all === 1 ? "" : "es"}
             </span>{" "}
             assigned to retired or unknown courts (
-            {unassigned.completed} done · {unassigned.inProgress} in progress · {unassigned.pending} pending). Reassign via the match cards on Groups / Knockout.
+            {unassigned.completed} done · {unassigned.inProgress} in progress · {unassigned.pending} pending). Use <span className="font-semibold">Distribute matches</span> above to spread them across your active courts, or reassign individually via the match cards on Groups / Knockout.
           </p>
         </div>
       )}
