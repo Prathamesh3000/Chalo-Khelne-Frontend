@@ -8,14 +8,14 @@ import CoGroupChatPage from "./CorporateAdmin/CoGroupChatPage";
 import CoNotification from "./CorporateAdmin/CoNotification";
 import CoSocial from "./CorporateAdmin/CoSocial";
 import CoNews from "./CorporateAdmin/CoNews";
-import ProtectedRoute from "./components/ProtectedRoute";
+import ProtectedRoute, { ROLES } from "./components/ProtectedRoute";
 
 // All Corporate pages own their own dark CorporateShell chrome. No AppLayout
 // wrap — would double-render the sidebar.
 const CorporateApp = () => {
   return (
     <Routes>
-      <Route element={<ProtectedRoute role="corporate_admin" />}>
+      <Route element={<ProtectedRoute allowedRoles={ROLES.corporate} />}>
         <Route path="/corporate-dashboard"   element={<CorporateDashboard />} />
         <Route path="/corporate-tournaments" element={<CorporateTournaments />} />
         <Route path="/corporate-staff"       element={<CorporateStaff />} />

@@ -21,6 +21,7 @@ import TeamKnockoutMatches from "./TeamKnockoutMatches";
 import RapidRalliesRegisterModal from "./RapidRalliesRegisterModal";
 import RapidRalliesLineupModal from "./RapidRalliesLineupModal";
 import AssignUmpireModal from "./Tournament/AssignUmpireModal";
+import CourtUmpireModal from "./Tournament/CourtUmpireModal";
 import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
@@ -126,6 +127,8 @@ const TeamKnockouts = () => {
   // can deselect courts to reserve them for the knockout.
   const [rrCourts, setRrCourts] = useState([]);
   const [rrCourtSel, setRrCourtSel] = useState([]);
+  // Inline court ⇆ umpire assignment (replaces navigating to the Courts page).
+  const [courtUmpireOpen, setCourtUmpireOpen] = useState(false);
   useEffect(() => {
     if (!tournamentId) return;
     axios.get(`/api/tournaments/${tournamentId}/courts`).then((r) => {
@@ -136,6 +139,23 @@ const TeamKnockouts = () => {
       setRrCourtSel(names); // default: all courts host the league
     }).catch(() => {});
   }, [tournamentId]);
+
+  // Re-pull courts after an inline change in the Courts & Umpires modal. Keeps
+  // the league court chips in sync: preserves the current league selection,
+  // drops removed courts, and auto-selects any newly-added table.
+  const refreshCourts = async () => {
+    if (!tournamentId) return;
+    try {
+      const r = await axios.get(`/api/tournaments/${tournamentId}/courts`);
+      const names = (r.data?.courts || r.data || [])
+        .filter((c) => c && c.isActive !== false && c.name)
+        .map((c) => c.name);
+      const known = new Set(rrCourts);
+      const added = names.filter((n) => !known.has(n));
+      setRrCourts(names);
+      setRrCourtSel((sel) => [...sel.filter((n) => names.includes(n)), ...added]);
+    } catch { /* non-fatal — chips just won't refresh */ }
+  };
 
   const fetchRoundRobin = async () => {
     if (!tournamentId) return;
@@ -1133,9 +1153,9 @@ const TeamKnockouts = () => {
         ]}
       />
       <button
-        onClick={() => navigate(`/tournaments/${tournamentId}/courts`)}
+        onClick={() => setCourtUmpireOpen(true)}
         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-orange-400 border border-orange-500/40 bg-orange-500/10 hover:bg-orange-500/20 transition w-auto"
-        title="Manage courts & assign umpires"
+        title="Assign umpires to courts / tables"
       >
         <FaUsers className="w-3.5 h-3.5" /> Courts &amp; Umpires
       </button>
@@ -1822,6 +1842,15 @@ const TeamKnockouts = () => {
           tournamentId={tournamentId}
           matchLabel={`${assignModalMatch.team1Id?.teamName || "Team 1"} vs ${assignModalMatch.team2Id?.teamName || "Team 2"}`}
           onAssigned={() => { setAssignModalMatch(null); fetchRoundRobin(); }}
+        />
+      )}
+
+      {courtUmpireOpen && (
+        <CourtUmpireModal
+          isOpen={courtUmpireOpen}
+          onClose={() => setCourtUmpireOpen(false)}
+          tournamentId={tournamentId}
+          onChanged={refreshCourts}
         />
       )}
 

@@ -1,7 +1,7 @@
 import { Routes, Route } from "react-router-dom";
 import { AppLayout } from "./shared/layout";
 import PTournamentManagement from "./pages/tournaments/List";
-import ProtectedRoute from "./components/ProtectedRoute";
+import ProtectedRoute, { ROLES } from "./components/ProtectedRoute";
 import PHome from "./pages/player/Home";
 import PSlotbooking from "./Player/PSlotbooking";
 import Ptrainers from "./Player/Ptrainers";
@@ -16,7 +16,7 @@ const PlayerApp = () => {
   return (
     <Routes>
       <Route element={<AppLayout role="player" />}>
-        <Route element={<ProtectedRoute />}>
+        <Route element={<ProtectedRoute allowedRoles={ROLES.player} />}>
         <Route 
             path="/phome" 
             element={<PHome />} 

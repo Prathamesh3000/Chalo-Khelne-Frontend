@@ -1,6 +1,6 @@
 import { Routes, Route } from "react-router-dom";
 import { AppLayout } from "./shared/layout";
-import ProtectedRoute from "./components/ProtectedRoute";
+import ProtectedRoute, { ROLES } from "./components/ProtectedRoute";
 
 // Manager pages
 import MDashboard from "./pages/manager/Dashboard";
@@ -69,7 +69,7 @@ const ManagerApp = () => {
           uses TournamentShell. Both sit OUTSIDE AppLayout to avoid
           double-chrome rendering.
           ═══════════════════════════════════════════════════ */}
-      <Route element={<ProtectedRoute />}>
+      <Route element={<ProtectedRoute allowedRoles={ROLES.manager} />}>
         <Route path="/mdashboard" element={<MDashboard />} />
         <Route path="/mtournament-management" element={<MTournamentManagement />} />
         <Route path="/tournament-management/group-stage" element={<MGroupStageManagement />} />
@@ -99,7 +99,7 @@ const ManagerApp = () => {
           All standard manager pages render inside this
           ═══════════════════════════════════════════════════ */}
       <Route element={<AppLayout role="manager" />}>
-        <Route element={<ProtectedRoute />}>
+        <Route element={<ProtectedRoute allowedRoles={ROLES.manager} />}>
 
           {/* Dashboard route moved above (uses ManagerShell). */}
 

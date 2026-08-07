@@ -10,13 +10,13 @@ import TrainerPlayerRequests from "./Trainer/TrainerPlayerRequests";
 import TrainerUpcomingSessions from "./Trainer/TrainerUpcomingSessions";
 import TSocial from "./Trainer/TSocial";
 import TNews from "./Trainer/TNews";
-import ProtectedRoute from "./components/ProtectedRoute";
+import ProtectedRoute, { ROLES } from "./components/ProtectedRoute";
 
 const TrainerApp = () => {
   return (
     <Routes>
       <Route element={<AppLayout role="trainer" />}>
-        <Route element={<ProtectedRoute role="trainer" />}>
+        <Route element={<ProtectedRoute allowedRoles={ROLES.trainer} />}>
           <Route path="/trainer-dashboard" element={<TrainerDashboard />} />
           <Route path="/trainer-history" element={<TrainerHistory />} />
           <Route

@@ -17,7 +17,7 @@ import SuGroupChatPage from "./SuperAdmin/SuGroupChatPage";
 import SuNotification from "./SuperAdmin/SuNotification";
 import SuSocial from "./SuperAdmin/SuSocial";
 import SuNews from "./SuperAdmin/SuNews";
-import ProtectedRoute from "./components/ProtectedRoute";
+import ProtectedRoute, { ROLES } from "./components/ProtectedRoute";
 
 // All SuperAdmin pages own their own dark SuperAdminShell chrome. No
 // AppLayout wrap — would double-render the sidebar.
@@ -25,7 +25,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 const SuperAdminapp = () => {
   return (
     <Routes>
-      <Route element={<ProtectedRoute />}>
+      <Route element={<ProtectedRoute allowedRoles={ROLES.superAdmin} />}>
         <Route path="/home"               element={<Home />} />
         <Route path="/pending"            element={<Pending />} />
         <Route path="/approved"           element={<Approved />} />

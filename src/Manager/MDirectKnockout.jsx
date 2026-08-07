@@ -12,6 +12,7 @@ import axios from "axios";
 import { AuthContext } from "../context/AuthContext";
 import BulkScoreUploadModal from "./BulkScoreUploadModal";
 import AssignUmpireModal from "./Tournament/AssignUmpireModal";
+import { buildRequestRounds, buildDefaultRoundsArray } from "./utils/knockoutDefaults";
 import { getSeedOrder } from "../utils/seedingUtils";
 import SeedPositionsPreview from "./components/SeedPositionsPreview";
 import CourtPoolPreview from "./components/CourtPoolPreview";
@@ -371,7 +372,6 @@ export default function MDirectKnockout() {
           // Build per-round payload with cascading defaults (Bo3 30/20 early,
           // Bo5 50/40 SF, Bo7 80/60 Final). Keeps standalone bracket scheduling
           // sensible across rounds without requiring a per-round UI on this page.
-          const { buildRequestRounds, buildDefaultRoundsArray } = require("./utils/knockoutDefaults");
           const totalRounds = Math.ceil(Math.log2(drawSize || 2));
           const rounds = buildRequestRounds({
             customizeRounds: true,
@@ -380,9 +380,9 @@ export default function MDirectKnockout() {
           });
           return {
             startDate: new Date().toISOString().split("T")[0],
-            startTime: "10:00",
+            startTime: "09:00",
             rounds,
-            breakBetweenRoundsMinutes: 15,
+            breakBetweenRoundsMinutes: 5,
             courtNumber: "1",
           };
         })(),

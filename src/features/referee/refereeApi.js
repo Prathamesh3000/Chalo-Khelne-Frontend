@@ -47,6 +47,29 @@ export const refereeApi = {
     );
     return res.data;
   },
+
+  // Active courts for a tournament (with their assigned umpire, if any).
+  fetchCourts: async (tournamentId) => {
+    const res = await axios.get(`/api/tournaments/${tournamentId}/courts`, getAuth());
+    return res.data?.courts || res.data || [];
+  },
+
+  // Create a court/table on the tournament (inline add).
+  createCourt: async (tournamentId, { name, type = null }) => {
+    const res = await axios.post(`/api/tournaments/${tournamentId}/courts`, { name, type }, getAuth());
+    return res.data?.court;
+  },
+
+  // Assign (or, with refereeUserId null, unassign) the umpire responsible for a
+  // court. One umpire per court — they officiate every match played on it.
+  assignUmpireToCourt: async (tournamentId, courtId, refereeUserId) => {
+    const res = await axios.patch(
+      `/api/tournaments/${tournamentId}/courts/${courtId}/umpire`,
+      { refereeUserId: refereeUserId || null },
+      getAuth()
+    );
+    return res.data?.court;
+  },
 };
 
 export default refereeApi;

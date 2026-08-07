@@ -1,5 +1,5 @@
 import { Routes, Route } from "react-router-dom";
-import ProtectedRoute from "./components/ProtectedRoute";
+import ProtectedRoute, { ROLES } from "./components/ProtectedRoute";
 import ClubAdminDashboard from "./ClubAdmin/ClubAdminDashboard";
 import TurfManagement from "./ClubAdmin/TurfManagement";
 import ViewTurf from "./ClubAdmin/ViewTurf";
@@ -21,7 +21,7 @@ import CGroupChatPage from "./ClubAdmin/CGroupChatPage";
 const ClubAdminApp = () => {
   return (
     <Routes>
-      <Route element={<ProtectedRoute role="clubAdmin" />}>
+      <Route element={<ProtectedRoute allowedRoles={ROLES.clubAdmin} />}>
         <Route path="/club-dashboard"     element={<ClubAdminDashboard />} />
         <Route path="/turf-management"    element={<TurfManagement />} />
         <Route path="/ClubAdminProfile"   element={<ClubAdminProfile />} />
