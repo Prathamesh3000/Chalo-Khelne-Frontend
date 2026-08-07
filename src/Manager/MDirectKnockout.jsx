@@ -1,12 +1,12 @@
 import { toast } from "react-toastify";
-import { useState, useEffect, useContext } from "react";
+import { useState, useEffect, useContext, useMemo } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { TabBar, Skeleton } from "../shared/ui";
 import { TournamentShell, TournamentFlowHeader } from "../shared/layout";
 import {
   Trophy, Users, Swords, Clock, ChevronRight, Plus, X, Search,
   RotateCcw, Upload, Check, AlertCircle, Zap, Target, Crown, Trash2,
-  UserPlus, Shield,
+  UserPlus, Shield, GitFork, LayoutList, Download,
 } from "lucide-react";
 import axios from "axios";
 import { AuthContext } from "../context/AuthContext";
@@ -18,6 +18,7 @@ import SeedPositionsPreview from "./components/SeedPositionsPreview";
 import CourtPoolPreview from "./components/CourtPoolPreview";
 import CourtPicker from "./components/CourtPicker";
 import { getMatchFormat as getMatchFormatHelper } from "../utils/sportTrack";
+import BracketTree from "./components/BracketTree";
 
 const DRAW_SIZES = [4, 8, 16, 32, 64, 128];
 
@@ -79,12 +80,73 @@ export default function MDirectKnockout() {
   const [registeredPlayers, setRegisteredPlayers] = useState([]);
   const [selectedPlayers, setSelectedPlayers] = useState([]);
   const [drawSize, setDrawSize] = useState(16);
+  const [selectedCategory, setSelectedCategory] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [generating, setGenerating] = useState(false);
+
+  // Derived unique categories list
+  const availableCategories = useMemo(() => {
+    const cats = new Set();
+    registeredPlayers.forEach((p) => {
+      if (p.category) cats.add(p.category);
+    });
+    return ["ALL", ...Array.from(cats)];
+  }, [registeredPlayers]);
+  const [bracketCategory, setBracketCategory] = useState("ALL");
   const [drawMethod, setDrawMethod] = useState("standard"); // standard | random | hybrid | custom
   const [numberOfSeeds, setNumberOfSeeds] = useState(16); // how many top players get fixed seeding positions (defaults to drawSize for standard)
   const [customSlots, setCustomSlots] = useState([]); // array of drawSize, each slot = player object or null
   const [activeSlot, setActiveSlot] = useState(null); // which slot index is selected for placement
+
+  // Helper to resolve player category
+  const getPlayerCategory = (playerObj) => {
+    if (!playerObj) return null;
+    const pId = (playerObj.playerId?._id || playerObj.playerId || "").toString();
+    const pName = playerObj.playerName || playerObj.userName || playerObj.name || "";
+
+    const found = registeredPlayers.find((p) => {
+      const regId = (p.playerId || p._id || "").toString();
+      if (regId && pId && regId === pId) return true;
+      if (pName && (p.userName === pName || p.playerName === pName || p.name === pName)) return true;
+      return false;
+    });
+
+    return found?.category || playerObj.category || null;
+  };
+
+  // Categories present in bracket matches + registrations
+  const bracketCategories = useMemo(() => {
+    const cats = new Set();
+    matches.forEach((m) => {
+      const c1 = getPlayerCategory(m.player1);
+      const c2 = getPlayerCategory(m.player2);
+      const matchCat = m.category || m.categoryName || c1 || c2;
+      if (matchCat) cats.add(matchCat);
+    });
+    registeredPlayers.forEach((p) => {
+      if (p.category) cats.add(p.category);
+    });
+    return ["ALL", ...Array.from(cats)];
+  }, [matches, registeredPlayers]);
+
+  // Filtered matches by round for bracket view
+  const filteredMatchesByRound = useMemo(() => {
+    if (!bracketCategory || bracketCategory === "ALL") return matchesByRound;
+
+    const result = {};
+    Object.entries(matchesByRound).forEach(([roundName, roundMatches]) => {
+      const filtered = roundMatches.filter((m) => {
+        const c1 = getPlayerCategory(m.player1);
+        const c2 = getPlayerCategory(m.player2);
+        const matchCat = m.category || m.categoryName || c1 || c2;
+        return matchCat === bracketCategory;
+      });
+      if (filtered.length > 0) {
+        result[roundName] = filtered;
+      }
+    });
+    return result;
+  }, [matchesByRound, bracketCategory, registeredPlayers]);
 
   // Scoring state
   const [activeMatch, setActiveMatch] = useState(null);
@@ -97,6 +159,9 @@ export default function MDirectKnockout() {
 
   // Match Detail Modal
   const [detailMatch, setDetailMatch] = useState(null);
+
+  // Bracket view mode: "tree" | "list"
+  const [bracketView, setBracketView] = useState("tree");
 
   // Court catalog (Sub-step 4) — drives the optional CourtPoolPreview shown
   // before bracket creation. Standalone direct-knockout is single-sport per
@@ -193,12 +258,19 @@ export default function MDirectKnockout() {
             if (ss.length === 0) return true;
             return ss.some((s) => String(s.sportId) === String(activeSportId));
           })
-          .map((b) => ({
-            playerId: b.userId?._id || b.userId,
-            userName: b.userName || b.userId?.name || "Unknown",
-            _id: b.userId?._id || b.userId,
-            category: b.category,
-          }));
+          .map((b) => {
+            const ss = Array.isArray(b.sportSelections) ? b.sportSelections : [];
+            const matchedSport = activeSportId
+              ? ss.find((s) => String(s.sportId) === String(activeSportId))
+              : ss[0];
+            const categoryName = matchedSport?.categoryName || b.category || b.selectedCategory || "General";
+            return {
+              playerId: b.userId?._id || b.userId || b._id,
+              userName: b.userName || b.userId?.name || "Unknown",
+              _id: b.userId?._id || b.userId || b._id,
+              category: categoryName,
+            };
+          });
         setRegisteredPlayers(players);
       }
     } catch { }
@@ -245,9 +317,6 @@ export default function MDirectKnockout() {
 
   const placePlayerInSlot = (player) => {
     if (activeSlot === null) {
-      // Auto-fill by SEED number (S1, S2, S3, ...) — not by array index.
-      // The array is laid out in bracket order [S1, S16, S8, S9, ...],
-      // so findIndex(null) would place the 2nd player at Seed 16.
       const size = customSlots.length;
       const seedOrder = getSeedOrder(size);
       let target = -1;
@@ -270,9 +339,6 @@ export default function MDirectKnockout() {
     setCustomSlots((prev) => { const u = [...prev]; u[slotIndex] = null; return u; });
   };
 
-  // Robust player-key helper: some entries have playerId as string, others as
-  // a populated `{ _id, name, ... }` object, others only have `_id`. Falls back
-  // to userName so distinct users never collapse to the same key.
   const keyOfPlayer = (p) => {
     if (!p) return "";
     const raw = p.playerId ?? p._id;
@@ -310,11 +376,17 @@ export default function MDirectKnockout() {
       });
     }
 
+    // Category filter
+    if (selectedCategory && selectedCategory !== "ALL") {
+      available = available.filter((p) => (p.category || "General") === selectedCategory);
+    }
+
     if (!searchQuery.trim()) return available;
     const q = searchQuery.toLowerCase();
     return available.filter(
       (p) =>
-        (p.userName || p.playerName || p.name || "").toLowerCase().includes(q)
+        (p.userName || p.playerName || p.name || "").toLowerCase().includes(q) ||
+        (p.category || "").toLowerCase().includes(q)
     );
   };
 
@@ -392,6 +464,9 @@ export default function MDirectKnockout() {
         const byeCount = res.data.bracket?.byeCount || 0;
         const byeMsg = byeCount > 0 ? ` (${byeCount} auto-BYEs given)` : "";
         toast.info(`Bracket created! ${res.data.bracket.totalMatches} matches across ${res.data.bracket.totalRounds} rounds${byeMsg}`);
+        if (selectedCategory && selectedCategory !== "ALL") {
+          setBracketCategory(selectedCategory);
+        }
         setSelectedPlayers([]);
         setCustomSlots([]);
         setActiveTab("bracket");
@@ -582,6 +657,54 @@ export default function MDirectKnockout() {
     />
   );
 
+  // ── Edit player name in bracket ──────────────────────────────────────────
+  const handleUpdatePlayerName = async (match, playerSlot, newPlayerName) => {
+    try {
+      const matchId = match.matchId || match._id;
+      const res = await axios.put(
+        `/api/tournaments/direct-knockout/matches/${matchId}/player-name`,
+        { playerSlot, playerName: newPlayerName }
+      );
+      if (res.data.success) {
+        toast.success(`Player name updated to "${newPlayerName}"`);
+        // Update matches list state
+        setMatches((prev) =>
+          prev.map((m) =>
+            (m.matchId && m.matchId === matchId) || String(m._id) === String(matchId)
+              ? { ...m, [playerSlot]: { ...(m[playerSlot] || {}), playerName: newPlayerName } }
+              : m
+          )
+        );
+        // Update matchesByRound state
+        setMatchesByRound((prev) => {
+          const next = { ...prev };
+          Object.keys(next).forEach((rk) => {
+            next[rk] = next[rk].map((m) =>
+              (m.matchId && m.matchId === matchId) || String(m._id) === String(matchId)
+                ? { ...m, [playerSlot]: { ...(m[playerSlot] || {}), playerName: newPlayerName } }
+                : m
+            );
+          });
+          return next;
+        });
+        // Update open detail match panel if it's the same match
+        if (
+          detailMatch &&
+          ((detailMatch.matchId && detailMatch.matchId === matchId) ||
+            String(detailMatch._id) === String(matchId))
+        ) {
+          setDetailMatch((prev) => ({
+            ...prev,
+            [playerSlot]: { ...(prev[playerSlot] || {}), playerName: newPlayerName },
+          }));
+        }
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to update player name");
+      throw err;
+    }
+  };
+
   return (
     <TournamentShell
       tournament={_shellTournament}
@@ -711,6 +834,81 @@ export default function MDirectKnockout() {
       {/* TAB: Bracket View */}
       {activeTab === "bracket" && (
         <div>
+          {/* Bracket Category Filter Tabs */}
+          {bracketCategories.length > 1 && (
+            <div className="bg-[#181A22] rounded-xl p-4 border border-white/[0.06] mb-6">
+              <div className="flex items-center gap-3 overflow-x-auto">
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap flex-shrink-0">
+                  Category:
+                </span>
+                <div className="flex gap-2 flex-wrap">
+                  {bracketCategories.map((cat) => {
+                    const count = cat === "ALL"
+                      ? matches.length
+                      : matches.filter((m) => {
+                          const c1 = getPlayerCategory(m.player1);
+                          const c2 = getPlayerCategory(m.player2);
+                          const matchCat = m.category || m.categoryName || c1 || c2;
+                          return matchCat === cat;
+                        }).length;
+                    const isActive = bracketCategory === cat;
+                    return (
+                      <button
+                        key={cat}
+                        onClick={() => setBracketCategory(cat)}
+                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-all w-auto whitespace-nowrap flex items-center gap-2 ${
+                          isActive
+                            ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-md shadow-orange-500/20"
+                            : "bg-white/[0.04] text-gray-400 hover:bg-white/[0.08] hover:text-white border border-white/[0.06]"
+                        }`}
+                      >
+                        <span>{cat === "ALL" ? "All Categories" : cat}</span>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+                          isActive ? "bg-white/20 text-white" : "bg-white/[0.08] text-gray-400"
+                        }`}>
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* View Mode Switcher (Tree View vs List View) */}
+          {hasBracket && Object.keys(filteredMatchesByRound).length > 0 && (
+            <div className="flex items-center justify-between mb-4 bg-[#181A22] p-2.5 rounded-xl border border-white/[0.06]">
+              <span className="text-xs font-bold text-gray-400 uppercase tracking-wider px-2">
+                Bracket Layout Mode:
+              </span>
+              <div className="flex items-center gap-1.5 bg-white/[0.04] p-1 rounded-lg border border-white/[0.06]">
+                <button
+                  onClick={() => setBracketView("tree")}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all w-auto ${
+                    bracketView === "tree"
+                      ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-sm"
+                      : "text-gray-400 hover:text-white"
+                  }`}
+                >
+                  <GitFork className="w-3.5 h-3.5" />
+                  Tree View
+                </button>
+                <button
+                  onClick={() => setBracketView("list")}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all w-auto ${
+                    bracketView === "list"
+                      ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-sm"
+                      : "text-gray-400 hover:text-white"
+                  }`}
+                >
+                  <LayoutList className="w-3.5 h-3.5" />
+                  List View
+                </button>
+              </div>
+            </div>
+          )}
+
           {!hasBracket ? (
             <div className="bg-[#181A22] rounded-2xl p-12 text-center border border-white/[0.06]">
               <Swords size={48} className="mx-auto text-gray-300 mb-4" />
@@ -723,9 +921,37 @@ export default function MDirectKnockout() {
                 Setup Draw
               </button>
             </div>
+          ) : Object.keys(filteredMatchesByRound).length === 0 ? (
+            <div className="bg-[#181A22] rounded-2xl p-12 text-center border border-white/[0.06]">
+              <Swords size={48} className="mx-auto text-gray-300 mb-4" />
+              <h3 className="text-lg font-semibold text-gray-400 mb-2">
+                No Matches Found for Category "{bracketCategory}"
+              </h3>
+              <p className="text-gray-400 mb-4">
+                Generate the knockout bracket for "{bracketCategory}" in the Setup tab.
+              </p>
+              <button
+                onClick={() => {
+                  setSelectedCategory(bracketCategory);
+                  setActiveTab("setup");
+                }}
+                className="px-6 py-2 bg-orange-500 text-white rounded-lg font-medium hover:bg-orange-600 w-auto"
+              >
+                Go to Setup for {bracketCategory}
+              </button>
+            </div>
+          ) : bracketView === "tree" ? (
+            <BracketTree
+              matchesByRound={filteredMatchesByRound}
+              onMatchClick={(match) => setDetailMatch(match)}
+              getRoundName={getRoundDisplayName}
+              tournamentTitle={tournament?.title}
+              sportName={bracketCategory || _shellTournament?.sportName || tournament?.sport}
+              onEditPlayerName={handleUpdatePlayerName}
+            />
           ) : (
             <div className="space-y-6">
-              {Object.entries(matchesByRound).map(([roundName, roundMatches]) => (
+              {Object.entries(filteredMatchesByRound).map(([roundName, roundMatches]) => (
                 <div key={roundName} className="bg-[#181A22] rounded-xl border border-white/[0.06] overflow-hidden">
                   {/* Round Header */}
                   <div className="bg-white/[0.04] px-5 py-3 border-b border-white/[0.06] flex justify-between items-center">
@@ -1028,6 +1254,35 @@ export default function MDirectKnockout() {
             <div className="grid grid-cols-2 gap-6">
               {/* Left: Available Players */}
               <div>
+                {/* Category Filter Pills for Custom Mode */}
+                {availableCategories.length > 1 && (
+                  <div className="mb-3">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1.5">
+                      Filter by Category
+                    </label>
+                    <div className="flex gap-1.5 flex-wrap">
+                      {availableCategories.map((cat) => {
+                        const count = cat === "ALL"
+                          ? registeredPlayers.length
+                          : registeredPlayers.filter((p) => (p.category || "General") === cat).length;
+                        return (
+                          <button
+                            key={cat}
+                            onClick={() => setSelectedCategory(cat)}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all w-auto ${
+                              selectedCategory === cat
+                                ? "bg-orange-500 text-white shadow-sm"
+                                : "bg-white/[0.06] text-gray-400 hover:bg-white/[0.10] hover:text-white border border-white/[0.06]"
+                            }`}
+                          >
+                            {cat === "ALL" ? "All" : cat} ({count})
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex gap-3 mb-3">
                   <div className="flex-1 relative">
                     <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -1039,24 +1294,26 @@ export default function MDirectKnockout() {
                 <h4 className="text-sm font-bold text-gray-300 mb-2">Available Players</h4>
                 <div className="max-h-[500px] overflow-y-auto border border-white/[0.06] rounded-xl">
                   {(() => {
-                    // Custom Placement: show registeredPlayers minus those
-                    // placed in customSlots. Ignore `matches` (existing bracket)
-                    // since the user is actively redrawing.
                     const placedIds = getCustomPlayerIds();
                     const q = searchQuery.trim().toLowerCase();
-                    const baseList = q
-                      ? registeredPlayers.filter((p) =>
-                          (p.userName || p.playerName || p.name || "").toLowerCase().includes(q)
-                        )
-                      : registeredPlayers;
+                    let baseList = registeredPlayers;
+                    if (selectedCategory && selectedCategory !== "ALL") {
+                      baseList = baseList.filter((p) => (p.category || "General") === selectedCategory);
+                    }
+                    if (q) {
+                      baseList = baseList.filter((p) =>
+                        (p.userName || p.playerName || p.name || "").toLowerCase().includes(q) ||
+                        (p.category || "").toLowerCase().includes(q)
+                      );
+                    }
                     const available = baseList.filter((p) => !placedIds.has(keyOfPlayer(p)));
                     if (available.length === 0) return (
                       <div className="p-6 text-center text-gray-400 text-sm">
-                        {registeredPlayers.length === 0 ? "No registered players found" : "All players have been placed"}
+                        {registeredPlayers.length === 0 ? "No registered players found" : "All players in this category have been placed"}
                       </div>
                     );
                     return (
-                      <div className="divide-y divide-gray-100">
+                      <div className="divide-y divide-white/[0.04]">
                         {available.map((player, idx) => {
                           const name = player.userName || player.playerName || player.name || `Player ${idx + 1}`;
                           return (
@@ -1067,7 +1324,14 @@ export default function MDirectKnockout() {
                               <div className="w-7 h-7 rounded-full bg-white/[0.08] flex items-center justify-center text-xs font-bold text-gray-400">
                                 {name.charAt(0).toUpperCase()}
                               </div>
-                              <p className="text-sm font-medium text-gray-100 flex-1">{name}</p>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-gray-100 truncate">{name}</p>
+                                {player.category && (
+                                  <span className="inline-block text-[10px] text-gray-400 bg-white/[0.06] px-2 py-0.5 rounded font-mono mt-0.5">
+                                    {player.category}
+                                  </span>
+                                )}
+                              </div>
                               {activeSlot !== null && (
                                 <span className="text-[10px] bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded-full font-bold">
                                   → Seed {activeSlot + 1}
@@ -1170,6 +1434,35 @@ export default function MDirectKnockout() {
             <div className="grid grid-cols-2 gap-6">
               {/* Left: Player Selection */}
               <div>
+                {/* Category Filter Pills */}
+                {availableCategories.length > 1 && (
+                  <div className="mb-3">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1.5">
+                      Filter by Category
+                    </label>
+                    <div className="flex gap-1.5 flex-wrap">
+                      {availableCategories.map((cat) => {
+                        const count = cat === "ALL"
+                          ? registeredPlayers.length
+                          : registeredPlayers.filter((p) => (p.category || "General") === cat).length;
+                        return (
+                          <button
+                            key={cat}
+                            onClick={() => setSelectedCategory(cat)}
+                            className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all w-auto ${
+                              selectedCategory === cat
+                                ? "bg-orange-500 text-white shadow-sm"
+                                : "bg-white/[0.06] text-gray-400 hover:bg-white/[0.10] hover:text-white border border-white/[0.06]"
+                            }`}
+                          >
+                            {cat === "ALL" ? "All Categories" : cat} ({count})
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex gap-3 mb-3">
                   <div className="flex-1 relative">
                     <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -1182,37 +1475,76 @@ export default function MDirectKnockout() {
                     {selectedPlayers.length === getFilteredPlayers().length ? "Deselect All" : "Select All"}
                   </button>
                 </div>
+
                 <div className="max-h-[400px] overflow-y-auto border border-white/[0.06] rounded-xl">
                   {getFilteredPlayers().length === 0 ? (
                     <div className="p-8 text-center text-gray-400">
                       <Users size={32} className="mx-auto mb-2" />
-                      <p>No registered players found</p>
+                      <p>No registered players found {selectedCategory !== "ALL" ? `for ${selectedCategory}` : ""}</p>
                     </div>
                   ) : (
-                    <div className="divide-y divide-gray-100">
-                      {getFilteredPlayers().map((player, idx) => {
-                        const id = player.playerId || player._id;
-                        const isSelected = selectedPlayers.some((p) => (p.playerId || p._id) === id);
-                        const name = player.userName || player.playerName || player.name || `Player ${idx + 1}`;
-                        return (
-                          <div key={id || idx}
-                            className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${isSelected ? "bg-orange-500/10" : "hover:bg-white/[0.04]"}`}
-                            onClick={() => togglePlayer(player)}>
-                            <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${isSelected ? "bg-orange-500 border-orange-500" : "border-white/[0.10]"}`}>
-                              {isSelected && <Check size={14} color="white" />}
+                    <div className="divide-y divide-white/[0.06]">
+                      {(() => {
+                        const filtered = getFilteredPlayers();
+
+                        const renderPlayerRow = (player, idx) => {
+                          const id = player.playerId || player._id;
+                          const isSelected = selectedPlayers.some((p) => (p.playerId || p._id) === id);
+                          const name = player.userName || player.playerName || player.name || `Player ${idx + 1}`;
+                          return (
+                            <div key={id || idx}
+                              className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${isSelected ? "bg-orange-500/10" : "hover:bg-white/[0.04]"}`}
+                              onClick={() => togglePlayer(player)}>
+                              <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${isSelected ? "bg-orange-500 border-orange-500" : "border-white/[0.10]"}`}>
+                                {isSelected && <Check size={14} color="white" />}
+                              </div>
+                              <div className="w-8 h-8 rounded-full bg-white/[0.08] flex items-center justify-center text-xs font-bold text-gray-400">
+                                {name.charAt(0).toUpperCase()}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-gray-100 truncate">{name}</p>
+                                {player.category && (
+                                  <span className="inline-block text-[10px] text-gray-400 bg-white/[0.06] px-2 py-0.5 rounded font-mono mt-0.5">
+                                    {player.category}
+                                  </span>
+                                )}
+                              </div>
+                              {isSelected && (
+                                <span className="text-[10px] bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded-full font-bold">
+                                  #{selectedPlayers.findIndex((p) => (p.playerId || p._id) === id) + 1}
+                                </span>
+                              )}
                             </div>
-                            <div className="w-8 h-8 rounded-full bg-white/[0.08] flex items-center justify-center text-xs font-bold text-gray-400">
-                              {name.charAt(0).toUpperCase()}
+                          );
+                        };
+
+                        if (selectedCategory === "ALL") {
+                          const grouped = {};
+                          filtered.forEach((p) => {
+                            const cat = p.category || "General";
+                            if (!grouped[cat]) grouped[cat] = [];
+                            grouped[cat].push(p);
+                          });
+                          return Object.entries(grouped).map(([catName, catPlayers]) => (
+                            <div key={catName}>
+                              <div className="bg-[#12141B] px-4 py-2 border-y border-white/[0.06] flex justify-between items-center sticky top-0 z-10">
+                                <span className="text-[11px] font-bold text-orange-400 uppercase tracking-wider flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full bg-orange-400 inline-block" />
+                                  {catName}
+                                </span>
+                                <span className="text-[10px] font-semibold text-gray-400 bg-white/[0.06] px-2 py-0.5 rounded-full">
+                                  {catPlayers.length}
+                                </span>
+                              </div>
+                              <div className="divide-y divide-white/[0.04]">
+                                {catPlayers.map((player, idx) => renderPlayerRow(player, idx))}
+                              </div>
                             </div>
-                            <p className="text-sm font-medium text-gray-100 flex-1">{name}</p>
-                            {isSelected && (
-                              <span className="text-[10px] bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded-full font-bold">
-                                #{selectedPlayers.findIndex((p) => (p.playerId || p._id) === id) + 1}
-                              </span>
-                            )}
-                          </div>
-                        );
-                      })}
+                          ));
+                        }
+
+                        return filtered.map((player, idx) => renderPlayerRow(player, idx));
+                      })()}
                     </div>
                   )}
                 </div>
