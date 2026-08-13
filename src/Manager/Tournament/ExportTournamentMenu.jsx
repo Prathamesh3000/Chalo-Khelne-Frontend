@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Download } from "lucide-react";
 import { toast } from "react-toastify";
 
+import { getAuthToken } from "../../shared/api/authToken";
 /*
  * Drop-in "export" buttons for any tournament context — wires to:
  *   GET /api/tournaments/:tournamentId/export/participants.csv
@@ -12,7 +13,7 @@ import { toast } from "react-toastify";
  */
 
 async function downloadAuthed(url, fallbackFilename) {
-  const token = localStorage.getItem("token");
+  const token = getAuthToken();
   const res = await fetch(url, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
@@ -21,7 +22,9 @@ async function downloadAuthed(url, fallbackFilename) {
     try {
       const body = await res.json();
       if (body?.message) msg = body.message;
-    } catch (_) {}
+    } catch {
+      // non-JSON error body — keep the default status message
+    }
     throw new Error(msg);
   }
   // Filename from Content-Disposition when present.

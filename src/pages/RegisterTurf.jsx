@@ -33,6 +33,22 @@ const RegisterTurf = () => {
   const [selectedDays, setSelectedDays] = useState([...DAYS]);
   const [photos, setPhotos] = useState([]);
   const [previews, setPreviews] = useState([]);
+  // Turf-owner payment collection — money goes to the OWNER (not the platform),
+  // so this is separate from the central Razorpay flow. Shown to players at
+  // booking; if no UPI/QR, the contact block is shown so they can reach you.
+  const [upiId, setUpiId] = useState("");
+  const [payName, setPayName] = useState("");
+  const [payPhone, setPayPhone] = useState("");
+  const [payWhatsapp, setPayWhatsapp] = useState("");
+  const [qrFile, setQrFile] = useState(null);
+  const [qrPreview, setQrPreview] = useState("");
+
+  const handleQrUpload = (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setQrFile(f);
+    setQrPreview(URL.createObjectURL(f));
+  };
 
   const handlePhotoUpload = (e) => {
     const files = Array.from(e.target.files).slice(0, 3);
@@ -75,7 +91,19 @@ const RegisterTurf = () => {
     photos.forEach((photo) => formData.append("turfImages", photo));
 
     try {
-      await axios.post("/api/turfs/register", formData, { headers: { "Content-Type": "multipart/form-data" } });
+      const res = await axios.post("/api/turfs/register", formData, { headers: { "Content-Type": "multipart/form-data" } });
+      // Save the owner's payment-collection details on the freshly-created turf.
+      const turfId = res?.data?.turf?._id;
+      if (turfId && (upiId || payName || payPhone || payWhatsapp || qrFile)) {
+        const pd = new FormData();
+        pd.append("upiId", upiId);
+        pd.append("contactName", payName || "");
+        pd.append("contactPhone", payPhone || contacts || "");
+        pd.append("contactWhatsapp", payWhatsapp || "");
+        if (qrFile) pd.append("qrImage", qrFile);
+        try { await axios.patch(`/api/turfs/${turfId}/payment-details`, pd, { headers: { "Content-Type": "multipart/form-data" } }); }
+        catch { /* turf is registered; payment details can be added later via Edit */ }
+      }
       toast.success("Turf submitted! It will appear publicly once an admin approves it.");
       navigate(-1);
     } catch (error) {
@@ -130,7 +158,7 @@ const RegisterTurf = () => {
           </div>
           {previews.length > 0 && (
             <div className="flex gap-3 mt-3">
-              {previews.map((src, i) => <img key={i} src={src} alt="" className="w-20 h-20 rounded-xl object-cover border border-gray-200" />)}
+              {previews.map((src, i) => <img loading="lazy" key={i} src={src} alt="" className="w-20 h-20 rounded-xl object-cover border border-gray-200" />)}
             </div>
           )}
         </Section>
@@ -140,13 +168,13 @@ const RegisterTurf = () => {
             {sports.map((sport, idx) => (
               <div key={idx} className="flex items-end gap-3">
                 <div className="flex-1">
-                  <label className="block text-xs font-semibold text-gray-500 mb-1">Sport Name</label>
-                  <input type="text" value={sport.name} onChange={(e) => updateSport(idx, "name", e.target.value)} placeholder="e.g. Cricket"
+                  <label className="block text-xs font-semibold text-gray-500 mb-1" htmlFor="sport-name">Sport Name</label>
+                  <input id="sport-name" type="text" value={sport.name} onChange={(e) => updateSport(idx, "name", e.target.value)} placeholder="e.g. Cricket"
                     className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition" />
                 </div>
                 <div className="w-32">
-                  <label className="block text-xs font-semibold text-gray-500 mb-1">₹/hr</label>
-                  <input type="number" value={sport.pricePerHour} onChange={(e) => updateSport(idx, "pricePerHour", e.target.value)} placeholder="500"
+                  <label className="block text-xs font-semibold text-gray-500 mb-1" htmlFor="hr">₹/hr</label>
+                  <input id="hr" type="number" value={sport.pricePerHour} onChange={(e) => updateSport(idx, "pricePerHour", e.target.value)} placeholder="500"
                     className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition" />
                 </div>
                 {sports.length > 1 && (
@@ -188,6 +216,30 @@ const RegisterTurf = () => {
                 {facilities.includes(f) && <Check className="w-3 h-3 inline mr-1" />}{f}
               </button>
             ))}
+          </div>
+        </Section>
+
+        <Section title="Payment Collection" icon={DollarSign}>
+          <p className="text-xs text-gray-500 -mt-1 mb-1">
+            Turf payments come <span className="font-semibold text-gray-700">directly to you</span> — not the platform. Players see your UPI / QR at booking. If you leave these blank, they'll see your contact details instead.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <InputField label="UPI ID" value={upiId} onChange={setUpiId} placeholder="yourname@bank" icon={DollarSign} />
+            <div>
+              <label className="block text-sm font-medium text-gray-600 mb-1.5">Payment QR image</label>
+              <div className="flex items-center gap-3">
+                <label className="px-3 py-2 rounded-xl border border-dashed border-gray-300 text-sm text-gray-500 hover:border-orange-400 cursor-pointer w-auto">
+                  <input type="file" accept="image/*" onChange={handleQrUpload} className="hidden" />
+                  {qrFile ? "Change QR" : "Upload QR"}
+                </label>
+                {qrPreview && <img loading="lazy" src={qrPreview} alt="QR" className="w-12 h-12 rounded-lg object-cover border border-gray-200" />}
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <InputField label="Contact name" value={payName} onChange={setPayName} placeholder="Owner / manager" />
+            <InputField label="Contact phone" value={payPhone} onChange={setPayPhone} placeholder="Defaults to the contact above" icon={Phone} />
+            <InputField label="WhatsApp" value={payWhatsapp} onChange={setPayWhatsapp} placeholder="Optional" />
           </div>
         </Section>
 

@@ -1,41 +1,60 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 import {
   Search, CheckCircle, Eye, ArrowLeft, Pencil, Check, X, Shield, Mail, Phone, User, Loader2,
 } from "lucide-react";
 import { SuperAdminShell } from "../shared/layout";
+import { Pagination } from "../shared/ui";
 
 const ROLES = ["All", "Player", "Trainer", "ClubAdmin", "corporate_admin"];
 const EDITABLE_ROLES = ["Player", "Trainer", "ClubAdmin", "corporate_admin", "Manager"];
+const PAGE_SIZE = 10;
 
 export default function Approved() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedRole, setSelectedRole] = useState("All");
   const [search, setSearch] = useState("");
+  const [debounced, setDebounced] = useState("");
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [selectedUser, setSelectedUser] = useState(null);
   const [editingRole, setEditingRole] = useState(false);
   const [newRole, setNewRole] = useState("");
 
-  useEffect(() => { fetchUsers(); }, []);
+  // Debounce the search box; reset to page 1 whenever the term changes.
+  useEffect(() => {
+    const t = setTimeout(() => { setDebounced(search.trim()); setPage(1); }, 350);
+    return () => clearTimeout(t);
+  }, [search]);
 
-  const fetchUsers = async () => {
+  // Reset to page 1 whenever the role filter changes.
+  useEffect(() => { setPage(1); }, [selectedRole]);
+
+  const fetchUsers = useCallback(async () => {
+    setLoading(true);
     try {
-      const res = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/update/approved-users`);
-      setUsers(res.data);
+      const params = { page, limit: PAGE_SIZE };
+      if (debounced) params.q = debounced;
+      if (selectedRole !== "All") params.role = selectedRole;
+      const res = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/update/approved-users`, { params });
+      setUsers(res.data.items || []);
+      setTotal(res.data.total || 0);
+      setTotalPages(res.data.totalPages || 1);
     } catch (err) {
       toast.error("Failed to load users");
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, debounced, selectedRole]);
 
-  const filtered = users.filter((u) => {
-    const matchesRole = selectedRole === "All" || u.role === selectedRole;
-    const matchesSearch = !search || (u.name || "").toLowerCase().includes(search.toLowerCase()) || (u.email || "").toLowerCase().includes(search.toLowerCase());
-    return matchesRole && matchesSearch;
-  });
+  useEffect(() => { fetchUsers(); }, [fetchUsers]);
+
+  // Both search (?q) and role (?role) are served by the backend now, so the
+  // page already holds exactly what should be shown.
+  const filtered = users;
 
   const handleStatusToggle = async () => {
     const newStatus = !selectedUser.isApproved;
@@ -60,16 +79,6 @@ export default function Approved() {
       toast.error("Failed to update role");
     }
   };
-
-  if (loading) {
-    return (
-      <SuperAdminShell searchPlaceholder="Search users…">
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="w-6 h-6 text-gray-500 animate-spin" />
-        </div>
-      </SuperAdminShell>
-    );
-  }
 
   // ── Detail View ────────────────────────────────────────────────────────────
   if (selectedUser) {
@@ -167,7 +176,7 @@ export default function Approved() {
             Approved users
           </h1>
           <p className="mt-1 text-[13px] text-gray-400">
-            <span className="font-mono tabular-nums">{filtered.length}</span> of <span className="font-mono tabular-nums">{users.length}</span> users
+            <span className="font-mono tabular-nums">{total}</span> approved user{total === 1 ? "" : "s"}
           </p>
         </div>
         <div className="flex gap-2">
@@ -185,7 +194,11 @@ export default function Approved() {
         </div>
       </header>
 
-      {filtered.length === 0 ? (
+      {loading ? (
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="w-6 h-6 text-gray-500 animate-spin" />
+        </div>
+      ) : filtered.length === 0 ? (
         <div className="bg-[#181A22] border border-white/[0.06] rounded-lg px-6 py-16 text-center">
           <div className="w-10 h-10 rounded-md bg-white/[0.06] inline-flex items-center justify-center mb-3">
             <CheckCircle className="w-5 h-5 text-gray-500" />
@@ -247,6 +260,15 @@ export default function Approved() {
           </div>
         </div>
       )}
+
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        total={total}
+        limit={PAGE_SIZE}
+        onPage={setPage}
+        loading={loading}
+      />
     </SuperAdminShell>
   );
 }

@@ -1,6 +1,6 @@
 import React from 'react'
 import { useNavigate } from "react-router-dom";
-import PrivacyImage from '../assets/PrivacyPolicy.jpg'; // Adjust if the path is different
+const PrivacyImage = '/images/PrivacyPolicy.jpg'; // §4.1 — out of the bundle
 
 const LFAQs = () => {
   const navigate = useNavigate();

@@ -4,10 +4,11 @@ import { Heart, Bookmark, Share2, Plus, X, Send, MapPin, Link2, Trophy, MessageC
 import axios from "axios";
 import { AuthContext } from "../context/AuthContext";
 
+import { getAuthToken } from "../shared/api/authToken";
 function MSocial() {
   const { auth } = useContext(AuthContext);
   const userId = auth?._id;
-  const token = localStorage.getItem("token");
+  const token = getAuthToken();
 
   const [tournamentName, setTournamentName] = useState("");
   const [caption, setCaption] = useState("");
@@ -55,14 +56,18 @@ function MSocial() {
     try {
       const res = await axios.post(`/api/posts/${postId}/like`, {}, { headers: { Authorization: `Bearer ${token}` } });
       setPosts(posts.map((p) => (p._id === postId ? res.data : p)));
-    } catch {}
+    } catch (err) {
+      console.warn("Failed to toggle like:", err.message);
+    }
   };
 
   const toggleSave = async (postId) => {
     try {
       const res = await axios.post(`/api/posts/${postId}/save`, {}, { headers: { Authorization: `Bearer ${token}` } });
       setPosts(posts.map((p) => (p._id === postId ? res.data : p)));
-    } catch {}
+    } catch (err) {
+      console.warn("Failed to toggle save:", err.message);
+    }
   };
 
   const timeAgo = (date) => {
@@ -250,8 +255,8 @@ function MSocial() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wider">Caption *</label>
-                <textarea rows={3} value={caption} onChange={(e) => setCaption(e.target.value)}
+                <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wider" htmlFor="caption">Caption *</label>
+                <textarea id="caption" rows={3} value={caption} onChange={(e) => setCaption(e.target.value)}
                   placeholder="What's happening? Use @mentions and #hashtags..."
                   className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition resize-none" />
               </div>

@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { ManagerShell } from "../shared/layout";
 
+import DialogA11y from "../shared/components/DialogA11y";
 const EMPTY_FORM = {
   code: "", discountType: "percentage", discountValue: "",
   applicableTo: "all", applicableId: "", applicableName: "",
@@ -45,7 +46,9 @@ export default function MCoupons() {
     try {
       const res = await axios.get("/api/coupons/analytics", { params: { createdBy: managerId } });
       if (res.data.success) setStats(res.data.stats);
-    } catch {}
+    } catch (err) {
+      console.warn("Failed to load coupon analytics:", err.message);
+    }
   };
 
   const handleCreate = async (e) => {
@@ -451,7 +454,13 @@ function IconBtn({ children, onClick, title, danger }) {
 
 function DarkModal({ title, subtitle, onClose, children, footer }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
+    <div
+        role="dialog"
+        aria-modal="true"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+        onClick={onClose}
+      >
+        <DialogA11y onClose={onClose} />
       <div
         className="bg-[#181A22] border border-white/[0.06] rounded-lg shadow-[0_24px_64px_rgba(0,0,0,0.5)] max-w-lg w-full max-h-[85vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}

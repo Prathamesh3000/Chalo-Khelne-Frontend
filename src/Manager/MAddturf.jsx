@@ -120,7 +120,7 @@ const AddTurf = () => {
           </div>
           {previews.length > 0 && (
             <div className="flex gap-3 mt-3">
-              {previews.map((src, i) => <img key={i} src={src} alt="" className="w-20 h-20 rounded-xl object-cover border border-gray-200" />)}
+              {previews.map((src, i) => <img loading="lazy" key={i} src={src} alt="" className="w-20 h-20 rounded-xl object-cover border border-gray-200" />)}
             </div>
           )}
         </Section>
@@ -130,13 +130,13 @@ const AddTurf = () => {
             {sports.map((sport, idx) => (
               <div key={idx} className="flex items-end gap-3">
                 <div className="flex-1">
-                  <label className="block text-xs font-semibold text-gray-500 mb-1">Sport Name</label>
-                  <input type="text" value={sport.name} onChange={(e) => updateSport(idx, "name", e.target.value)} placeholder="e.g. Cricket"
+                  <label className="block text-xs font-semibold text-gray-500 mb-1" htmlFor="sport-name">Sport Name</label>
+                  <input id="sport-name" type="text" value={sport.name} onChange={(e) => updateSport(idx, "name", e.target.value)} placeholder="e.g. Cricket"
                     className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition" />
                 </div>
                 <div className="w-32">
-                  <label className="block text-xs font-semibold text-gray-500 mb-1">₹/hr</label>
-                  <input type="number" value={sport.pricePerHour} onChange={(e) => updateSport(idx, "pricePerHour", e.target.value)} placeholder="500"
+                  <label className="block text-xs font-semibold text-gray-500 mb-1" htmlFor="hr">₹/hr</label>
+                  <input id="hr" type="number" value={sport.pricePerHour} onChange={(e) => updateSport(idx, "pricePerHour", e.target.value)} placeholder="500"
                     className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition" />
                 </div>
                 {sports.length > 1 && (

@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { ClubAdminShell } from "../shared/layout";
 
+import { getAuthToken } from "../shared/api/authToken";
 const statusPillClass = (status) => {
   const s = (status || "").toLowerCase();
   if (["confirmed", "active", "paid"].includes(s)) return "bg-emerald-500/15 text-emerald-300";
@@ -22,7 +23,7 @@ const statusPillClass = (status) => {
 
 export default function ClubAdminFinance() {
   const { auth } = useContext(AuthContext);
-  const token = localStorage.getItem("token");
+  const token = getAuthToken();
   const headers = { Authorization: `Bearer ${token}` };
 
   const [view, setView] = useState("overview");

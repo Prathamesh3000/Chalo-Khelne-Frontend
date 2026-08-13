@@ -1,5 +1,6 @@
 import { io } from "socket.io-client";
 
+import { getAuthToken } from "../../shared/api/authToken";
 // Derive socket origin from the API base (dev "/api" → localhost; prod
 // "https://host/api" → "https://host"). VITE_API_URL never existed → this used
 // to always hit localhost, breaking live-scoring sockets in production.
@@ -18,7 +19,7 @@ const subscriptions = new Map(); // roomId → Set of callbacks
 export function initSocket() {
   if (socket?.connected) return socket;
 
-  const token = localStorage.getItem("token");
+  const token = getAuthToken();
   if (!token) return null;
 
   socket = io(SERVER_URL, {
@@ -43,8 +44,6 @@ export function initSocket() {
 
   socket.on("connect_error", (err) => {
     reconnectAttempts++;
-    if (reconnectAttempts === 1) {
-    }
     if (reconnectAttempts >= MAX_RECONNECT) {
       socket.disconnect(); // Stop trying
     }

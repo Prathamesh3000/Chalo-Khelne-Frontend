@@ -5,6 +5,7 @@ import defaultImg from "../assets/tournament.avif";
 import { getTournamentType } from "../utils/sportTrack";
 import { assetUrl } from "../shared/lib/assetUrl";
 
+import { getAuthToken } from "../shared/api/authToken";
 const TournamentsCard = () => {
   const [tournaments, setTournaments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -13,7 +14,7 @@ const TournamentsCard = () => {
   useEffect(() => {
     const fetchTournaments = async () => {
       try {
-        const token = localStorage.getItem("token");
+        const token = getAuthToken();
         const response = await fetch("/api/tournaments", {
           headers: {
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -77,7 +78,7 @@ const TournamentsCard = () => {
         >
           {/* Image */}
           <div className="relative h-48 overflow-hidden">
-            <img
+            <img loading="lazy"
               src={
                 tournament.tournamentLogo
                   ? assetUrl('tournaments/' + tournament.tournamentLogo.split("\\").pop())

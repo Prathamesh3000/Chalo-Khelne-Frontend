@@ -107,7 +107,7 @@ function TrainerCard({ trainer }) {
       {/* Avatar banner */}
       <div className="h-28 bg-gradient-to-br from-orange-500/[0.18] to-orange-500/[0.06] flex items-center justify-center relative">
         {profileImage ? (
-          <img
+          <img loading="lazy"
             src={profileImage}
             alt={name}
             className="w-20 h-20 rounded-full object-cover"

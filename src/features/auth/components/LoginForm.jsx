@@ -7,14 +7,10 @@ import { Button, Input } from "../../../shared/ui";
 import { useAuth } from "../context/AuthContext";
 import { login as loginApi } from "../api/auth";
 
-const ROLE_HOME = {
-  superadmin: "/home",
-  manager: "/mdashboard",
-  clubadmin: "/club-dashboard",
-  corporate_admin: "/corporate-dashboard",
-  trainer: "/trainer-dashboard",
-  player: "/phome",
-};
+// §4.3 — this local map was missing club_admin, vendor and every agency role,
+// so those users fell through to "/phome" and a club admin landed on the PLAYER
+// home right after signing in. Now shared with App.jsx.
+import { homeForRole } from "../roleHome";
 
 export function LoginForm({ onSuccess, onForgotPassword }) {
   const { login } = useAuth();
@@ -37,7 +33,7 @@ export function LoginForm({ onSuccess, onForgotPassword }) {
         const data = await loginApi(values);
         const user = login(data);
         toast.success("Welcome back!");
-        const path = ROLE_HOME[user.role?.toLowerCase()] || "/phome";
+        const path = homeForRole(user.role);
         onSuccess?.(path);
       } catch (e) {
         const payload = e.response?.data || {};

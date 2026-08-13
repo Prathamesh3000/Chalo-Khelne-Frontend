@@ -31,11 +31,15 @@ export function pushRecentItem(item) {
       ...filtered,
     ].slice(0, MAX);
     localStorage.setItem(KEY, JSON.stringify(next));
-  } catch {}
+  } catch {
+    // best-effort — ignore quota / disabled-storage errors
+  }
 }
 
 export function clearRecentItems() {
   try {
     localStorage.removeItem(KEY);
-  } catch {}
+  } catch {
+    // best-effort — ignore disabled-storage errors
+  }
 }

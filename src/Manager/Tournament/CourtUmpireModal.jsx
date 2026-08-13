@@ -3,6 +3,7 @@ import { X, Plus, Loader2, AlertCircle, LayoutGrid, Shield } from "lucide-react"
 import { toast } from "react-toastify";
 import refereeApi from "../../features/referee/refereeApi";
 
+import DialogA11y from "../../shared/components/DialogA11y";
 /**
  * CourtUmpireModal — inline court/table ⇆ umpire assignment for the manager,
  * so there's no need to navigate to the separate Courts page just to assign
@@ -86,9 +87,12 @@ export default function CourtUmpireModal({ isOpen, onClose, tournamentId, onChan
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-      onClick={onClose}
-    >
+        role="dialog"
+        aria-modal="true"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+        onClick={onClose}
+      >
+        <DialogA11y onClose={onClose} />
       <div
         className="bg-[#181A22] rounded-2xl border border-white/10 shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}

@@ -197,7 +197,7 @@ const TurfManagement = () => {
                     style={{ border: images[idx] ? "1px solid rgba(249,115,22,0.4)" : "1px dashed rgba(255,255,255,0.12)" }}>
                     {images[idx] ? (
                       <>
-                        <img src={images[idx]} alt="" className="w-full h-32 object-cover" />
+                        <img loading="lazy" src={images[idx]} alt="" className="w-full h-32 object-cover" />
                         <button type="button" onClick={() => handleRemoveImage(idx)}
                           className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/60 hover:bg-black/80 backdrop-blur-sm rounded-md flex items-center justify-center transition w-auto">
                           <X className="w-3 h-3 text-white" />
@@ -390,7 +390,7 @@ function TurfCard({ turf, onDelete }) {
       {/* Image */}
       <div className="h-36 bg-white/[0.04] overflow-hidden relative">
         {turf.images?.[0] ? (
-          <img src={assetUrl(turf.images[0])} alt={turf.name}
+          <img loading="lazy" src={assetUrl(turf.images[0])} alt={turf.name}
             className="w-full h-full object-cover"
             onError={(e) => { e.currentTarget.style.display = "none"; }} />
         ) : (

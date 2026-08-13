@@ -7,6 +7,7 @@ import {
 import { assetUrl } from "../shared/lib/assetUrl";
 import { ManagerShell } from "../shared/layout";
 
+import { getAuthToken } from "../shared/api/authToken";
 const MTurfDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -17,7 +18,7 @@ const MTurfDetails = () => {
   useEffect(() => {
     const fetchTurfDetails = async () => {
       try {
-        const token = localStorage.getItem("token");
+        const token = getAuthToken();
         const response = await fetch(`/api/turfs/${id}`, {
           headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         });
@@ -32,7 +33,7 @@ const MTurfDetails = () => {
 
     const fetchBookings = async () => {
       try {
-        const token = localStorage.getItem("token");
+        const token = getAuthToken();
         const response = await fetch(`/api/players/turf-bookings/turf/${id}`, {
           headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         });
@@ -49,7 +50,7 @@ const MTurfDetails = () => {
 
   const handleStatusUpdate = async (bookingId, newStatus) => {
     try {
-      const token = localStorage.getItem("token");
+      const token = getAuthToken();
       const response = await fetch(`/api/players/turf-bookings/${bookingId}/status`, {
         method: "PUT",
         headers: {
@@ -138,7 +139,7 @@ const MTurfDetails = () => {
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-5">
           {turf.photos.map((photo, index) => (
             <div key={index} className="aspect-[4/3] rounded-md overflow-hidden bg-white/[0.04]" style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
-              <img
+              <img loading="lazy"
                 src={assetUrl(photo)}
                 alt={`Turf ${index + 1}`}
                 className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"

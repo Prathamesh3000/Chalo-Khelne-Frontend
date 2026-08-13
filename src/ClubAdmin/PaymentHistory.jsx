@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { ClubAdminShell } from "../shared/layout";
 
+import { getAuthToken } from "../shared/api/authToken";
 const TABS = [
   { key: "all",        label: "All payments", icon: CreditCard },
   { key: "tournament", label: "Tournament",   icon: Trophy     },
@@ -19,7 +20,7 @@ const formatDate = (d) =>
 
 const PaymentHistoryPage = () => {
   const { auth } = useContext(AuthContext);
-  const token = localStorage.getItem("token");
+  const token = getAuthToken();
   const headers = { Authorization: `Bearer ${token}` };
 
   const [payments, setPayments] = useState([]);

@@ -3,6 +3,7 @@ import { X, Check, RefreshCcw, Edit, Trophy } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import { Switch } from "@mui/material";
 
+import { getAuthToken } from "../shared/api/authToken";
 const TeamKnockoutsScoreboard = () => {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [currentGame, setCurrentGame] = useState(0);
@@ -124,7 +125,7 @@ const TeamKnockoutsScoreboard = () => {
 
         setMessage(`Submitting game ${gameData.gameNumber}...`);
 
-        const token = localStorage.getItem("token");
+        const token = getAuthToken();
         const response = await fetch(
           `/api/tournaments/team-knockout/matches/${matchId}/complete-game`,
           {
@@ -252,7 +253,7 @@ const TeamKnockoutsScoreboard = () => {
       setLoading(true);
 
       // Get current live state from backend
-      const token = localStorage.getItem("token");
+      const token = getAuthToken();
       const response = await fetch(
         `/api/tournaments/team-knockout/matches/${matchId}/live-state`,
         {
@@ -592,7 +593,7 @@ const TeamKnockoutsScoreboard = () => {
   // NEW: Use proper backend API for live score updates
   const updateLiveScore = async (homePoints, awayPoints) => {
     try {
-      const token = localStorage.getItem("token");
+      const token = getAuthToken();
       const response = await fetch(
         `/api/tournaments/team-knockout/matches/${matchId}/live-score`,
         {
@@ -783,7 +784,7 @@ const TeamKnockoutsScoreboard = () => {
 
     try {
       // Use the proper backend API for game completion
-      const token = localStorage.getItem("token");
+      const token = getAuthToken();
       const response = await fetch(
         `/api/tournaments/team-knockout/matches/${matchId}/complete-game`,
         {
@@ -904,7 +905,7 @@ const TeamKnockoutsScoreboard = () => {
       // Get team ID based on team type
       const teamId = team === "team1" ? "home_team_id" : "away_team_id"; // You'll need actual team IDs
 
-      const token = localStorage.getItem("token");
+      const token = getAuthToken();
       const response = await fetch(
         `/api/tournaments/team-knockout/teams/${teamId}/substitute`,
         {
@@ -1022,7 +1023,7 @@ const TeamKnockoutsScoreboard = () => {
 
       // Update match state and backend
       try {
-        const token = localStorage.getItem("token");
+        const token = getAuthToken();
         const response = await fetch(
           `/api/tournaments/team-knockout/matches/${matchId}/live-score`,
           {
@@ -1092,7 +1093,7 @@ const TeamKnockoutsScoreboard = () => {
         try {
           setLoading(true);
           // Fetch team data and substitution history
-          const token = localStorage.getItem("token");
+          const token = getAuthToken();
           const response = await fetch(
             `/api/tournaments/team-knockout/matches/${matchId}/live-state`,
             {
@@ -1226,10 +1227,10 @@ const TeamKnockoutsScoreboard = () => {
             <div className="space-y-6">
               {/* Current Player Selector */}
               <div>
-                <label className="block text-sm font-medium text-gray-200 mb-2">
+                <label className="block text-sm font-medium text-gray-200 mb-2" htmlFor="current-player">
                   Current Player
                 </label>
-                <select
+                <select id="current-player"
                   value={selectedPlayer}
                   onChange={(e) => setSelectedPlayer(e.target.value)}
                   disabled={loading}
@@ -1246,10 +1247,10 @@ const TeamKnockoutsScoreboard = () => {
 
               {/* Substitute Player Selector */}
               <div>
-                <label className="block text-sm font-medium text-gray-200 mb-2">
+                <label className="block text-sm font-medium text-gray-200 mb-2" htmlFor="substitute-player">
                   Substitute Player
                 </label>
-                <select
+                <select id="substitute-player"
                   value={selectedSubstitute}
                   onChange={(e) => setSelectedSubstitute(e.target.value)}
                   disabled={loading || !selectedPlayer}

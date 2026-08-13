@@ -98,8 +98,8 @@ export default function SportTrainers({ trainers = [] }) {
         </h3>
         <div className="flex items-end gap-2 max-w-md">
           <div className="flex-1">
-            <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-500 mb-1.5">Add a sport</label>
-            <select
+            <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-500 mb-1.5" htmlFor="add-a-sport">Add a sport</label>
+            <select id="add-a-sport"
               value={newSport}
               onChange={(e) => setNewSport(e.target.value)}
               className="w-full h-9 px-3 rounded-md text-[13px] text-gray-200 focus:outline-none"

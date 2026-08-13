@@ -8,6 +8,8 @@ import {
 } from "lucide-react";
 import { ManagerShell } from "../shared/layout";
 
+import DialogA11y from "../shared/components/DialogA11y";
+import { activatable } from "../shared/utils/activatable";
 const ROLE_META = {
   trainer:     { label: "Trainer",     icon: "🏋️", color: "#F97316" },
   referee:     { label: "Referee",     icon: "🏅", color: "#3B82F6" },
@@ -149,7 +151,11 @@ export default function AllStaffApplicationsPage() {
                 app.status === "pending" ? "border-amber-500/20" : "border-white/[0.06]"
               }`}>
                 {/* Row */}
-                <div className="flex items-center gap-3 p-4 cursor-pointer hover:bg-white/[0.02] transition" onClick={() => setExpandedId(isExp ? null : app._id)}>
+                <div
+                  className="flex items-center gap-3 p-4 cursor-pointer hover:bg-white/[0.02] transition"
+                  aria-expanded={isExp}
+                  {...activatable(() => setExpandedId(isExp ? null : app._id))}
+                >
                   <div className="w-10 h-10 rounded-full flex items-center justify-center text-base flex-shrink-0"
                     style={{ backgroundColor: rm.color + "20", border: `1px solid ${rm.color}30` }}>
                     {rm.icon}
@@ -259,7 +265,13 @@ export default function AllStaffApplicationsPage() {
 
       {/* Full Profile Modal */}
       {profileModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setProfileModal(null)}>
+        <div
+        role="dialog"
+        aria-modal="true"
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        onClick={() => setProfileModal(null)}
+      >
+        <DialogA11y onClose={() => setProfileModal(null)} />
           <div className="bg-[#181A22] border border-white/[0.06] rounded-lg shadow-[0_24px_64px_rgba(0,0,0,0.5)] w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
             <div className="px-5 py-4 border-b border-white/[0.06] flex items-center justify-between">
               <h3 className="text-[14px] font-medium text-white">Applicant profile</h3>

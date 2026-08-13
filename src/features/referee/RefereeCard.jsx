@@ -26,7 +26,7 @@ export default function RefereeCard({ referee, onClick, compact }) {
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 flex items-center gap-3">
         {referee.profileImage ? (
-          <img src={referee.profileImage} alt={name} className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm" />
+          <img loading="lazy" src={referee.profileImage} alt={name} className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm" />
         ) : (
           <div className="w-12 h-12 rounded-full bg-orange-500 flex items-center justify-center text-white font-bold text-lg shadow-sm">
             {initial}

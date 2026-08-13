@@ -52,7 +52,7 @@ const Navbar = ({ toggleSidebar }) => {
         </button>
 
         <Link to={homePath} className="flex items-center gap-2 flex-shrink-0">
-          <img
+          <img loading="lazy"
             src="/sportapp_logo.png"
             alt="ChaloKhelne"
             className="h-7 w-auto object-contain"

@@ -379,7 +379,7 @@ function PlayerRow({ player, isWinner, matchType }) {
   return (
     <div className="flex items-center gap-2 mb-1">
       {player.playerId?.profileImage ? (
-        <img
+        <img loading="lazy"
           src={assetUrl(player.playerId.profileImage)}
           alt={player.userName}
           className="w-8 h-8 rounded-full object-cover"

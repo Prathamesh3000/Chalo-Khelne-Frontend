@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { Tag, Plus, X, Trash2, Users, Unlock, Sparkles } from "lucide-react";
 
+import DialogA11y from "../shared/components/DialogA11y";
 const SPORTS = ["Tennis", "Badminton", "Padel", "Cricket", "Swimming", "Football", "Pickleball", "Table Tennis"];
 const randomCode = () => "PROMO" + Math.random().toString(36).slice(2, 7).toUpperCase();
 
@@ -85,14 +86,20 @@ export default function Coupons() {
       )}
 
       {addOpen && (
-        <div onClick={() => setAddOpen(false)} className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+        <div
+        role="dialog"
+        aria-modal="true"
+        onClick={() => setAddOpen(false)}
+        className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+      >
+        <DialogA11y onClose={() => setAddOpen(false)} />
           <div onClick={(e) => e.stopPropagation()} className="bg-[#181A22] rounded-2xl max-w-md w-full overflow-hidden border border-white/[0.1] shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="p-5 border-b border-white/[0.08] flex justify-between items-center bg-[#0a0d14]">
               <div><span className="text-[10px] font-mono tracking-wider font-bold text-emerald-400 uppercase">Marketing</span><h3 className="text-[17px] font-bold text-white mt-0.5">New Promo Code</h3></div>
               <button onClick={() => setAddOpen(false)} className="text-gray-500 hover:text-white w-auto bg-transparent"><X size={18} /></button>
             </div>
             <form onSubmit={addCoupon} className="p-5 space-y-3.5">
-              <div><label className={label}>Campaign Name *</label><input className={input} value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="Summer Splash" required /></div>
+              <div><label className={label} htmlFor="campaign-name">Campaign Name *</label><input id="campaign-name" className={input} value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="Summer Splash" required /></div>
               <div>
                 <label className={label}>Code *</label>
                 <div className="flex gap-2">
@@ -101,14 +108,14 @@ export default function Coupons() {
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div><label className={label}>Type</label><select className={input} value={form.discountType} onChange={(e) => { set("discountType", e.target.value); set("value", e.target.value === "Percentage" ? 15 : 50); }}><option value="Percentage" className="bg-[#181A22]">Percentage (%)</option><option value="Flat" className="bg-[#181A22]">Flat ({currency})</option></select></div>
-                <div><label className={label}>Value</label><input className={input} type="number" min="0" value={form.value} onChange={(e) => set("value", e.target.value)} /></div>
+                <div><label className={label} htmlFor="type">Type</label><select id="type" className={input} value={form.discountType} onChange={(e) => { set("discountType", e.target.value); set("value", e.target.value === "Percentage" ? 15 : 50); }}><option value="Percentage" className="bg-[#181A22]">Percentage (%)</option><option value="Flat" className="bg-[#181A22]">Flat ({currency})</option></select></div>
+                <div><label className={label} htmlFor="value">Value</label><input id="value" className={input} type="number" min="0" value={form.value} onChange={(e) => set("value", e.target.value)} /></div>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div><label className={label}>Valid From</label><input className={input} type="date" value={form.validFrom} onChange={(e) => set("validFrom", e.target.value)} /></div>
-                <div><label className={label}>Valid Until</label><input className={input} type="date" value={form.validUntil} onChange={(e) => set("validUntil", e.target.value)} /></div>
+                <div><label className={label} htmlFor="valid-from">Valid From</label><input id="valid-from" className={input} type="date" value={form.validFrom} onChange={(e) => set("validFrom", e.target.value)} /></div>
+                <div><label className={label} htmlFor="valid-until">Valid Until</label><input id="valid-until" className={input} type="date" value={form.validUntil} onChange={(e) => set("validUntil", e.target.value)} /></div>
               </div>
-              <div><label className={label}>Usage Limit</label><input className={input} type="number" min="0" value={form.usageLimit} onChange={(e) => set("usageLimit", e.target.value)} /></div>
+              <div><label className={label} htmlFor="usage-limit">Usage Limit</label><input id="usage-limit" className={input} type="number" min="0" value={form.usageLimit} onChange={(e) => set("usageLimit", e.target.value)} /></div>
               <div>
                 <label className={label}>Applicable Sports</label>
                 <div className="flex flex-wrap gap-1.5">

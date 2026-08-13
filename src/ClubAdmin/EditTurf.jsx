@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { ClubAdminShell } from "../shared/layout";
 
+import { getAuthToken } from "../shared/api/authToken";
 const DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
 const SPORTS_PRESETS = ["Football", "Cricket", "Basketball", "Tennis", "Badminton", "Volleyball", "Hockey", "Table Tennis", "Swimming", "Pickleball", "Chess", "Carrom"];
 const FACILITY_PRESETS = [
@@ -43,13 +44,28 @@ const EditTurf = () => {
   const [images, setImages] = useState([null, null, null]);
   const [imageFiles, setImageFiles] = useState([null, null, null]);
   const [existingImages, setExistingImages] = useState([]);
+  // Turf-owner payment collection (goes to the owner, not the platform).
+  const [upiId, setUpiId] = useState("");
+  const [payName, setPayName] = useState("");
+  const [payPhone, setPayPhone] = useState("");
+  const [payWhatsapp, setPayWhatsapp] = useState("");
+  const [qrFile, setQrFile] = useState(null);
+  const [qrPreview, setQrPreview] = useState("");
+  const [existingQr, setExistingQr] = useState("");
+
+  const handleQrChange = (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setQrFile(f);
+    setQrPreview(URL.createObjectURL(f));
+  };
 
   const fileInputRefs = [useRef(null), useRef(null), useRef(null)];
 
   useEffect(() => {
     const fetchTurf = async () => {
       try {
-        const token = localStorage.getItem("token");
+        const token = getAuthToken();
         const response = await axios.get(`/api/turfs/${id}?userId=${auth._id}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -76,6 +92,11 @@ const EditTurf = () => {
           setSelectedDays(t.availableTimeSlots.map((s) => s.day));
         }
         setExistingImages(t.images || []);
+        setUpiId(t.ownerPayment?.upiId || "");
+        setExistingQr(t.ownerPayment?.qrImage || "");
+        setPayName(t.contact?.name || "");
+        setPayPhone(t.contact?.phone || "");
+        setPayWhatsapp(t.contact?.whatsapp || "");
         setIsLoading(false);
       } catch (error) {
         toast.error("Failed to fetch turf details");
@@ -147,10 +168,22 @@ const EditTurf = () => {
       fd.append("existingImages", JSON.stringify(existingImages));
       imageFiles.forEach((f) => { if (f) fd.append("turfImages", f); });
 
-      const token = localStorage.getItem("token");
+      const token = getAuthToken();
       await axios.put(`/api/turfs/${id}`, fd, {
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" },
       });
+      // Save turf-owner payment/contact details (separate endpoint; owner-scoped).
+      const pd = new FormData();
+      pd.append("upiId", upiId);
+      pd.append("contactName", payName || "");
+      pd.append("contactPhone", payPhone || "");
+      pd.append("contactWhatsapp", payWhatsapp || "");
+      if (qrFile) pd.append("qrImage", qrFile);
+      try {
+        await axios.patch(`/api/turfs/${id}/payment-details`, pd, {
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" },
+        });
+      } catch { /* turf saved; payment details can be retried */ }
       toast.success("Turf updated successfully!");
       navigate(`/turf/${id}`);
     } catch (error) {
@@ -202,7 +235,7 @@ const EditTurf = () => {
               <div className="grid grid-cols-3 gap-3">
                 {existingImages.map((imagePath, index) => (
                   <div key={imagePath} className="relative rounded-md overflow-hidden" style={{ border: "1px solid rgba(249,115,22,0.4)" }}>
-                    <img src={assetUrl(imagePath)} alt={`Turf ${index + 1}`} className="w-full h-32 object-cover" />
+                    <img loading="lazy" src={assetUrl(imagePath)} alt={`Turf ${index + 1}`} className="w-full h-32 object-cover" />
                     <button type="button" onClick={() => handleRemoveExistingImage(index)}
                       className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/60 hover:bg-black/80 backdrop-blur-sm rounded-md flex items-center justify-center transition w-auto">
                       <X className="w-3 h-3 text-red-300" />
@@ -221,7 +254,7 @@ const EditTurf = () => {
                 style={{ border: images[idx] ? "1px solid rgba(249,115,22,0.4)" : "1px dashed rgba(255,255,255,0.12)" }}>
                 {images[idx] ? (
                   <>
-                    <img src={images[idx]} alt="" className="w-full h-32 object-cover" />
+                    <img loading="lazy" src={images[idx]} alt="" className="w-full h-32 object-cover" />
                     <button type="button" onClick={() => handleRemoveImage(idx)}
                       className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/60 hover:bg-black/80 backdrop-blur-sm rounded-md flex items-center justify-center transition w-auto">
                       <X className="w-3 h-3 text-white" />
@@ -349,6 +382,30 @@ const EditTurf = () => {
                 </button>
               );
             })}
+          </div>
+        </Section>
+
+        <Section icon={IndianRupee} title="Payment collection">
+          <p className="text-[12px] text-gray-500 -mt-1 mb-1">
+            Turf payments come <span className="text-gray-300 font-semibold">directly to you</span>, not the platform. Players see your UPI / QR at booking; leave these blank and they'll see your contact instead.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <DarkInput label="UPI ID" value={upiId} onChange={setUpiId} placeholder="yourname@bank" />
+            <div>
+              <label className="block text-[13px] font-medium text-gray-300 mb-1.5">Payment QR image</label>
+              <div className="flex items-center gap-3">
+                <label className="h-9 px-3 rounded-md text-[13px] text-gray-300 cursor-pointer flex items-center w-auto" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)" }}>
+                  <input type="file" accept="image/*" onChange={handleQrChange} className="hidden" />
+                  {qrFile ? "Change QR" : existingQr ? "Replace QR" : "Upload QR"}
+                </label>
+                {(qrPreview || existingQr) && <img loading="lazy" src={qrPreview || assetUrl(existingQr)} alt="QR" className="w-11 h-11 rounded-md object-cover border border-white/10" />}
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <DarkInput label="Contact name" value={payName} onChange={setPayName} placeholder="Owner / manager" />
+            <DarkInput label="Contact phone" value={payPhone} onChange={setPayPhone} placeholder="Shown if no UPI/QR" />
+            <DarkInput label="WhatsApp" value={payWhatsapp} onChange={setPayWhatsapp} placeholder="Optional" />
           </div>
         </Section>
 

@@ -131,8 +131,12 @@ export default function useMatchScoring(matchId) {
       await new Promise((r) => setTimeout(r, 300));
     }
 
-    // Sync + refetch
-    try { await syncPointsTableApi(matchId); } catch {}
+    // Sync + refetch (sync is best-effort — the refetch below reflects server truth)
+    try {
+      await syncPointsTableApi(matchId);
+    } catch (err) {
+      console.warn("Points-table sync failed:", err.message);
+    }
     queryClient.invalidateQueries({ queryKey: keys.matchLiveState(matchId) });
   };
 

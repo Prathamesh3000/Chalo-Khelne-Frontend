@@ -7,6 +7,7 @@ import axios from "axios";
 import { toast } from "react-toastify";
 import { X, Crown, Loader2 } from "lucide-react";
 
+import DialogA11y from "../shared/components/DialogA11y";
 const SLOTS = [
   { slot: "P1", label: "Captain", locked: null },
   { slot: "P2", label: "Player 2", locked: null },
@@ -89,9 +90,12 @@ export default function RapidRalliesRegisterModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      onClick={onClose}
-    >
+        role="dialog"
+        aria-modal="true"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+        onClick={onClose}
+      >
+        <DialogA11y onClose={onClose} />
       <div
         className="bg-[#181A22] rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
@@ -112,8 +116,8 @@ export default function RapidRalliesRegisterModal({
         {/* Body */}
         <div className="px-5 py-4 space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-gray-300 mb-1">Team name</label>
-            <input
+            <label className="block text-xs font-semibold text-gray-300 mb-1" htmlFor="team-name">Team name</label>
+            <input id="team-name"
               value={teamName}
               onChange={(e) => setTeamName(e.target.value)}
               placeholder="e.g. Kharadi Falcons"

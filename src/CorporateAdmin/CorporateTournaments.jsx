@@ -79,7 +79,7 @@ function TournamentCard({ tournament }) {
       {/* Image */}
       <div className="h-36 bg-white/[0.04] overflow-hidden relative">
         {tournament.tournamentLogo ? (
-          <img
+          <img loading="lazy"
             src={assetUrl("tournaments/" + tournament.tournamentLogo.split("\\").pop())}
             alt={tournament.title}
             className="w-full h-full object-cover"

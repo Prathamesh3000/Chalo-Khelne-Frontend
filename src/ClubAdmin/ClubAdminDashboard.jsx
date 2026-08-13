@@ -9,10 +9,11 @@ import {
 import { ClubAdminShell } from "../shared/layout";
 import SchoolDashboard from "./SchoolDashboard";
 
+import { getAuthToken } from "../shared/api/authToken";
 const ClubAdminDashboard = () => {
   const { auth } = useContext(AuthContext);
   const navigate = useNavigate();
-  const token = localStorage.getItem("token");
+  const token = getAuthToken();
   const headers = { Authorization: `Bearer ${token}` };
 
   const [orgType, setOrgType] = useState(null); // null = still resolving

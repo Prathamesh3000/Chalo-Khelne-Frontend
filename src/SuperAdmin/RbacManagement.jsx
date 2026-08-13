@@ -1,5 +1,5 @@
 import { toast } from "react-toastify";
-import { useState, useEffect, Fragment } from "react";
+import { useState, useEffect, useCallback, Fragment } from "react";
 import axios from "axios";
 import {
   Shield,
@@ -22,6 +22,9 @@ import {
   UserX,
 } from "lucide-react";
 import { SuperAdminShell } from "../shared/layout";
+import { Pagination } from "../shared/ui";
+
+const PAGE_SIZE = 10;
 
 const MODULE_ICONS = {
   tournament: "🏆",
@@ -140,6 +143,10 @@ export default function RbacManagement() {
   const [users, setUsers] = useState([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [userFilters, setUserFilters] = useState({ role: "all", status: "all", search: "" });
+  const [usersDebounced, setUsersDebounced] = useState("");
+  const [usersPage, setUsersPage] = useState(1);
+  const [usersTotal, setUsersTotal] = useState(0);
+  const [usersTotalPages, setUsersTotalPages] = useState(1);
   const [suspendedUsers, setSuspendedUsers] = useState([]);
   const [suspendedLoading, setSuspendedLoading] = useState(false);
   const [actionTarget, setActionTarget] = useState(null); // { user, action: "suspend"|"reject"|"reactivate" }
@@ -150,27 +157,38 @@ export default function RbacManagement() {
     fetchAll();
   }, []);
 
+  // Debounce the search box; reset to page 1 whenever the term changes.
   useEffect(() => {
-    if (activeTab === "users") fetchUsers();
-    if (activeTab === "suspended") fetchSuspended();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, userFilters.role, userFilters.status]);
+    const t = setTimeout(() => {
+      setUsersDebounced(userFilters.search.trim());
+      setUsersPage(1);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [userFilters.search]);
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     setUsersLoading(true);
     try {
-      const params = {};
+      const params = { page: usersPage, limit: PAGE_SIZE };
       if (userFilters.role !== "all") params.role = userFilters.role;
       if (userFilters.status !== "all") params.status = userFilters.status;
-      if (userFilters.search.trim()) params.search = userFilters.search.trim();
+      if (usersDebounced) params.q = usersDebounced;
       const { data } = await axios.get("/api/roles/users", { params });
       setUsers(data.items || []);
+      setUsersTotal(data.total || 0);
+      setUsersTotalPages(data.totalPages || 1);
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to load users");
     } finally {
       setUsersLoading(false);
     }
-  };
+  }, [usersPage, userFilters.role, userFilters.status, usersDebounced]);
+
+  useEffect(() => {
+    if (activeTab === "users") fetchUsers();
+    if (activeTab === "suspended") fetchSuspended();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, fetchUsers]);
 
   const fetchSuspended = async () => {
     setSuspendedLoading(true);
@@ -207,8 +225,13 @@ export default function RbacManagement() {
       toast.success(`User ${action === "reactivate" ? "reactivated" : action + "ed"}`);
       setActionTarget(null);
       setActionReason("");
-      // Refresh whichever tab the user is on
-      if (activeTab === "users") fetchUsers();
+      // Refresh whichever tab the user is on. A status change can drop the row
+      // from the current filtered page — if it was the last one on a non-first
+      // page, step back so we don't land on an empty page.
+      if (activeTab === "users") {
+        if (users.length === 1 && usersPage > 1) setUsersPage((p) => p - 1);
+        else fetchUsers();
+      }
       if (activeTab === "suspended") fetchSuspended();
     } catch (err) {
       toast.error(err.response?.data?.message || "Action failed");
@@ -779,13 +802,12 @@ export default function RbacManagement() {
                 placeholder="Search name or email…"
                 value={userFilters.search}
                 onChange={(e) => setUserFilters((p) => ({ ...p, search: e.target.value }))}
-                onKeyDown={(e) => e.key === "Enter" && fetchUsers()}
                 className="w-full h-9 pl-9 pr-3 bg-[#0F1117] border border-white/[0.08] rounded-md text-[13px] text-white placeholder:text-gray-600 focus:outline-none focus:border-orange-400/40"
               />
             </div>
             <select
               value={userFilters.role}
-              onChange={(e) => setUserFilters((p) => ({ ...p, role: e.target.value }))}
+              onChange={(e) => { setUsersPage(1); setUserFilters((p) => ({ ...p, role: e.target.value })); }}
               className="h-9 px-3 bg-[#0F1117] border border-white/[0.08] rounded-md text-[13px] text-white focus:outline-none focus:border-orange-400/40 appearance-none"
             >
               {USER_ROLES.map((r) => (
@@ -794,7 +816,7 @@ export default function RbacManagement() {
             </select>
             <select
               value={userFilters.status}
-              onChange={(e) => setUserFilters((p) => ({ ...p, status: e.target.value }))}
+              onChange={(e) => { setUsersPage(1); setUserFilters((p) => ({ ...p, status: e.target.value })); }}
               className="h-9 px-3 bg-[#0F1117] border border-white/[0.08] rounded-md text-[13px] text-white focus:outline-none focus:border-orange-400/40 appearance-none"
             >
               {USER_STATUS.map((s) => (
@@ -884,6 +906,15 @@ export default function RbacManagement() {
               </div>
             </div>
           )}
+
+          <Pagination
+            page={usersPage}
+            totalPages={usersTotalPages}
+            total={usersTotal}
+            limit={PAGE_SIZE}
+            onPage={setUsersPage}
+            loading={usersLoading}
+          />
         </div>
       )}
 

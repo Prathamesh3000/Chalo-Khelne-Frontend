@@ -31,7 +31,7 @@ const Hero = ({ navigate }) => (
   <section className="relative min-h-[100vh] flex items-center bg-gray-950 overflow-hidden">
     {/* Background image — full cover */}
     <div className="absolute inset-0">
-      <img
+      <img loading="lazy"
         src="https://images.unsplash.com/photo-1686776619157-1fa56b168992?q=80&w=1470&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
         alt=""
         className="w-full h-full object-cover"
@@ -135,6 +135,7 @@ const Hero = ({ navigate }) => (
 // ─── FEATURES ───────────────────────────────────────────────────
 import { MapPin as MapPinIcon, Trophy as TrophyIcon, Zap as ZapIcon, Users as UsersIcon, Newspaper as NewsIcon, ArrowLeftRight, ArrowRight as ArrowRightIcon } from "lucide-react";
 
+import { activatable } from "../shared/utils/activatable";
 const featureList = [
   { title: "Turf & Venue Booking", desc: "Browse facilities, check live slot availability, and book slots instantly with hourly pricing.", link: "/l/turf-content", icon: MapPinIcon, color: "bg-orange-500", light: "bg-orange-50 text-orange-500" },
   { title: "Tournament Engine", desc: "Group stage, knockout, team events with auto match generation, live scoring, and leaderboards.", link: "/l/event", icon: TrophyIcon, color: "bg-amber-500", light: "bg-amber-50 text-amber-600" },
@@ -361,7 +362,7 @@ const Venues = ({ venues, navigate }) => (
                 {/* Image */}
                 <div className="h-36 bg-slate-200 overflow-hidden">
                   {v.images?.[0] ? (
-                    <img
+                    <img loading="lazy"
                       src={v.images[0].startsWith("http") ? v.images[0] : `/uploads/${v.images[0]}`}
                       alt={v.name}
                       className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
@@ -462,7 +463,7 @@ const Footer = ({ navigate }) => (
               ["Trainers", "/l/trainer"],
               ["News", "/l/news"],
             ].map(([label, to]) => (
-              <div key={label} onClick={() => navigate(to)} className="hover:text-slate-300 cursor-pointer transition-colors">
+              <div key={label} {...activatable(() => navigate(to))} className="hover:text-slate-300 cursor-pointer transition-colors">
                 {label}
               </div>
             ))}
@@ -478,7 +479,7 @@ const Footer = ({ navigate }) => (
               ["Privacy", "/privacy-policy"],
               ["Terms", "/terms-and-conditions"],
             ].map(([label, to]) => (
-              <div key={label} onClick={() => navigate(to)} className="hover:text-slate-300 cursor-pointer transition-colors">
+              <div key={label} {...activatable(() => navigate(to))} className="hover:text-slate-300 cursor-pointer transition-colors">
                 {label}
               </div>
             ))}

@@ -129,8 +129,8 @@ export default function AttendanceView({ trainers = [] }) {
           ))}
         </div>
         <div className="flex items-center gap-2">
-          <label className="text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-500">Day</label>
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={`${field} w-44`} style={inputStyle} />
+          <label className="text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-500" htmlFor="day">Day</label>
+          <input id="day" type="date" value={date} onChange={(e) => setDate(e.target.value)} className={`${field} w-44`} style={inputStyle} />
         </div>
       </div>
 

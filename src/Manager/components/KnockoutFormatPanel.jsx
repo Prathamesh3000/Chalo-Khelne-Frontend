@@ -133,8 +133,8 @@ export default function KnockoutFormatPanel({
           )}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[11px] font-semibold text-gray-600 mb-1">Slot (mins)</label>
-              <input
+              <label className="block text-[11px] font-semibold text-gray-600 mb-1" htmlFor="slot-mins">Slot (mins)</label>
+              <input id="slot-mins"
                 type="number"
                 min="1"
                 value={uniformSlot}
@@ -143,8 +143,8 @@ export default function KnockoutFormatPanel({
               />
             </div>
             <div>
-              <label className="block text-[11px] font-semibold text-gray-600 mb-1">Match (mins)</label>
-              <input
+              <label className="block text-[11px] font-semibold text-gray-600 mb-1" htmlFor="match-mins">Match (mins)</label>
+              <input id="match-mins"
                 type="number"
                 min="1"
                 value={uniformMatch}
@@ -242,10 +242,10 @@ export default function KnockoutFormatPanel({
 
       {/* Inter-round break */}
       <div className="flex items-center gap-2">
-        <label className="text-[11px] font-semibold text-gray-600 uppercase tracking-wider">
+        <label className="text-[11px] font-semibold text-gray-600 uppercase tracking-wider" htmlFor="break-between-rounds-mins">
           Break between rounds (mins)
         </label>
-        <input
+        <input id="break-between-rounds-mins"
           type="number"
           min="0"
           value={breakBetweenRoundsMinutes}

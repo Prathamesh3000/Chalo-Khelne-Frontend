@@ -2,6 +2,7 @@ import { useState, useEffect, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 
+import { getAuthToken } from "../shared/api/authToken";
 const PSlotbooking = () => {
   const navigate = useNavigate();
   const [turfs, setTurfs] = useState([]);
@@ -12,7 +13,7 @@ const PSlotbooking = () => {
   useEffect(() => {
     const fetchTurfs = async () => {
       try {
-        const token = localStorage.getItem("token");
+        const token = getAuthToken();
         const response = await fetch(`/api/turfs`, {
           headers: {
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -28,7 +29,7 @@ const PSlotbooking = () => {
     const fetchUserBookings = async () => {
       try {
         if (!userId) return;
-        const token = localStorage.getItem("token");
+        const token = getAuthToken();
         const response = await fetch(`/api/players/turf-bookings/user/${userId}`, {
           headers: {
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -91,7 +92,7 @@ const PSlotbooking = () => {
           {turfs.map((turf) => (
             <div key={turf._id} className="bg-white rounded-lg shadow-lg overflow-hidden">
               {turf.photos?.length > 0 && (
-                <img
+                <img loading="lazy"
                   src={`/uploads/${turf.photos[0].replace(/\\/g, "/").split("/").pop()}`}
                   alt="Turf"
                   className="w-full h-48 object-cover"

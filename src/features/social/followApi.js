@@ -1,7 +1,8 @@
 import axios from "axios";
 
+import { getAuthToken } from "../../shared/api/authToken";
 const getAuthHeader = () => {
-  const token = localStorage.getItem("token");
+  const token = getAuthToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 

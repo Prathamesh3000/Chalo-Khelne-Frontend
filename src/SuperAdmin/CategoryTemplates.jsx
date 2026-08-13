@@ -15,6 +15,7 @@ import {
 import { toast } from "react-toastify";
 import { SuperAdminShell } from "../shared/layout";
 
+import { getAuthToken } from "../shared/api/authToken";
 const API = `${import.meta.env.VITE_API_BASE_URL || "/api"}/category-templates`;
 
 const GENDER_LABEL = {
@@ -103,7 +104,7 @@ export default function CategoryTemplates() {
   const [seeding, setSeeding] = useState(false);
 
   const authHeader = () => ({
-    Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
+    Authorization: `Bearer ${getAuthToken() || ""}`,
   });
 
   const fetchAll = async () => {

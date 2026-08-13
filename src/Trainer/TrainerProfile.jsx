@@ -204,8 +204,8 @@ const TrainerProfile = () => {
             <h2 className="text-xl font-semibold mb-4">Personal Information</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               <div>
-                <label className="block text-gray-700 mb-1">First Name</label>
-                <input
+                <label className="block text-gray-700 mb-1" htmlFor="first-name">First Name</label>
+                <input id="first-name"
                   type="text"
                   name="firstName"
                   value={formData.firstName}
@@ -214,8 +214,8 @@ const TrainerProfile = () => {
                 />
               </div>
               <div>
-                <label className="block text-gray-700 mb-1">Last Name</label>
-                <input
+                <label className="block text-gray-700 mb-1" htmlFor="last-name">Last Name</label>
+                <input id="last-name"
                   type="text"
                   name="lastName"
                   value={formData.lastName}
@@ -224,10 +224,10 @@ const TrainerProfile = () => {
                 />
               </div>
               <div>
-                <label className="block text-gray-700 mb-1">
+                <label className="block text-gray-700 mb-1" htmlFor="date-of-birth">
                   Date of Birth
                 </label>
-                <input
+                <input id="date-of-birth"
                   type="date"
                   name="dob"
                   value={formData.dob}
@@ -236,8 +236,8 @@ const TrainerProfile = () => {
                 />
               </div>
               <div>
-                <label className="block text-gray-700 mb-1">Gender</label>
-                <select
+                <label className="block text-gray-700 mb-1" htmlFor="gender">Gender</label>
+                <select id="gender"
                   name="gender"
                   value={formData.gender}
                   onChange={handleInputChange}
@@ -250,8 +250,8 @@ const TrainerProfile = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-gray-700 mb-1">Sport</label>
-                <input
+                <label className="block text-gray-700 mb-1" htmlFor="sport">Sport</label>
+                <input id="sport"
                   type="text"
                   name="sport"
                   value={formData.sport}
@@ -260,10 +260,10 @@ const TrainerProfile = () => {
                 />
               </div>
               <div>
-                <label className="block text-gray-700 mb-1">
+                <label className="block text-gray-700 mb-1" htmlFor="experience-years">
                   Experience (Years)
                 </label>
-                <input
+                <input id="experience-years"
                   type="number"
                   name="experience"
                   value={formData.experience}
@@ -272,8 +272,8 @@ const TrainerProfile = () => {
                 />
               </div>
               <div className="md:col-span-2">
-                <label className="block text-gray-700 mb-1">Address</label>
-                <textarea
+                <label className="block text-gray-700 mb-1" htmlFor="address">Address</label>
+                <textarea id="address"
                   name="address"
                   value={formData.address}
                   onChange={handleInputChange}
@@ -282,10 +282,10 @@ const TrainerProfile = () => {
                 ></textarea>
               </div>
               <div>
-                <label className="block text-gray-700 mb-1">
+                <label className="block text-gray-700 mb-1" htmlFor="emergency-contact">
                   Emergency Contact
                 </label>
-                <input
+                <input id="emergency-contact"
                   type="tel"
                   name="emergencyContact"
                   value={formData.emergencyContact}
@@ -294,10 +294,10 @@ const TrainerProfile = () => {
                 />
               </div>
               <div>
-                <label className="block text-gray-700 mb-1">
+                <label className="block text-gray-700 mb-1" htmlFor="emergency-contact-name">
                   Emergency Contact Name
                 </label>
-                <input
+                <input id="emergency-contact-name"
                   type="text"
                   name="emergencyContactName"
                   value={formData.emergencyContactName}
@@ -306,8 +306,8 @@ const TrainerProfile = () => {
                 />
               </div>
               <div className="md:col-span-2">
-                <label className="block text-gray-700 mb-1">About Me</label>
-                <textarea
+                <label className="block text-gray-700 mb-1" htmlFor="about-me">About Me</label>
+                <textarea id="about-me"
                   name="about"
                   value={formData.about}
                   onChange={handleInputChange}
@@ -372,10 +372,10 @@ const TrainerProfile = () => {
                 className="grid grid-cols-1 md:grid-cols-2 gap-4"
               >
                 <div>
-                  <label className="block text-gray-700 mb-1">
+                  <label className="block text-gray-700 mb-1" htmlFor="certificate-name">
                     Certificate Name
                   </label>
-                  <input
+                  <input id="certificate-name"
                     type="text"
                     name="name"
                     value={newCertificate.name}
@@ -385,10 +385,10 @@ const TrainerProfile = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-gray-700 mb-1">
+                  <label className="block text-gray-700 mb-1" htmlFor="issuing-organization">
                     Issuing Organization
                   </label>
-                  <input
+                  <input id="issuing-organization"
                     type="text"
                     name="issuedBy"
                     value={newCertificate.issuedBy}
@@ -398,8 +398,8 @@ const TrainerProfile = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-gray-700 mb-1">Issue Date</label>
-                  <input
+                  <label className="block text-gray-700 mb-1" htmlFor="issue-date">Issue Date</label>
+                  <input id="issue-date"
                     type="date"
                     name="issueDate"
                     value={newCertificate.issueDate}
@@ -409,10 +409,10 @@ const TrainerProfile = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-gray-700 mb-1">
+                  <label className="block text-gray-700 mb-1" htmlFor="expiry-date-if-applicable">
                     Expiry Date (if applicable)
                   </label>
-                  <input
+                  <input id="expiry-date-if-applicable"
                     type="date"
                     name="expiryDate"
                     value={newCertificate.expiryDate}
@@ -421,10 +421,10 @@ const TrainerProfile = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-gray-700 mb-1">
+                  <label className="block text-gray-700 mb-1" htmlFor="certificate-id-optional">
                     Certificate ID (optional)
                   </label>
-                  <input
+                  <input id="certificate-id-optional"
                     type="text"
                     name="certificateId"
                     value={newCertificate.certificateId}

@@ -5,6 +5,7 @@ import { Plus, Trash2, CalendarDays, Loader2, UserCog, Clock, X } from "lucide-r
 import ScheduleTimetable from "./ScheduleTimetable";
 import SessionAdjustmentFlow from "./SessionAdjustmentFlow";
 
+import DialogA11y from "../shared/components/DialogA11y";
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const inputStyle = { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", colorScheme: "dark" };
@@ -338,7 +339,13 @@ export default function ScheduleAdmin() {
 
       {/* Modal */}
       {modal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setModal(null)}>
+        <div
+        role="dialog"
+        aria-modal="true"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+        onClick={() => setModal(null)}
+      >
+        <DialogA11y onClose={() => setModal(null)} />
           <div className="w-full max-w-sm rounded-xl bg-[#181A22] border border-white/10 p-5" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h4 className="text-[14px] font-semibold text-white">

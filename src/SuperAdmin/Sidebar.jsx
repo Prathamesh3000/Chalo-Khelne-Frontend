@@ -22,6 +22,7 @@ import {
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
+import { getAuthToken } from "../shared/api/authToken";
 export default function Sidebar() {
   const [showModal, setShowModal] = useState(false);
   const [activeTab, setActiveTab] = useState("bulk"); // "bulk" or "single"
@@ -81,7 +82,7 @@ export default function Sidebar() {
     formData.append("file", file);
 
     try {
-      const token = localStorage.getItem("token");
+      const token = getAuthToken();
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/bulk-upload`, {
         method: "POST",
         headers: {
@@ -115,7 +116,7 @@ export default function Sidebar() {
     setIsLoading(true);
 
     try {
-      const token = localStorage.getItem("token");
+      const token = getAuthToken();
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/bulk-upload/single`, {
         method: "POST",
         headers: {
@@ -305,8 +306,8 @@ export default function Sidebar() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-2 italic">Full Name</label>
-                      <input
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-2 italic" htmlFor="full-name">Full Name</label>
+                      <input id="full-name"
                         type="text"
                         name="name"
                         required
@@ -317,8 +318,8 @@ export default function Sidebar() {
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-2 italic">Role</label>
-                      <select
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-2 italic" htmlFor="role">Role</label>
+                      <select id="role"
                         name="role"
                         value={singleUser.role}
                         onChange={handleSingleUserChange}
@@ -333,8 +334,8 @@ export default function Sidebar() {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-2 italic">Email Channel</label>
-                    <input
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-2 italic" htmlFor="email-channel">Email Channel</label>
+                    <input id="email-channel"
                       type="email"
                       name="email"
                       required
@@ -347,8 +348,8 @@ export default function Sidebar() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-2 italic">Comms (Mobile)</label>
-                      <input
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-2 italic" htmlFor="comms-mobile">Comms (Mobile)</label>
+                      <input id="comms-mobile"
                         type="text"
                         name="mobile"
                         required
@@ -359,8 +360,8 @@ export default function Sidebar() {
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-2 italic">Access Key (Password)</label>
-                      <input
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-2 italic" htmlFor="access-key-password">Access Key (Password)</label>
+                      <input id="access-key-password"
                         type="password"
                         name="password"
                         required
@@ -374,8 +375,8 @@ export default function Sidebar() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-2 italic">Age</label>
-                      <input
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-2 italic" htmlFor="age">Age</label>
+                      <input id="age"
                         type="number"
                         name="age"
                         value={singleUser.age}
@@ -385,8 +386,8 @@ export default function Sidebar() {
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-2 italic">Biological Gender</label>
-                      <select
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-2 italic" htmlFor="biological-gender">Biological Gender</label>
+                      <select id="biological-gender"
                         name="sex"
                         value={singleUser.sex}
                         onChange={handleSingleUserChange}

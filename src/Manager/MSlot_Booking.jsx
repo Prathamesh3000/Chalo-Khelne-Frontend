@@ -4,6 +4,7 @@ import { MapPin, Eye, AlertCircle, Grid3X3, Loader2 } from "lucide-react";
 import { assetUrl } from "../shared/lib/assetUrl";
 import { ManagerShell } from "../shared/layout";
 
+import { getAuthToken } from "../shared/api/authToken";
 const SlotBooking = () => {
   const navigate = useNavigate();
   const [turfs, setTurfs] = useState([]);
@@ -15,7 +16,7 @@ const SlotBooking = () => {
       try {
         const user = JSON.parse(localStorage.getItem("user"));
         if (!user?._id) throw new Error("Manager ID not found");
-        const token = localStorage.getItem("token");
+        const token = getAuthToken();
         const res = await fetch(`/api/turfs/assigned/${user._id}`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
@@ -78,7 +79,7 @@ function TurfCard({ turf, onView }) {
       {/* Image */}
       <div className="h-40 bg-white/[0.04] overflow-hidden relative">
         {turf.images?.length > 0 ? (
-          <img
+          <img loading="lazy"
             src={assetUrl(turf.images[0])}
             alt={turf.name}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"

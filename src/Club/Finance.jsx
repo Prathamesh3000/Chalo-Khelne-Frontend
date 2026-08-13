@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { DollarSign, Plus, X, TrendingUp, TrendingDown, Wallet, Receipt, Coffee, Trash2, Minus } from "lucide-react";
 
+import DialogA11y from "../shared/components/DialogA11y";
 const CATEGORIES = ["Court Booking", "Membership", "Tournament Fee", "Equipment Rental", "POS Cafe", "Staff Salary", "Maintenance", "Utility Bill", "Refund", "Other"];
 const METHODS = ["UPI", "Card", "Cash", "NetBanking"];
 const CAFE_MENU = [
@@ -116,14 +117,14 @@ export default function Finance() {
         <Modal title="Record Journal Entry" onClose={() => setAddOpen(false)}>
           <form onSubmit={addEntry} className="p-5 space-y-3.5">
             <div className="grid grid-cols-2 gap-3">
-              <div><label className={label}>Type</label><select className={input} value={form.type} onChange={(e) => set("type", e.target.value)}><option value="Income" className="bg-[#181A22]">Income (+)</option><option value="Expense" className="bg-[#181A22]">Expense (−)</option></select></div>
-              <div><label className={label}>Category</label><select className={input} value={form.category} onChange={(e) => set("category", e.target.value)}>{CATEGORIES.map((c) => <option key={c} value={c} className="bg-[#181A22]">{c}</option>)}</select></div>
+              <div><label className={label} htmlFor="type">Type</label><select id="type" className={input} value={form.type} onChange={(e) => set("type", e.target.value)}><option value="Income" className="bg-[#181A22]">Income (+)</option><option value="Expense" className="bg-[#181A22]">Expense (−)</option></select></div>
+              <div><label className={label} htmlFor="category">Category</label><select id="category" className={input} value={form.category} onChange={(e) => set("category", e.target.value)}>{CATEGORIES.map((c) => <option key={c} value={c} className="bg-[#181A22]">{c}</option>)}</select></div>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div><label className={label}>Amount (₹)</label><input className={input} type="number" min="0" value={form.amount} onChange={(e) => set("amount", e.target.value)} /></div>
-              <div><label className={label}>Method</label><select className={input} value={form.paymentMethod} onChange={(e) => set("paymentMethod", e.target.value)}>{METHODS.map((mth) => <option key={mth} value={mth} className="bg-[#181A22]">{mth}</option>)}</select></div>
+              <div><label className={label} htmlFor="amount">Amount (₹)</label><input id="amount" className={input} type="number" min="0" value={form.amount} onChange={(e) => set("amount", e.target.value)} /></div>
+              <div><label className={label} htmlFor="method">Method</label><select id="method" className={input} value={form.paymentMethod} onChange={(e) => set("paymentMethod", e.target.value)}>{METHODS.map((mth) => <option key={mth} value={mth} className="bg-[#181A22]">{mth}</option>)}</select></div>
             </div>
-            <div><label className={label}>Description</label><input className={input} value={form.description} onChange={(e) => set("description", e.target.value)} placeholder="e.g. Utility bill — July" /></div>
+            <div><label className={label} htmlFor="description">Description</label><input id="description" className={input} value={form.description} onChange={(e) => set("description", e.target.value)} placeholder="e.g. Utility bill — July" /></div>
             {form.type === "Income" && <div className="text-[11px] text-gray-500">18% GST ({money(Math.round((Number(form.amount) || 0) * 0.18 * 100) / 100)}) will be recorded on this income.</div>}
             <button type="submit" disabled={posting} className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold text-[13px] py-2.5 rounded-lg">{posting ? "Posting…" : "Post Entry"}</button>
           </form>
@@ -188,7 +189,13 @@ function POSModal({ onClose, onCheckout, posting }) {
 
 function Modal({ title, onClose, children, wide }) {
   return (
-    <div onClick={onClose} className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+    <div
+        role="dialog"
+        aria-modal="true"
+        onClick={onClose}
+        className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+      >
+        <DialogA11y onClose={onClose} />
       <div onClick={(e) => e.stopPropagation()} className={`bg-[#181A22] rounded-2xl w-full overflow-hidden border border-white/[0.1] shadow-2xl ${wide ? "max-w-2xl" : "max-w-md"}`}>
         <div className="p-5 border-b border-white/[0.08] flex justify-between items-center bg-[#0a0d14]">
           <div><span className="text-[10px] font-mono tracking-wider font-bold text-emerald-400 uppercase">Finance</span><h3 className="text-[17px] font-bold text-white mt-0.5">{title}</h3></div>

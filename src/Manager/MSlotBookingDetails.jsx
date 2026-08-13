@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { assetUrl } from "../shared/lib/assetUrl";
 
+import { getAuthToken } from "../shared/api/authToken";
 const TurfDetails = () => {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -17,7 +18,7 @@ const TurfDetails = () => {
   useEffect(() => {
     const fetchTurfDetails = async () => {
       try {
-        const token = localStorage.getItem("token");
+        const token = getAuthToken();
         const response = await fetch(
           `/api/turfs/${id}`,
           {
@@ -175,7 +176,7 @@ const TurfDetails = () => {
             {turf.images?.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {turf.images.map((image, index) => (
-                  <img
+                  <img loading="lazy"
                     key={index}
                     src={assetUrl(image)}
                     alt={`${turf.name} - Image ${index + 1}`}

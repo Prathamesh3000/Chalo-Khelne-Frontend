@@ -245,14 +245,14 @@ export default function VendorsListTab() {
             <div className="px-6 py-4 border-t border-white/[0.06] space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1">Status</label>
-                  <select value={editStatus} onChange={(e) => setEditStatus(e.target.value)} className="w-full h-9 px-2 bg-[#0F1117] border border-white/[0.08] rounded-md text-[13px] text-white capitalize">
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1" htmlFor="status">Status</label>
+                  <select id="status" value={editStatus} onChange={(e) => setEditStatus(e.target.value)} className="w-full h-9 px-2 bg-[#0F1117] border border-white/[0.08] rounded-md text-[13px] text-white capitalize">
                     {STATUSES.map((s) => <option key={s} value={s}>{fmtStatus(s)}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1">Commission %</label>
-                  <input type="number" min="0" max="100" value={editCommission} onChange={(e) => setEditCommission(e.target.value)} className="w-full h-9 px-2 bg-[#0F1117] border border-white/[0.08] rounded-md text-[13px] text-white" />
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1" htmlFor="commission">Commission %</label>
+                  <input id="commission" type="number" min="0" max="100" value={editCommission} onChange={(e) => setEditCommission(e.target.value)} className="w-full h-9 px-2 bg-[#0F1117] border border-white/[0.08] rounded-md text-[13px] text-white" />
                 </div>
               </div>
               <label className="flex items-center gap-2 text-[12px] text-gray-300 cursor-pointer">

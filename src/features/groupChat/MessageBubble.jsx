@@ -109,7 +109,7 @@ function AttachmentPreview({ attachment, isOwn, dark }) {
   if (isImage) {
     return (
       <div className="relative group">
-        <img src={fileUrl} alt={attachment.name} className="max-w-[240px] rounded-xl object-cover" />
+        <img loading="lazy" src={fileUrl} alt={attachment.name} className="max-w-[240px] rounded-xl object-cover" />
         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 rounded-xl transition flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
           <a href={fileUrl} target="_blank" rel="noopener noreferrer"
             className="p-2 bg-white/90 rounded-full hover:bg-white transition w-auto" title="View">

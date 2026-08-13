@@ -28,12 +28,15 @@ import CourtPoolPreview from "./components/CourtPoolPreview";
 import CourtPicker from "./components/CourtPicker";
 import KnockoutFormatPanel, { hasFormatPanelErrors } from "./components/KnockoutFormatPanel";
 import { buildRequestRounds, isSetBasedSport } from "./utils/knockoutDefaults";
+import { getAuthToken } from "../shared/api/authToken";
+import DialogA11y from "../shared/components/DialogA11y";
 import {
   getCategories,
   getMatchFormat as getMatchFormatHelper,
   getQualifyPerGroup,
   getTournamentType,
   getCurrentStage,
+  resolveSetsToWin,
 } from "../utils/sportTrack";
 
 // Resolve umpire display name from match.referee (Phase 2).
@@ -346,7 +349,7 @@ export default function Tournament({
             }
 
             try {
-              const token = localStorage.getItem("token");
+              const token = getAuthToken();
               const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
               // PRIMARY: Use the live-state endpoint (this is what scoreboard uses)
               const liveStateResponse = await fetch(
@@ -441,10 +444,7 @@ export default function Tournament({
               }
 
               return { ...match, hasScores: false, status: 'pending' };
-            } catch (error) {
-              // Add debug information
-              if (error.message.includes('404')) {
-              }
+            } catch {
               return { ...match, hasScores: false, status: 'pending' };
             }
           })
@@ -848,7 +848,7 @@ export default function Tournament({
             let enrichedMatch = { ...match, type: 'super-knockout' };
 
             try {
-              const token = localStorage.getItem("token");
+              const token = getAuthToken();
               const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
               // If match is in-progress, get live state for current score/set/game data
               if (match.status === 'in-progress') {
@@ -1008,7 +1008,7 @@ export default function Tournament({
               }
 
               try {
-                const token = localStorage.getItem("token");
+                const token = getAuthToken();
                 const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
                 // PRIMARY: Use the live-state endpoint (same as Round 1 and scoreboard)
                 const liveStateResponse = await fetch(
@@ -2371,7 +2371,7 @@ export default function Tournament({
                         const renderPlayerRow = (name, won, avatar, align = "left") => (
                           <div className={`flex items-center gap-2 ${align === "right" ? "flex-row-reverse text-right" : ""}`}>
                             {avatar ? (
-                              <img src={assetUrl(avatar)} alt={name}
+                              <img loading="lazy" src={assetUrl(avatar)} alt={name}
                                 className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
                             ) : (
                               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0 ${won ? "bg-emerald-500/100" : "bg-orange-400"}`}>
@@ -2749,7 +2749,7 @@ export default function Tournament({
                                 {/* Player 1 */}
                                 <div className="flex items-center gap-2.5">
                                   {match.player1?.playerId?.profileImage ? (
-                                    <img src={assetUrl(match.player1.playerId.profileImage)} alt="" className="w-8 h-8 rounded-full object-cover border-2 border-white shadow-sm" />
+                                    <img loading="lazy" src={assetUrl(match.player1.playerId.profileImage)} alt="" className="w-8 h-8 rounded-full object-cover border-2 border-white shadow-sm" />
                                   ) : (
                                     <div className="w-8 h-8 rounded-full bg-orange-500/100 flex items-center justify-center text-white text-xs font-bold border-2 border-white shadow-sm">
                                       {(match.player1?.userName || match.player1?.name || '?').charAt(0)}
@@ -2776,7 +2776,7 @@ export default function Tournament({
                                 {/* Player 2 */}
                                 <div className="flex items-center gap-2.5">
                                   {match.player2?.playerId?.profileImage ? (
-                                    <img src={assetUrl(match.player2.playerId.profileImage)} alt="" className="w-8 h-8 rounded-full object-cover border-2 border-white shadow-sm" />
+                                    <img loading="lazy" src={assetUrl(match.player2.playerId.profileImage)} alt="" className="w-8 h-8 rounded-full object-cover border-2 border-white shadow-sm" />
                                   ) : (
                                     <div className="w-8 h-8 rounded-full bg-emerald-500/100 flex items-center justify-center text-white text-xs font-bold border-2 border-white shadow-sm">
                                       {(match.player2?.userName || match.player2?.name || '?').charAt(0)}
@@ -3424,10 +3424,10 @@ export default function Tournament({
                   />
                 ) : (
                   <>
-                    <label className="block text-sm font-medium text-gray-300">
+                    <label className="block text-sm font-medium text-gray-300" htmlFor="court-number">
                       Court Number
                     </label>
-                    <input
+                    <input id="court-number"
                       type="text"
                       className="w-full border p-2 mt-1"
                       value={courtNumber}
@@ -3438,10 +3438,10 @@ export default function Tournament({
 
                 <div className="grid grid-cols-2 gap-3 mt-3">
                   <div>
-                    <label className="block text-sm font-medium text-gray-300">
+                    <label className="block text-sm font-medium text-gray-300" htmlFor="slot-duration-mins">
                       Slot Duration (mins)
                     </label>
-                    <input
+                    <input id="slot-duration-mins"
                       type="number"
                       min="1"
                       className="w-full border p-2 mt-1"
@@ -3451,10 +3451,10 @@ export default function Tournament({
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-300">
+                    <label className="block text-sm font-medium text-gray-300" htmlFor="match-duration-mins">
                       Match Duration (mins)
                     </label>
-                    <input
+                    <input id="match-duration-mins"
                       type="number"
                       min="1"
                       className="w-full border p-2 mt-1"
@@ -3471,10 +3471,10 @@ export default function Tournament({
                   </span>
                 </p>
 
-                <label className="block text-sm font-medium text-gray-300 mt-3">
+                <label className="block text-sm font-medium text-gray-300 mt-3" htmlFor="match-start-time">
                   Match Start Time
                 </label>
-                <input
+                <input id="match-start-time"
                   type="time"
                   className="w-full border p-2 mt-1"
                   value={startTime}
@@ -3625,10 +3625,10 @@ export default function Tournament({
 
                 {/* Match Duration Setting */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-gray-300 mb-2" htmlFor="estimated-match-duration-min">
                     Estimated Match Duration (minutes)
                   </label>
-                  <select
+                  <select id="estimated-match-duration-min"
                     className="w-full border border-white/[0.08] rounded-lg p-3 focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                     value={directKnockoutSchedule.estimatedDuration}
                     onChange={(e) => setDirectKnockoutSchedule(prev => ({
@@ -3741,7 +3741,7 @@ export default function Tournament({
             <div className={`flex-1 rounded-xl p-4 border ${won ? "bg-emerald-500/10 border-emerald-500/30" : "bg-white/[0.04] border-white/[0.06]"}`}>
               <div className="flex items-center gap-3">
                 {img ? (
-                  <img src={assetUrl(img)} alt={name}
+                  <img loading="lazy" src={assetUrl(img)} alt={name}
                     className="w-14 h-14 rounded-full object-cover flex-shrink-0" />
                 ) : (
                   <div className={`w-14 h-14 rounded-full flex items-center justify-center text-white text-xl font-bold flex-shrink-0 ${won ? "bg-emerald-500/100" : accent === "p1" ? "bg-orange-400" : "bg-blue-400"}`}>
@@ -3764,9 +3764,12 @@ export default function Tournament({
 
           return (
           <div
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-40 p-4"
-            onClick={closeModal}
-          >
+        role="dialog"
+        aria-modal="true"
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-40 p-4"
+        onClick={closeModal}
+      >
+        <DialogA11y onClose={closeModal} />
             <div
               className="bg-[#181A22] rounded-2xl shadow-2xl w-full max-w-[880px] max-h-[90vh] overflow-hidden flex flex-col relative"
               onClick={(e) => e.stopPropagation()}
@@ -4561,10 +4564,10 @@ export default function Tournament({
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-gray-300 mb-1" htmlFor="destination-group">
                     Destination Group
                   </label>
-                  <select
+                  <select id="destination-group"
                     value={destinationGroupId}
                     onChange={(e) => setDestinationGroupId(e.target.value)}
                     className="w-full rounded-lg border border-white/[0.08] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
@@ -4712,7 +4715,9 @@ export default function Tournament({
         groupId={bulkScoreModal.groupId}
         matchType="player"
         maxSets={getMatchFormat().maxSets}
-        setsToWin={getMatchFormat().setsToWin}
+        // Resolved, not raw: a stored setsToWin of 3 on a best-of-3 would
+        // reject a valid 2-0 before it ever reached the server.
+        setsToWin={resolveSetsToWin(getMatchFormat())}
         title={bulkScoreModal.title}
       />
 

@@ -11,6 +11,7 @@
  */
 
 import axios from "axios";
+import { disconnectSocket } from "../features/realtime";
 import { toast } from "react-toastify";
 
 let _logoutFn = null;
@@ -67,6 +68,16 @@ function forceLogout(message) {
   localStorage.removeItem("token");
   localStorage.removeItem("user");
   localStorage.removeItem("loginTime");
+
+  // §4.4 — an expired session must drop the socket as well. _logoutFn is the
+  // AuthContext logout (which disconnects), but it is only registered once the
+  // provider has mounted; disconnect here too so a 401 during startup cannot
+  // leave an authenticated socket behind.
+  try {
+    disconnectSocket();
+  } catch (_) {
+    /* teardown is best-effort */
+  }
 
   if (_logoutFn) _logoutFn();
 

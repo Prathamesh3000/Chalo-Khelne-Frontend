@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { Package, Plus, X, Trash2, PackagePlus, ShoppingCart, AlertTriangle } from "lucide-react";
 
+import DialogA11y from "../shared/components/DialogA11y";
 const CATEGORIES = ["Balls", "Nets", "Rackets", "Jerseys", "Bibs", "Cones", "Equipment", "Snacks", "Drinks"];
 const money = (n) => `₹${(Number(n) || 0).toLocaleString()}`;
 
@@ -90,14 +91,14 @@ export default function Inventory() {
       {addOpen && (
         <Modal title="Provision Stock Item" onClose={() => setAddOpen(false)}>
           <form onSubmit={addItem} className="p-5 space-y-3.5">
-            <div><label className={label}>Item Name *</label><input className={input} value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="Match Footballs" required /></div>
+            <div><label className={label} htmlFor="item-name">Item Name *</label><input id="item-name" className={input} value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="Match Footballs" required /></div>
             <div className="grid grid-cols-2 gap-3">
-              <div><label className={label}>Category</label><select className={input} value={form.category} onChange={(e) => set("category", e.target.value)}>{CATEGORIES.map((c) => <option key={c} value={c} className="bg-[#181A22]">{c}</option>)}</select></div>
-              <div><label className={label}>Quantity</label><input className={input} type="number" min="0" value={form.quantity} onChange={(e) => set("quantity", e.target.value)} /></div>
+              <div><label className={label} htmlFor="category">Category</label><select id="category" className={input} value={form.category} onChange={(e) => set("category", e.target.value)}>{CATEGORIES.map((c) => <option key={c} value={c} className="bg-[#181A22]">{c}</option>)}</select></div>
+              <div><label className={label} htmlFor="quantity">Quantity</label><input id="quantity" className={input} type="number" min="0" value={form.quantity} onChange={(e) => set("quantity", e.target.value)} /></div>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div><label className={label}>Unit Price (₹)</label><input className={input} type="number" min="0" value={form.unitPrice} onChange={(e) => set("unitPrice", e.target.value)} /></div>
-              <div><label className={label}>Low-Stock Alert At</label><input className={input} type="number" min="0" value={form.minAlertThreshold} onChange={(e) => set("minAlertThreshold", e.target.value)} /></div>
+              <div><label className={label} htmlFor="unit-price">Unit Price (₹)</label><input id="unit-price" className={input} type="number" min="0" value={form.unitPrice} onChange={(e) => set("unitPrice", e.target.value)} /></div>
+              <div><label className={label} htmlFor="low-stock-alert-at">Low-Stock Alert At</label><input id="low-stock-alert-at" className={input} type="number" min="0" value={form.minAlertThreshold} onChange={(e) => set("minAlertThreshold", e.target.value)} /></div>
             </div>
             <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[13px] py-2.5 rounded-lg">Add Item</button>
           </form>
@@ -131,7 +132,7 @@ function ActionModal({ action, onClose, onDone, setErr }) {
         <div className="text-[12px] text-gray-500">In stock: <span className="text-gray-200 font-bold">{item.quantity}</span> · Unit: <span className="text-gray-200">{money(item.unitPrice)}</span></div>
         <div><label className={label}>{mode === "restock" ? "Quantity to add" : "Quantity to rent"}</label><input className={input} type="number" min="1" value={qty} onChange={(e) => setQty(e.target.value)} autoFocus /></div>
         {mode === "rent" && <>
-          <div><label className={label}>Customer</label><input className={input} value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Walk-in" /></div>
+          <div><label className={label} htmlFor="customer">Customer</label><input id="customer" className={input} value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Walk-in" /></div>
           <div className="text-[12px] text-gray-500">Total charge: <span className="text-emerald-300 font-bold">{money((Number(item.unitPrice) || 0) * (Number(qty) || 0))}</span> → posted to finance.</div>
         </>}
         <button type="submit" className={`w-full text-white font-bold text-[13px] py-2.5 rounded-lg ${mode === "restock" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-blue-600 hover:bg-blue-700"}`}>{mode === "restock" ? "Add to Stock" : "Confirm Rental"}</button>
@@ -142,7 +143,13 @@ function ActionModal({ action, onClose, onDone, setErr }) {
 
 function Modal({ title, onClose, children }) {
   return (
-    <div onClick={onClose} className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+    <div
+        role="dialog"
+        aria-modal="true"
+        onClick={onClose}
+        className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+      >
+        <DialogA11y onClose={onClose} />
       <div onClick={(e) => e.stopPropagation()} className="bg-[#181A22] rounded-2xl max-w-md w-full overflow-hidden border border-white/[0.1] shadow-2xl">
         <div className="p-5 border-b border-white/[0.08] flex justify-between items-center bg-[#0a0d14]">
           <div><span className="text-[10px] font-mono tracking-wider font-bold text-emerald-400 uppercase">Inventory</span><h3 className="text-[17px] font-bold text-white mt-0.5">{title}</h3></div>

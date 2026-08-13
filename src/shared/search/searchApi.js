@@ -1,5 +1,6 @@
 import axios from "axios";
 
+import { getAuthToken } from "../../shared/api/authToken";
 let inflight = null;
 
 export async function searchEntities(query, { types, limit, signal } = {}) {
@@ -22,7 +23,7 @@ export async function searchEntities(query, { types, limit, signal } = {}) {
   if (limit) params.limit = limit;
 
   try {
-    const token = localStorage.getItem("token");
+    const token = getAuthToken();
     const res = await axios.get("/api/search", {
       params,
       signal: controller.signal,

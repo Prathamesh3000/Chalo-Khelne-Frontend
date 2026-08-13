@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
+import { getAuthToken } from "../shared/api/authToken";
 // ─── Sign In Modal ───────────────────────────────────────────
 const SignInModal = ({ onClose, message }) => (
   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -48,7 +49,7 @@ const TrainerCard = ({ trainer, onClick }) => {
       {/* Avatar header */}
       <div className="h-40 bg-gradient-to-br from-orange-50 to-amber-50 flex items-center justify-center">
         <div className="w-24 h-24 rounded-full bg-white border-4 border-white shadow-md overflow-hidden">
-          <img
+          <img loading="lazy"
             src={`https://ui-avatars.com/api/?name=${trainer.firstName}+${trainer.lastName}&background=FB923C&color=fff&bold=true`}
             alt={`${trainer.firstName} ${trainer.lastName}`}
             className="w-full h-full object-cover"
@@ -117,7 +118,7 @@ const TrainerDetailModal = ({ trainer, onClose, onSignInPrompt }) => {
           </button>
           <div className="flex flex-col md:flex-row gap-5 items-center md:items-start">
             <div className="w-24 h-24 rounded-full bg-white/20 border-4 border-white/30 overflow-hidden flex-shrink-0">
-              <img
+              <img loading="lazy"
                 src={`https://ui-avatars.com/api/?name=${trainer.firstName}+${trainer.lastName}&background=FB923C&color=fff&bold=true`}
                 alt={`${trainer.firstName}`}
                 className="w-full h-full object-cover"
@@ -330,7 +331,7 @@ function LTrainer() {
     (async () => {
       try {
         setLoading(true);
-        const token = localStorage.getItem("token");
+        const token = getAuthToken();
         const res = await fetch("/api/trainer/trainers", {
           headers: {
             ...(token ? { Authorization: `Bearer ${token}` } : {}),

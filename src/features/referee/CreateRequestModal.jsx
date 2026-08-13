@@ -44,8 +44,8 @@ export default function CreateRequestModal({ isOpen, onClose, onSubmit, loading 
           <Field label="Club Name" value={form.club} onChange={(v) => set("club", v)} placeholder="Your club name" />
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Sport *</label>
-            <select
+            <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="sport">Sport *</label>
+            <select id="sport"
               value={form.game}
               onChange={(e) => set("game", e.target.value)}
               className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-400"
@@ -56,8 +56,8 @@ export default function CreateRequestModal({ isOpen, onClose, onSubmit, loading 
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Position Type</label>
-            <select
+            <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="position-type">Position Type</label>
+            <select id="position-type"
               value={form.positionType}
               onChange={(e) => set("positionType", e.target.value)}
               className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-400"
@@ -82,8 +82,8 @@ export default function CreateRequestModal({ isOpen, onClose, onSubmit, loading 
           <Field label="Contact *" value={form.contact} onChange={(v) => set("contact", v)} placeholder="Phone number" />
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
-            <textarea
+            <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="notes">Notes</label>
+            <textarea id="notes"
               value={form.notes}
               onChange={(e) => set("notes", e.target.value)}
               rows={2}

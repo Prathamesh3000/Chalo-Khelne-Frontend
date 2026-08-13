@@ -15,6 +15,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Carousel from "./LCarousel.jsx";
 import TurfCards from "./LTurfCards.jsx";
 
+import { getAuthToken } from "../shared/api/authToken";
 // Turf Detail Modal Component
 const TurfDetailModal = ({ turf, onClose, onSignInPrompt }) => {
   // Hooks must run unconditionally — keep this above the early return below.
@@ -73,7 +74,7 @@ const TurfDetailModal = ({ turf, onClose, onSignInPrompt }) => {
 
         {/* Image Gallery */}
         <div className="relative h-[250px]">
-          <img
+          <img loading="lazy"
             src={
               turf.images?.[0]
                 ? `/uploads/${turf.images[0]}`
@@ -192,7 +193,7 @@ const TurfDetailModal = ({ turf, onClose, onSignInPrompt }) => {
                           className="text-sm border border-gray-200 rounded-full px-3 py-1 flex items-center gap-2"
                         >
                           {sport.icon && (
-                            <img
+                            <img loading="lazy"
                               src={sport.icon}
                               alt={sport.name || "Sport"}
                               className="w-4 h-4"
@@ -585,7 +586,7 @@ const TurfContent = () => {
   const fetchTurfs = async (page = 1) => {
     try {
       setLoading(true);
-      const token = localStorage.getItem("token");
+      const token = getAuthToken();
       const response = await fetch(`/api/turfs?page=${page}&limit=10`, {
         headers: {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),

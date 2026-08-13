@@ -53,7 +53,7 @@ export default function MessageInput({ onSend, sending, dark = false }) {
           {files.map((file, i) => (
             <div key={i} className="relative flex-shrink-0">
               {file.type.startsWith("image") ? (
-                <img
+                <img loading="lazy"
                   src={URL.createObjectURL(file)}
                   alt=""
                   className="w-16 h-16 rounded-md object-cover"

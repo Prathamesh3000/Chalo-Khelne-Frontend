@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { Briefcase, Plus, X, Trash2, Check, RotateCcw } from "lucide-react";
 
+import DialogA11y from "../shared/components/DialogA11y";
 const ROLES = ["Manager", "Reception", "Ground Staff", "Scorer", "Cameraman", "Referee Coordinator", "Security", "Cleaner"];
 const SHIFTS = ["Morning", "Evening", "Night", "Full Day"];
 const PERMS = ["bookings", "membership", "finance", "reports", "maintenance", "courtStatus", "payments", "sessions"];
@@ -134,23 +135,29 @@ export default function Staff() {
       )}
 
       {addOpen && (
-        <div onClick={() => setAddOpen(false)} className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+        <div
+        role="dialog"
+        aria-modal="true"
+        onClick={() => setAddOpen(false)}
+        className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+      >
+        <DialogA11y onClose={() => setAddOpen(false)} />
           <div onClick={(e) => e.stopPropagation()} className="bg-[#181A22] rounded-2xl max-w-md w-full overflow-hidden border border-white/[0.1] shadow-2xl">
             <div className="p-5 border-b border-white/[0.08] flex justify-between items-center bg-[#0a0d14]">
               <div><span className="text-[10px] font-mono tracking-wider font-bold text-emerald-400 uppercase">Roster</span><h3 className="text-[17px] font-bold text-white mt-0.5">Add Staff</h3></div>
               <button onClick={() => setAddOpen(false)} className="text-gray-500 hover:text-white w-auto bg-transparent"><X size={18} /></button>
             </div>
             <form onSubmit={addStaff} className="p-5 space-y-3.5">
-              <div><label className={label}>Name *</label><input className={input} value={form.name} onChange={(e) => set("name", e.target.value)} required /></div>
+              <div><label className={label} htmlFor="name">Name *</label><input id="name" className={input} value={form.name} onChange={(e) => set("name", e.target.value)} required /></div>
               <div className="grid grid-cols-2 gap-3">
-                <div><label className={label}>Role</label><select className={input} value={form.role} onChange={(e) => set("role", e.target.value)}>{ROLES.map((r) => <option key={r} value={r} className="bg-[#181A22]">{r}</option>)}</select></div>
-                <div><label className={label}>Shift</label><select className={input} value={form.shift} onChange={(e) => set("shift", e.target.value)}>{SHIFTS.map((s) => <option key={s} value={s} className="bg-[#181A22]">{s}</option>)}</select></div>
+                <div><label className={label} htmlFor="role">Role</label><select id="role" className={input} value={form.role} onChange={(e) => set("role", e.target.value)}>{ROLES.map((r) => <option key={r} value={r} className="bg-[#181A22]">{r}</option>)}</select></div>
+                <div><label className={label} htmlFor="shift">Shift</label><select id="shift" className={input} value={form.shift} onChange={(e) => set("shift", e.target.value)}>{SHIFTS.map((s) => <option key={s} value={s} className="bg-[#181A22]">{s}</option>)}</select></div>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div><label className={label}>Phone</label><input className={input} value={form.phone} onChange={(e) => set("phone", e.target.value)} /></div>
-                <div><label className={label}>Salary (₹)</label><input className={input} type="number" min="0" value={form.salary} onChange={(e) => set("salary", e.target.value)} /></div>
+                <div><label className={label} htmlFor="phone">Phone</label><input id="phone" className={input} value={form.phone} onChange={(e) => set("phone", e.target.value)} /></div>
+                <div><label className={label} htmlFor="salary">Salary (₹)</label><input id="salary" className={input} type="number" min="0" value={form.salary} onChange={(e) => set("salary", e.target.value)} /></div>
               </div>
-              <div><label className={label}>Email</label><input className={input} value={form.email} onChange={(e) => set("email", e.target.value)} /></div>
+              <div><label className={label} htmlFor="email">Email</label><input id="email" className={input} value={form.email} onChange={(e) => set("email", e.target.value)} /></div>
               <div className="text-[11px] text-gray-500">Default permissions for <span className="text-emerald-300 font-semibold">{form.role}</span> will be applied (editable in the Permissions tab).</div>
               <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[13px] py-2.5 rounded-lg">Add Staff</button>
             </form>

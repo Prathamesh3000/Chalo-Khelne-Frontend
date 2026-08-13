@@ -67,11 +67,11 @@ export default function Communication() {
               </div>
             </div>
             <div>
-              <label className={label}>Target Audience</label>
-              <select className={input} value={form.audience} onChange={(e) => set("audience", e.target.value)}>{AUDIENCES.map((a) => <option key={a} value={a} className="bg-[#181A22]">{a}</option>)}</select>
+              <label className={label} htmlFor="target-audience">Target Audience</label>
+              <select id="target-audience" className={input} value={form.audience} onChange={(e) => set("audience", e.target.value)}>{AUDIENCES.map((a) => <option key={a} value={a} className="bg-[#181A22]">{a}</option>)}</select>
             </div>
-            {form.channel === "Email" && <div><label className={label}>Email Subject *</label><input className={input} value={form.subject} onChange={(e) => set("subject", e.target.value)} placeholder="Subject line" /></div>}
-            <div><label className={label}>Announcement Body *</label><textarea className={`${input} resize-none`} rows={4} value={form.text} onChange={(e) => set("text", e.target.value)} placeholder="Write your announcement…" /></div>
+            {form.channel === "Email" && <div><label className={label} htmlFor="email-subject">Email Subject *</label><input id="email-subject" className={input} value={form.subject} onChange={(e) => set("subject", e.target.value)} placeholder="Subject line" /></div>}
+            <div><label className={label} htmlFor="announcement-body">Announcement Body *</label><textarea id="announcement-body" className={`${input} resize-none`} rows={4} value={form.text} onChange={(e) => set("text", e.target.value)} placeholder="Write your announcement…" /></div>
             <button type="submit" disabled={sending} className="w-full flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold text-[13px] py-2.5 rounded-lg"><Send size={13} /> {sending ? "Dispatching…" : "Broadcast Announcement"}</button>
             <div className="flex items-center gap-1.5 text-[11px] text-gray-500"><ShieldCheck size={12} className="text-emerald-400" /> Logged &amp; queued. External delivery relay activates once a provider is connected.</div>
           </form>

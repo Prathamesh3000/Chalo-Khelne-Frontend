@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
+import DialogA11y from "../shared/components/DialogA11y";
+import { activatable } from "../shared/utils/activatable";
 import {
   Users, Check, X, Eye, ChevronDown, Briefcase, ShieldCheck, ShieldX,
   Star, Clock, Phone, Mail, Award, FileText, Calendar, MapPin,
@@ -148,7 +150,11 @@ export default function StaffApplications({ tournamentId, managerId }) {
             return (
               <div key={app._id} className={`bg-white rounded-2xl border overflow-hidden transition-all ${app.status === "pending" ? "border-yellow-200 shadow-sm" : "border-gray-100"}`}>
                 {/* Row */}
-                <div className="flex items-center gap-3 p-4 cursor-pointer hover:bg-gray-50/50 transition" onClick={() => setExpandedId(isExp ? null : app._id)}>
+                <div
+                  className="flex items-center gap-3 p-4 cursor-pointer hover:bg-gray-50/50 transition"
+                  aria-expanded={isExp}
+                  {...activatable(() => setExpandedId(isExp ? null : app._id))}
+                >
                   {/* Avatar */}
                   <div className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 text-lg" style={{ backgroundColor: rm.color + "15" }}>
                     {rm.icon}
@@ -315,7 +321,13 @@ export default function StaffApplications({ tournamentId, managerId }) {
 
       {/* Full Profile Modal */}
       {profileModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setProfileModal(null)}>
+        <div
+        role="dialog"
+        aria-modal="true"
+        className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+        onClick={() => setProfileModal(null)}
+      >
+        <DialogA11y onClose={() => setProfileModal(null)} />
           <div className="bg-white rounded-2xl w-full max-w-lg max-h-[85vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
             {/* Modal Header */}
             <div className="bg-gradient-to-r from-orange-500 to-[#F97316] p-5 text-white">

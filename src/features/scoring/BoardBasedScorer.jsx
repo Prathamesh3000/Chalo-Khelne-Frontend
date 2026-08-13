@@ -114,8 +114,8 @@ export default function BoardBasedScorer({
 
         <div className="flex items-center gap-3">
           <div className="flex-1">
-            <label className="text-xs font-bold text-gray-500 block mb-1">Pocketed-coin points</label>
-            <input
+            <label className="text-xs font-bold text-gray-500 block mb-1" htmlFor="pocketed-coin-points">Pocketed-coin points</label>
+            <input id="pocketed-coin-points"
               type="number"
               min="0"
               value={points}

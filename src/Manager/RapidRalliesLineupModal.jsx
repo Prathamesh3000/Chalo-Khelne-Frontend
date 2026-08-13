@@ -7,6 +7,7 @@ import axios from "axios";
 import { toast } from "react-toastify";
 import { X, Loader2 } from "lucide-react";
 
+import DialogA11y from "../shared/components/DialogA11y";
 const RUBBERS = [
   { setNumber: 2, field: "partner2", title: "Rubber 2 — Doubles", kind: "partner" },
   { setNumber: 4, field: "partner4", title: "Rubber 4 — Doubles", kind: "partner" },
@@ -129,7 +130,13 @@ export default function RapidRalliesLineupModal({ open, onClose, matchId, onSave
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+    <div
+        role="dialog"
+        aria-modal="true"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+        onClick={onClose}
+      >
+        <DialogA11y onClose={onClose} />
       <div
         className="bg-[#181A22] rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}

@@ -97,7 +97,7 @@ export default function StoryViewer({ open, onClose, stories = [], author, isOwn
 
         {/* Content */}
         {isImage ? (
-          <img src={assetUrl(current.image)} alt="" className="w-full h-full object-contain" />
+          <img loading="lazy" src={assetUrl(current.image)} alt="" className="w-full h-full object-contain" />
         ) : (
           <div
             className="w-full h-full flex items-center justify-center p-8 text-center"

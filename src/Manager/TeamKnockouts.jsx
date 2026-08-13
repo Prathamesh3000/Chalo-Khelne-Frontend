@@ -30,6 +30,7 @@ import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { TextField } from "@mui/material";
 import dayjs from "dayjs";
 
+import { getAuthToken } from "../shared/api/authToken";
 const TeamKnockouts = () => {
   const navigate = useNavigate();
   // Declared up top: effects below (tournament-info fetch) reference it in their
@@ -339,7 +340,7 @@ const TeamKnockouts = () => {
 
   const fetchTournamentDetails = async () => {
     try {
-      const token = localStorage.getItem("token");
+      const token = getAuthToken();
       const response = await fetch(
         `/api/tournaments/${tournamentId}`,
         {
@@ -404,7 +405,7 @@ const TeamKnockouts = () => {
 
       const url = `/api/players/bookings/tournament-teams/${tournamentId}`;
 
-      const token = localStorage.getItem("token");
+      const token = getAuthToken();
       const response = await fetch(url, {
         method: "GET",
         headers: {
@@ -547,7 +548,7 @@ const TeamKnockouts = () => {
           setCount,
         };
 
-        const token = localStorage.getItem("token");
+        const token = getAuthToken();
         const response = await fetch(
           `/api/tournaments/team-knockout/create`,
           {
@@ -591,7 +592,7 @@ const TeamKnockouts = () => {
       }
 
       // Handle subsequent rounds
-      const token = localStorage.getItem("token");
+      const token = getAuthToken();
       const previousRoundResponse = await fetch(
         `/api/tournaments/team-knockout/matches-by-round?tournamentId=${tournamentId}&round=${currentRound - 1}`,
         {
@@ -783,10 +784,10 @@ const TeamKnockouts = () => {
             <div className="grid grid-cols-2 gap-4">
               {/* Match Interval */}
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2" htmlFor="interval-min">
                   Interval (min)
                 </label>
-                <input
+                <input id="interval-min"
                   type="number"
                   value={
                     roundSchedules?.[currentSchedulingRound]?.matchInterval || ""
@@ -809,10 +810,10 @@ const TeamKnockouts = () => {
 
               {/* Court Number */}
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2" htmlFor="starting-court">
                   Starting Court
                 </label>
-                <input
+                <input id="starting-court"
                   type="number"
                   value={
                     roundSchedules?.[currentSchedulingRound]?.courtNumber || ""
@@ -876,7 +877,7 @@ const TeamKnockouts = () => {
 
     const handleSave = async () => {
       try {
-        const token = localStorage.getItem("token");
+        const token = getAuthToken();
         const response = await fetch(
           `/api/tournaments/team-knockout/matches/${currentMatchForSub._id}/substitute`,
           {
@@ -992,7 +993,7 @@ const TeamKnockouts = () => {
       setSaving(true);
       try {
         // Save current match doubles lineup
-        const token = localStorage.getItem("token");
+        const token = getAuthToken();
         const response = await fetch(
           `/api/tournaments/team-knockout/matches/${currentMatch._id}/substitute`,
           {
@@ -1496,8 +1497,8 @@ const TeamKnockouts = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                   <div>
-                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1 block">Start Date & Time</label>
-                    <input
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1 block" htmlFor="start-date-time">Start Date & Time</label>
+                    <input id="start-date-time"
                       type="datetime-local"
                       value={rrSchedule.matchStartTime}
                       onChange={(e) => setRrSchedule({ ...rrSchedule, matchStartTime: e.target.value })}
@@ -1505,8 +1506,8 @@ const TeamKnockouts = () => {
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1 block">Match Interval (min)</label>
-                    <input
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1 block" htmlFor="match-interval-min">Match Interval (min)</label>
+                    <input id="match-interval-min"
                       type="number"
                       value={rrSchedule.matchInterval}
                       onChange={(e) => setRrSchedule({ ...rrSchedule, matchInterval: e.target.value })}
@@ -1515,8 +1516,8 @@ const TeamKnockouts = () => {
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1 block">Court Number</label>
-                    <input
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1 block" htmlFor="court-number">Court Number</label>
+                    <input id="court-number"
                       type="text"
                       value={rrSchedule.courtNumber}
                       onChange={(e) => setRrSchedule({ ...rrSchedule, courtNumber: e.target.value })}

@@ -251,12 +251,12 @@ export default function StudentsAdmin() {
         </p>
         <div className="flex flex-wrap items-end gap-3">
           <div>
-            <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-500 mb-1.5">Class / Standard</label>
-            <input value={uploadStd} onChange={(e) => setUploadStd(e.target.value)} list="ck-class-names" placeholder="e.g. Std 5" className={`w-36 ${field}`} style={inputStyle} />
+            <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-500 mb-1.5" htmlFor="class-standard">Class / Standard</label>
+            <input id="class-standard" value={uploadStd} onChange={(e) => setUploadStd(e.target.value)} list="ck-class-names" placeholder="e.g. Std 5" className={`w-36 ${field}`} style={inputStyle} />
           </div>
           <div>
-            <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-500 mb-1.5">Excel file</label>
-            <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" onChange={(e) => setFile(e.target.files?.[0] || null)}
+            <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-500 mb-1.5" htmlFor="excel-file">Excel file</label>
+            <input id="excel-file" ref={fileRef} type="file" accept=".xlsx,.xls,.csv" onChange={(e) => setFile(e.target.files?.[0] || null)}
               className="text-[12px] text-gray-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-[12px] file:font-semibold file:bg-white/[0.08] file:text-gray-200 hover:file:bg-white/[0.12]" />
           </div>
           <button onClick={upload} disabled={uploading}

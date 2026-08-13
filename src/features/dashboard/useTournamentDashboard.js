@@ -24,7 +24,9 @@ const fetchAllMatches = async (tournamentId, groups) => {
       const res = await axios.get(`/api/tournaments/matches/${tournamentId}/${g._id}`);
       const matches = (res.data?.matches || []).map((m) => ({ ...m, groupName: g.groupName, groupId: g._id }));
       all.push(...matches);
-    } catch {}
+    } catch (err) {
+      console.warn(`Dashboard match fetch failed for group ${g._id}:`, err.message);
+    }
   }
   return all;
 };

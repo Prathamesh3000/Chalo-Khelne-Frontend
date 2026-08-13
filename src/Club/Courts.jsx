@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { Dribbble, Plus, Building, Wrench, Layers, SunMoon, Info, DollarSign, X, Trash2 } from "lucide-react";
 
+import DialogA11y from "../shared/components/DialogA11y";
 const SPORTS = ["Tennis", "Badminton", "Padel", "Cricket", "Swimming", "Football", "Pickleball", "Table Tennis"];
 const STATUS_BADGE = {
   Available: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
@@ -146,20 +147,20 @@ export default function Courts() {
       {addOpen && (
         <Modal title="Add New Court / Field" tag="Facility Directory" onClose={() => setAddOpen(false)}>
           <form onSubmit={addCourt} className="p-5 space-y-3.5">
-            <div><label className={label}>Court/Field Name *</label><input className={input} value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="Court 5 (Premium Clay)" required /></div>
+            <div><label className={label} htmlFor="court-field-name">Court/Field Name *</label><input id="court-field-name" className={input} value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="Court 5 (Premium Clay)" required /></div>
             <div className="grid grid-cols-2 gap-3">
-              <div><label className={label}>Sport *</label><select className={input} value={form.sport} onChange={(e) => set("sport", e.target.value)}>{SPORTS.map((s) => <option key={s} value={s} className="bg-[#181A22]">{s}</option>)}</select></div>
-              <div><label className={label}>Surface Type *</label><input className={input} value={form.surfaceType} onChange={(e) => set("surfaceType", e.target.value)} placeholder="Acrylic / Clay / Grass" required /></div>
+              <div><label className={label} htmlFor="sport">Sport *</label><select id="sport" className={input} value={form.sport} onChange={(e) => set("sport", e.target.value)}>{SPORTS.map((s) => <option key={s} value={s} className="bg-[#181A22]">{s}</option>)}</select></div>
+              <div><label className={label} htmlFor="surface-type">Surface Type *</label><input id="surface-type" className={input} value={form.surfaceType} onChange={(e) => set("surfaceType", e.target.value)} placeholder="Acrylic / Clay / Grass" required /></div>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div><label className={label}>Setting</label><select className={input} value={form.isIndoor ? "indoor" : "outdoor"} onChange={(e) => set("isIndoor", e.target.value === "indoor")}><option value="indoor" className="bg-[#181A22]">Indoor</option><option value="outdoor" className="bg-[#181A22]">Outdoor</option></select></div>
-              <div><label className={label}>Max Capacity</label><input className={input} type="number" min="0" value={form.capacity} onChange={(e) => set("capacity", e.target.value)} /></div>
+              <div><label className={label} htmlFor="setting">Setting</label><select id="setting" className={input} value={form.isIndoor ? "indoor" : "outdoor"} onChange={(e) => set("isIndoor", e.target.value === "indoor")}><option value="indoor" className="bg-[#181A22]">Indoor</option><option value="outdoor" className="bg-[#181A22]">Outdoor</option></select></div>
+              <div><label className={label} htmlFor="max-capacity">Max Capacity</label><input id="max-capacity" className={input} type="number" min="0" value={form.capacity} onChange={(e) => set("capacity", e.target.value)} /></div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div><label className={label}>Price / hr ({currency})</label><input className={input} type="number" min="0" value={form.pricePerHour} onChange={(e) => set("pricePerHour", e.target.value)} /></div>
               <div><label className={label}>Peak / hr ({currency})</label><input className={input} type="number" min="0" value={form.peakHourPrice} onChange={(e) => set("peakHourPrice", e.target.value)} /></div>
             </div>
-            <div><label className={label}>Operating Hours</label><input className={input} value={form.operatingHours} onChange={(e) => set("operatingHours", e.target.value)} placeholder="06:00 - 22:00" /></div>
+            <div><label className={label} htmlFor="operating-hours">Operating Hours</label><input id="operating-hours" className={input} value={form.operatingHours} onChange={(e) => set("operatingHours", e.target.value)} placeholder="06:00 - 22:00" /></div>
             <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[13px] py-2.5 rounded-lg">Add Court</button>
           </form>
         </Modal>
@@ -169,8 +170,8 @@ export default function Courts() {
       {maintOpen && (
         <Modal title="Court Repairs Block" tag="Maintenance" onClose={() => setMaintOpen(false)}>
           <form onSubmit={submitMaintenance} className="p-5 space-y-3.5">
-            <div><label className={label}>Court *</label><select className={input} value={maint.courtId} onChange={(e) => setMaint((m) => ({ ...m, courtId: e.target.value }))} required><option value="" className="bg-[#181A22]">Select court…</option>{courts.map((c) => <option key={c._id} value={c._id} className="bg-[#181A22]">{c.name} ({c.sport})</option>)}</select></div>
-            <div><label className={label}>Reason</label><input className={input} value={maint.reason} onChange={(e) => setMaint((m) => ({ ...m, reason: e.target.value }))} placeholder="Resurfacing / net repair…" /></div>
+            <div><label className={label} htmlFor="court">Court *</label><select id="court" className={input} value={maint.courtId} onChange={(e) => setMaint((m) => ({ ...m, courtId: e.target.value }))} required><option value="" className="bg-[#181A22]">Select court…</option>{courts.map((c) => <option key={c._id} value={c._id} className="bg-[#181A22]">{c.name} ({c.sport})</option>)}</select></div>
+            <div><label className={label} htmlFor="reason">Reason</label><input id="reason" className={input} value={maint.reason} onChange={(e) => setMaint((m) => ({ ...m, reason: e.target.value }))} placeholder="Resurfacing / net repair…" /></div>
             <button type="submit" className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold text-[13px] py-2.5 rounded-lg">Mark Under Maintenance</button>
           </form>
         </Modal>
@@ -185,7 +186,13 @@ function Row({ icon, k, v }) {
 
 function Modal({ title, tag, onClose, children }) {
   return (
-    <div onClick={onClose} className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+    <div
+        role="dialog"
+        aria-modal="true"
+        onClick={onClose}
+        className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+      >
+        <DialogA11y onClose={onClose} />
       <div onClick={(e) => e.stopPropagation()} className="bg-[#181A22] rounded-2xl max-w-md w-full overflow-hidden border border-white/[0.1] shadow-2xl">
         <div className="p-5 border-b border-white/[0.08] flex justify-between items-center bg-[#0a0d14]">
           <div>

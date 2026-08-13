@@ -228,7 +228,7 @@ function PlayerAvatar({ player, isWinner, isCompleted }) {
     <div className={`flex flex-col items-center text-center flex-1 transition-all ${isWinner ? "scale-110" : isCompleted ? "opacity-40" : ""}`}>
       <div className="relative">
         {player.playerId?.profileImage ? (
-          <img
+          <img loading="lazy"
             src={assetUrl(player.playerId.profileImage)}
             alt={player.playerName}
             className={`w-16 h-16 rounded-full object-cover border-4 ${isWinner ? "border-green-400 shadow-xl" : "border-gray-100"}`}

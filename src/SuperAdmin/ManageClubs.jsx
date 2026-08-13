@@ -1,33 +1,52 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 import {
   Building2, Pencil, Trash2, X, Loader2, Search, Mail, Phone, MapPin,
 } from "lucide-react";
 import { SuperAdminShell } from "../shared/layout";
+import { Pagination } from "../shared/ui";
+
+import DialogA11y from "../shared/components/DialogA11y";
+const PAGE_SIZE = 10;
 
 export default function ManageClubs() {
   const [clubs, setClubs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [debounced, setDebounced] = useState("");
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editForm, setEditForm] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedUsers, setSelectedUsers] = useState([]);
 
-  useEffect(() => { fetchClubs(); }, []);
+  // Debounce the search box; reset to page 1 whenever the term changes.
+  useEffect(() => {
+    const t = setTimeout(() => { setDebounced(search.trim()); setPage(1); }, 350);
+    return () => clearTimeout(t);
+  }, [search]);
 
-  const fetchClubs = async () => {
+  const fetchClubs = useCallback(async () => {
+    setLoading(true);
     try {
-      const res = await axios.get("/api/clubadminprofile");
-      setClubs(res.data);
+      const params = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE) });
+      if (debounced) params.set("q", debounced);
+      const res = await axios.get(`/api/clubadminprofile?${params}`);
+      setClubs(res.data.items || []);
+      setTotal(res.data.total || 0);
+      setTotalPages(res.data.totalPages || 1);
       setSelectedUsers([]);
     } catch (error) {
       toast.error("Failed to fetch clubs");
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, debounced]);
+
+  useEffect(() => { fetchClubs(); }, [fetchClubs]);
 
   const handleToggleStatus = async (userId) => {
     try {
@@ -44,7 +63,9 @@ export default function ManageClubs() {
     try {
       await axios.delete(`/api/clubadminprofile/${userId}`);
       toast.success("Club deleted successfully");
-      fetchClubs();
+      // If this was the last row on a non-first page, step back a page.
+      if (clubs.length === 1 && page > 1) setPage((p) => p - 1);
+      else fetchClubs();
     } catch (error) {
       toast.error("Failed to delete club");
     }
@@ -61,7 +82,7 @@ export default function ManageClubs() {
     }
   };
 
-  const handleSelectAll = (e) => setSelectedUsers(e.target.checked ? filtered.map((c) => c._id) : []);
+  const handleSelectAll = (e) => setSelectedUsers(e.target.checked ? clubs.map((c) => c._id) : []);
   const handleSelectUser = (userId) =>
     setSelectedUsers((prev) => prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]);
 
@@ -97,24 +118,6 @@ export default function ManageClubs() {
     }
   };
 
-  const filtered = clubs.filter((c) => {
-    if (!search) return true;
-    const s = search.toLowerCase();
-    return (c.name || "").toLowerCase().includes(s) ||
-      (c.email || "").toLowerCase().includes(s) ||
-      (c.profile?.clubName || c.clubName || "").toLowerCase().includes(s);
-  });
-
-  if (loading) {
-    return (
-      <SuperAdminShell searchPlaceholder="Search clubs…">
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="w-6 h-6 text-gray-500 animate-spin" />
-        </div>
-      </SuperAdminShell>
-    );
-  }
-
   return (
     <SuperAdminShell searchPlaceholder="Search clubs…">
       <header className="flex items-start justify-between gap-4 mb-6 flex-wrap">
@@ -127,7 +130,7 @@ export default function ManageClubs() {
             Manage clubs
           </h1>
           <p className="mt-1 text-[13px] text-gray-400">
-            <span className="font-mono tabular-nums">{filtered.length}</span> of <span className="font-mono tabular-nums">{clubs.length}</span> clubs
+            <span className="font-mono tabular-nums">{total}</span> club{total === 1 ? "" : "s"}
           </p>
         </div>
         <div className="flex gap-2">
@@ -147,7 +150,11 @@ export default function ManageClubs() {
         </div>
       </header>
 
-      {filtered.length === 0 ? (
+      {loading ? (
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="w-6 h-6 text-gray-500 animate-spin" />
+        </div>
+      ) : clubs.length === 0 ? (
         <div className="bg-[#181A22] border border-white/[0.06] rounded-lg px-6 py-16 text-center">
           <div className="w-10 h-10 rounded-md bg-white/[0.06] inline-flex items-center justify-center mb-3">
             <Building2 className="w-5 h-5 text-gray-500" />
@@ -165,7 +172,7 @@ export default function ManageClubs() {
                 <tr className="border-b border-white/[0.06]">
                   <th className="w-12 px-4 py-3 text-center">
                     <input type="checkbox"
-                      checked={selectedUsers.length > 0 && selectedUsers.length === filtered.length}
+                      checked={selectedUsers.length > 0 && selectedUsers.length === clubs.length}
                       onChange={handleSelectAll}
                       className="rounded w-4 h-4 cursor-pointer"
                       style={{ accentColor: "#f97316" }} />
@@ -179,7 +186,7 @@ export default function ManageClubs() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((club) => {
+                {clubs.map((club) => {
                   const isSelected = selectedUsers.includes(club._id);
                   return (
                     <tr key={club._id}
@@ -252,9 +259,24 @@ export default function ManageClubs() {
         </div>
       )}
 
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        total={total}
+        limit={PAGE_SIZE}
+        onPage={setPage}
+        loading={loading}
+      />
+
       {/* Edit Modal */}
       {isEditModalOpen && editForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setIsEditModalOpen(false)}>
+        <div
+        role="dialog"
+        aria-modal="true"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+        onClick={() => setIsEditModalOpen(false)}
+      >
+        <DialogA11y onClose={() => setIsEditModalOpen(false)} />
           <div className="bg-[#181A22] border border-white/[0.06] rounded-lg shadow-[0_24px_64px_rgba(0,0,0,0.5)] w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="px-5 py-4 border-b border-white/[0.06] flex justify-between items-center">
               <h2 className="text-[14px] font-medium text-white">Edit club details</h2>
@@ -279,8 +301,8 @@ export default function ManageClubs() {
               </div>
               <ModalField label="Sports (comma separated)" name="sports" value={editForm.sports} onChange={handleEditChange} />
               <div>
-                <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-500 mb-1.5">Detailed address</label>
-                <textarea name="address" rows={2} value={editForm.address} onChange={handleEditChange}
+                <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-500 mb-1.5" htmlFor="detailed-address">Detailed address</label>
+                <textarea id="detailed-address" name="address" rows={2} value={editForm.address} onChange={handleEditChange}
                   className="w-full px-3 py-2.5 rounded-md text-[13px] text-gray-200 placeholder:text-gray-500 focus:outline-none resize-none"
                   style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }} />
               </div>

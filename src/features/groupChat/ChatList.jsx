@@ -207,13 +207,13 @@ function CreateChatModal({ dark, name, setName, desc, setDesc, pending, onClose,
         </div>
         <div className="px-5 py-4 space-y-3">
           <div>
-            <label className={`block mb-1.5 ${t.label}`}>Chat name *</label>
-            <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Table Tennis Squad"
+            <label className={`block mb-1.5 ${t.label}`} htmlFor="chat-name">Chat name *</label>
+            <input id="chat-name" type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Table Tennis Squad"
               className={`w-full ${t.input}`} style={t.inputStyle} autoFocus />
           </div>
           <div>
-            <label className={`block mb-1.5 ${t.label}`}>Description</label>
-            <input type="text" value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="What's this chat about?"
+            <label className={`block mb-1.5 ${t.label}`} htmlFor="description">Description</label>
+            <input id="description" type="text" value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="What's this chat about?"
               className={`w-full ${t.input}`} style={t.inputStyle} />
           </div>
         </div>

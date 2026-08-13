@@ -1,39 +1,59 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "react-toastify";
 import {
   ClipboardCheck, Check, X, Mail, Phone, Building2, Calendar, Search, Loader2,
 } from "lucide-react";
 import { SuperAdminShell } from "../shared/layout";
+import { Pagination } from "../shared/ui";
+
+import { getAuthToken } from "../shared/api/authToken";
+const PAGE_SIZE = 10;
 
 export default function Pending() {
   const [pendingUsers, setPendingUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [debounced, setDebounced] = useState("");
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [actionLoading, setActionLoading] = useState(null);
 
-  useEffect(() => { fetchPending(); }, []);
+  // Debounce the search box; reset to page 1 whenever the term changes.
+  useEffect(() => {
+    const t = setTimeout(() => { setDebounced(search.trim()); setPage(1); }, 350);
+    return () => clearTimeout(t);
+  }, [search]);
 
-  const fetchPending = async () => {
+  const fetchPending = useCallback(async () => {
+    setLoading(true);
     try {
-      const token = localStorage.getItem("token");
-      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/update/pending-approval`, {
+      const token = getAuthToken();
+      const params = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE) });
+      if (debounced) params.set("q", debounced);
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/update/pending-approval?${params}`, {
         headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       });
       if (!res.ok) throw new Error("Failed to fetch");
-      setPendingUsers(await res.json());
+      const data = await res.json();
+      setPendingUsers(data.items || []);
+      setTotal(data.total || 0);
+      setTotalPages(data.totalPages || 1);
     } catch (err) {
       toast.error("Failed to load pending requests");
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, debounced]);
+
+  useEffect(() => { fetchPending(); }, [fetchPending]);
 
   const handleApproval = async (userId, status) => {
     const action = status === "approved" ? "approve" : "reject";
     if (status === "rejected" && !window.confirm("Reject this request? The user will be removed.")) return;
     setActionLoading(userId);
     try {
-      const token = localStorage.getItem("token");
+      const token = getAuthToken();
       const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/update/${action}/${userId}`, {
         method: "POST",
         headers: {
@@ -42,8 +62,10 @@ export default function Pending() {
         },
       });
       if (!res.ok) throw new Error("Failed");
-      setPendingUsers((prev) => prev.filter((u) => u._id !== userId));
       toast.success(status === "approved" ? "Club approved successfully!" : "Request rejected");
+      // If this was the last row on a non-first page, step back a page.
+      if (pendingUsers.length === 1 && page > 1) setPage((p) => p - 1);
+      else fetchPending();
     } catch (err) {
       toast.error(`Failed to ${action}`);
     } finally {
@@ -51,10 +73,7 @@ export default function Pending() {
     }
   };
 
-  const filtered = pendingUsers.filter((u) =>
-    (u.name || "").toLowerCase().includes(search.toLowerCase()) ||
-    (u.email || "").toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = pendingUsers;
 
   return (
     <SuperAdminShell searchPlaceholder="Search pending…">
@@ -69,10 +88,10 @@ export default function Pending() {
             Pending approvals
           </h1>
           <p className="mt-1 text-[13px] text-gray-400">
-            <span className="font-mono tabular-nums">{pendingUsers.length}</span> request{pendingUsers.length === 1 ? "" : "s"} awaiting review.
+            <span className="font-mono tabular-nums">{total}</span> request{total === 1 ? "" : "s"} awaiting review.
           </p>
         </div>
-        {pendingUsers.length > 0 && (
+        {(total > 0 || debounced) && (
           <div className="relative w-full sm:w-72">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500" />
             <input
@@ -167,6 +186,15 @@ export default function Pending() {
           ))}
         </div>
       )}
+
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        total={total}
+        limit={PAGE_SIZE}
+        onPage={setPage}
+        loading={loading}
+      />
     </SuperAdminShell>
   );
 }

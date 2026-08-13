@@ -237,7 +237,7 @@ function RefereeCard({ ref_: ref, dark, onHire }) {
       {/* Profile header */}
       <div className="p-4 flex items-center gap-3">
         {avatar ? (
-          <img src={avatar} alt={user.name}
+          <img loading="lazy" src={avatar} alt={user.name}
             className="w-12 h-12 rounded-full object-cover flex-shrink-0"
             style={{ border: `2px solid ${dark ? "rgba(255,255,255,0.06)" : "#F3F4F6"}` }} />
         ) : (

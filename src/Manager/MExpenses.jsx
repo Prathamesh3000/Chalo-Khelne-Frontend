@@ -2,6 +2,8 @@ import { toast } from "react-toastify";
 import { useState, useEffect, useContext } from "react";
 import { AuthContext } from "../context/AuthContext";
 import axios from "axios";
+import { getAuthToken } from "../shared/api/authToken";
+import DialogA11y from "../shared/components/DialogA11y";
 import {
   Plus, Search, Trash2, Pencil, CreditCard, Receipt, TrendingUp, Tag,
   FileText, CheckCircle, AlertCircle, Clock, X, BarChart3, ChevronLeft,
@@ -31,7 +33,7 @@ const EMPTY_PAYMENT = {
 
 export default function MExpenses() {
   const { auth } = useContext(AuthContext);
-  const token = localStorage.getItem("token");
+  const token = getAuthToken();
   const headers = { Authorization: `Bearer ${token}` };
 
   const [expenses, setExpenses] = useState([]);
@@ -745,7 +747,13 @@ function ExpenseStatusPill({ status }) {
 
 function Modal({ title, subtitle, onClose, children, footer }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/40 backdrop-blur-sm p-4" onClick={onClose}>
+    <div
+        role="dialog"
+        aria-modal="true"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/40 backdrop-blur-sm p-4"
+        onClick={onClose}
+      >
+        <DialogA11y onClose={onClose} />
       <div
         className="bg-white rounded-2xl border border-neutral-200 shadow-[0_24px_64px_rgba(0,0,0,0.16)] max-w-lg w-full max-h-[85vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}

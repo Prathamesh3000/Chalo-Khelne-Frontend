@@ -37,7 +37,9 @@ export default function CreateThreadPage() {
         tags,
       });
       navigate("/forum");
-    } catch {}
+    } catch (err) {
+      console.error("Failed to create thread:", err.message);
+    }
   };
 
   return (
@@ -71,8 +73,8 @@ export default function CreateThreadPage() {
 
         {/* Title */}
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Title *</label>
-          <input
+          <label className="block text-sm font-semibold text-gray-700 mb-1.5" htmlFor="title">Title *</label>
+          <input id="title"
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -85,8 +87,8 @@ export default function CreateThreadPage() {
 
         {/* Content */}
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Content *</label>
-          <textarea
+          <label className="block text-sm font-semibold text-gray-700 mb-1.5" htmlFor="content">Content *</label>
+          <textarea id="content"
             value={content}
             onChange={(e) => setContent(e.target.value)}
             placeholder="Share your thoughts... Use @mentions and #hashtags"

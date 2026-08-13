@@ -1,7 +1,7 @@
 import { toast } from "react-toastify";
 import { useState, useEffect, useContext, useMemo } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { TabBar, Skeleton } from "../shared/ui";
+import { TabBar, Skeleton, Modal } from "../shared/ui";
 import { TournamentShell, TournamentFlowHeader } from "../shared/layout";
 import {
   Trophy, Users, Swords, Clock, ChevronRight, Plus, X, Search,
@@ -17,9 +17,10 @@ import { getSeedOrder } from "../utils/seedingUtils";
 import SeedPositionsPreview from "./components/SeedPositionsPreview";
 import CourtPoolPreview from "./components/CourtPoolPreview";
 import CourtPicker from "./components/CourtPicker";
-import { getMatchFormat as getMatchFormatHelper } from "../utils/sportTrack";
+import { getMatchFormat as getMatchFormatHelper, resolveSetsToWin } from "../utils/sportTrack";
 import BracketTree from "./components/BracketTree";
 
+import DialogA11y from "../shared/components/DialogA11y";
 const DRAW_SIZES = [4, 8, 16, 32, 64, 128];
 
 // Shared helper: resolves an umpire's display name from match.referee.
@@ -76,9 +77,25 @@ export default function MDirectKnockout() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
+  // Hand-off from the bulk Excel upload: ?category=<name>&autoselect=1.
+  // Consumed once (autoselectDone) so the manager's later edits to the
+  // selection are never clobbered by a re-render.
+  const [autoselectDone, setAutoselectDone] = useState(false);
+  const [pendingAutoOpen, setPendingAutoOpen] = useState(false);
+
   // Setup state
   const [registeredPlayers, setRegisteredPlayers] = useState([]);
   const [selectedPlayers, setSelectedPlayers] = useState([]);
+
+  // ── Tournament-day attendance ──────────────────────────────────────────
+  // 53 register, 22 turn up. The bracket must be buildable from who is
+  // PRESENT. `playerSource` toggles between the checked-in list and every
+  // registration; it defaults to checked-in as soon as ANY check-in exists,
+  // which is why the roster distinguishes "not marked" from "absent".
+  const [attendance, setAttendance] = useState({ rows: [], summary: {}, loaded: false });
+  const [playerSource, setPlayerSource] = useState(
+    searchParams.get("source") === "checked_in" ? "checked_in" : "all"
+  );
   const [drawSize, setDrawSize] = useState(16);
   const [selectedCategory, setSelectedCategory] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
@@ -160,6 +177,13 @@ export default function MDirectKnockout() {
   // Match Detail Modal
   const [detailMatch, setDetailMatch] = useState(null);
 
+  // Confirm Generate Modal
+  const [showGenerateModal, setShowGenerateModal] = useState(false);
+  const [generatePreview, setGeneratePreview] = useState(null);
+  const [previewCourtCount, setPreviewCourtCount] = useState(null);
+  const [previewMatchDuration, setPreviewMatchDuration] = useState(20);
+  const [previewGapMinutes, setPreviewGapMinutes] = useState(10);
+
   // Bracket view mode: "tree" | "list"
   const [bracketView, setBracketView] = useState("tree");
 
@@ -203,6 +227,7 @@ export default function MDirectKnockout() {
     if (multi && !activeSportId) return;
     fetchMatches();
     fetchRegisteredPlayers();
+    fetchAttendance();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tournamentId, activeSportId, tournament]);
 
@@ -224,7 +249,9 @@ export default function MDirectKnockout() {
     try {
       const res = await axios.get(`/api/tournaments/${tournamentId}`);
       if (res.data) setTournament(res.data.tournament || res.data);
-    } catch { }
+    } catch (_) {
+      /* the header falls back to placeholder text; the bracket still renders */
+    }
   };
 
   const fetchMatches = async () => {
@@ -236,8 +263,29 @@ export default function MDirectKnockout() {
         setMatches(res.data.matches || []);
         setMatchesByRound(res.data.matchesByRound || {});
       }
-    } catch { } finally {
+    } catch (_) {
+      /* leaves the previous bracket on screen rather than blanking it */
+    } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchAttendance = async () => {
+    if (!tournamentId) return;
+    try {
+      const res = await axios.get(`/api/tournaments/${tournamentId}/attendance`, {
+        params: activeSportId ? { sportId: activeSportId } : {},
+      });
+      const rows = res.data?.data || [];
+      const summary = res.data?.summary || {};
+      setAttendance({ rows, summary, loaded: true });
+      // Auto-switch to the checked-in list once the desk has started, unless
+      // the manager has explicitly chosen otherwise via the toggle.
+      if ((summary.checkedIn || 0) > 0 && searchParams.get("source") !== "all") {
+        setPlayerSource("checked_in");
+      }
+    } catch {
+      setAttendance((a) => ({ ...a, loaded: true }));
     }
   };
 
@@ -268,12 +316,30 @@ export default function MDirectKnockout() {
               playerId: b.userId?._id || b.userId || b._id,
               userName: b.userName || b.userId?.name || "Unknown",
               _id: b.userId?._id || b.userId || b._id,
+              // The BOOKING id, kept distinct from playerId: for a registration
+              // with an account those differ, and attendance is keyed on the
+              // booking. Without this the check-in filter silently matched
+              // nobody for account holders.
+              bookingId: b._id,
               category: categoryName,
+              seed: b.seed ?? null,
             };
           });
+        // Seed order first (1 = top seed), unseeded after in registration
+        // order. Bracket generation treats list order as seed rank, so this is
+        // what lets an Excel `Seed` column drive the draw with no manual
+        // re-ranking.
+        players.sort((a, b) => {
+          if (a.seed && b.seed) return a.seed - b.seed;
+          if (a.seed) return -1;
+          if (b.seed) return 1;
+          return 0;
+        });
         setRegisteredPlayers(players);
       }
-    } catch { }
+    } catch {
+      /* the picker degrades to an empty list; the banner above still loads */
+    }
   };
 
   // Player selection
@@ -364,9 +430,31 @@ export default function MDirectKnockout() {
     return ids;
   };
 
+  // Booking ids of everyone marked PRESENT (for the active sport). Used to
+  // narrow the picker to who actually turned up.
+  const checkedInBookingIds = useMemo(() => {
+    const s = new Set();
+    for (const r of attendance.rows) {
+      if (r.attendanceStatus === "checked_in") s.add(String(r.bookingId));
+    }
+    return s;
+  }, [attendance.rows]);
+
   const getFilteredPlayers = () => {
     const inBracket = getPlayersInBracket();
     let available = registeredPlayers;
+
+    // Tournament-day source: only players marked present. `registeredPlayers`
+    // rows carry the BOOKING id in `_id`/`playerId` depending on whether the
+    // registration has a user account, so match on either.
+    if (playerSource === "checked_in" && attendance.loaded) {
+      available = available.filter(
+        (p) =>
+          checkedInBookingIds.has(String(p.bookingId || "")) ||
+          checkedInBookingIds.has(String(p._id || "")) ||
+          checkedInBookingIds.has(String(p.playerId || ""))
+      );
+    }
 
     // Exclude players already in the bracket
     if (inBracket.size > 0) {
@@ -390,7 +478,7 @@ export default function MDirectKnockout() {
     );
   };
 
-  // Generate bracket
+  // Generate bracket — open confirmation modal with a preview, then call doGenerate on confirm
   const handleGenerate = async () => {
     let players;
 
@@ -400,14 +488,11 @@ export default function MDirectKnockout() {
       const minNeeded = Math.ceil(drawSize / 2) + 1;
       if (placed.length < minNeeded) { toast.info(`Need at least ${minNeeded} players for a ${drawSize}-draw`); return; }
 
-      // Convert from bracket-line order to seed-rank order
-      // customSlots[i] is at bracket line i, which has seed number seedOrder[i]
-      // Backend expects: index 0 = Seed 1 (rank 1), index 1 = Seed 2 (rank 2), etc.
       const seedOrder = getSeedOrder(drawSize);
       const bySeedRank = new Array(drawSize).fill(null);
       for (let i = 0; i < drawSize; i++) {
         if (customSlots[i]) {
-          bySeedRank[seedOrder[i] - 1] = customSlots[i]; // seedOrder[i] is 1-based
+          bySeedRank[seedOrder[i] - 1] = customSlots[i];
         }
       }
       players = bySeedRank.filter(Boolean).map((p) => ({
@@ -426,38 +511,164 @@ export default function MDirectKnockout() {
       }));
     }
 
+    // Prepare preview and show confirmation modal.
+    const playerCount = players.length;
+    const byes = (drawSize || playerCount) - playerCount;
+
+    // Court count — prefer the ACTIVE sport's court pool (already fetched into
+    // tournamentCourts). tournament.courts is not sport-scoped, so on a
+    // multi-sport event it over-counted with another sport's courts.
+    const activeCourts = tournamentCourts.filter((c) => c.isActive !== false).length;
+    const allCourts = Array.isArray(tournament?.courts) ? tournament.courts.length : 0;
+    const defaultCourtCount = activeCourts || allCourts || Math.min(3, (drawSize || 4) / 2);
+
+    // Match duration — read the sport's own rule book instead of assuming 20
+    // minutes. Time-based sports (halves/quarters) derive from their period
+    // config; everything else uses rules.matchDuration when configured.
+    const sportCfg = Array.isArray(tournament?.sports)
+      ? tournament.sports.find((s) => String(s.sportId) === String(activeSportId))
+      : null;
+    const rules = sportCfg?.sportRules?.rules || {};
+    const fmt = sportCfg?.sportRules?.format || {};
+    let defaultDuration = Number(rules.matchDuration) || 0;
+    if (!defaultDuration && fmt.halvesCount && fmt.halvesDuration) {
+      defaultDuration = Number(fmt.halvesCount) * Number(fmt.halvesDuration);
+    }
+    if (!defaultDuration && fmt.quartersCount && fmt.quartersDuration) {
+      defaultDuration = Number(fmt.quartersCount) * Number(fmt.quartersDuration);
+    }
+    if (!defaultDuration || defaultDuration <= 0) defaultDuration = 20;
+
+    setPreviewCourtCount(defaultCourtCount);
+    setPreviewMatchDuration(defaultDuration);
+    setPreviewGapMinutes(10);
+    // Carry the category so the bracket is stamped + scoped to it. "ALL" means
+    // one undifferentiated bracket for this sport.
+    setGeneratePreview({ players, playerCount, drawSize, byes, drawMethod, category: selectedCategory });
+    setShowGenerateModal(true);
+  };
+
+  // Local calendar date as YYYY-MM-DD. Deliberately NOT toISOString(), which
+  // reports the UTC day — in IST that rolls over at 05:30, so an early-morning
+  // generate scheduled the whole bracket on the previous day.
+  const localDateStr = (d = new Date()) => {
+    const p = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  };
+
+  // Validation for the three scheduling inputs. The backend silently falls back
+  // when these are empty or zero (no courts → one court; no duration → the
+  // per-round default), so without this the manager gets a bracket that quietly
+  // ignores what they typed. Returns an error string, or null when valid.
+  const scheduleFieldError = (() => {
+    const courts = Number(previewCourtCount);
+    const dur = Number(previewMatchDuration);
+    const gap = Number(previewGapMinutes);
+    if (!Number.isFinite(courts) || courts < 1) return "Enter at least 1 court.";
+    if (!Number.isFinite(dur) || dur < 1) return "Match duration must be at least 1 minute.";
+    if (!Number.isFinite(gap) || gap < 0) return "Gap cannot be negative.";
+    return null;
+  })();
+
+  // Smallest supported draw that fits n players (4…128).
+  const nextDrawSize = (n) => {
+    let v = 4;
+    while (v < n && v < 128) v *= 2;
+    return v;
+  };
+
+  // ── Excel hand-off (?category=&autoselect=1) ─────────────────────────────
+  // Pre-selects the uploaded registrants in seed order and sizes the draw, so
+  // the manager arrives at a review step instead of an empty setup form.
+  useEffect(() => {
+    if (autoselectDone) return;
+    if (searchParams.get("autoselect") !== "1") return;
+    if (registeredPlayers.length === 0) return;
+
+    const urlCat = searchParams.get("category");
+    const pool = urlCat
+      ? registeredPlayers.filter((p) => (p.category || "General") === urlCat)
+      : registeredPlayers;
+    if (pool.length < 2) return;
+
+    const size = nextDrawSize(pool.length);
+    const picked = pool.slice(0, size);
+
+    if (urlCat) setSelectedCategory(urlCat);
+    setDrawSize(size);
+    setNumberOfSeeds(picked.length);
+    setSelectedPlayers(picked);
+    setActiveTab("setup");
+    setAutoselectDone(true);
+    // Only auto-open the confirm modal when the draw is actually generatable
+    // (a 4-draw needs 3+ players); otherwise leave the selection for the
+    // manager to fix rather than firing a validation toast at them on arrival.
+    if (picked.length >= Math.ceil(size / 2) + 1) setPendingAutoOpen(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [registeredPlayers, searchParams, autoselectDone]);
+
+  // Second pass — open the modal only once the pre-selection has landed in
+  // state, so handleGenerate reads the new values and not the stale ones.
+  useEffect(() => {
+    if (!pendingAutoOpen) return;
+    if (selectedPlayers.length === 0) return;
+    setPendingAutoOpen(false);
+    handleGenerate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingAutoOpen, selectedPlayers]);
+
+  // Called when user confirms in the modal
+  const doGenerate = async () => {
+    if (!generatePreview) return;
+    // Guard the programmatic path too — the button is disabled, but doGenerate
+    // is also reachable from the Excel hand-off auto-open.
+    if (scheduleFieldError) { toast.warn(scheduleFieldError); return; }
+    setShowGenerateModal(false);
     setGenerating(true);
     try {
-      // STEP 16d — backend requires sportId. Use the active sport from the
-      // sport switcher (falls back to sports[0] for single-sport tournaments).
       const _firstSportId = activeSportId || tournament?.sports?.[0]?.sportId || null;
-
-      // For custom mode: send players in seed-slot order, backend treats as standard (input order = seed order)
+      // Coerce once, up front. The inputs hold "" for an empty box, and
+      // `duration + gap` on a string silently concatenates ("25" + "" = "25")
+      // instead of adding. The server happens to parseInt its way out of that,
+      // but the payload should be numeric by construction.
+      const _courts = Number(previewCourtCount) || 1;
+      const _matchDur = Number(previewMatchDuration) || 0;
+      const _gap = Number(previewGapMinutes) || 0;
       const res = await axios.post("/api/tournaments/direct-knockout/standalone/create", {
         tournamentId,
         sportId: _firstSportId,
-        players,
-        drawSize,
-        drawMethod: drawMethod === "custom" ? "standard" : drawMethod,
-        numberOfSeeds: drawMethod === "random" ? 0 : drawMethod === "standard" || drawMethod === "custom" ? players.length : numberOfSeeds,
+        category: generatePreview.category,
+        players: generatePreview.players,
+        drawSize: generatePreview.drawSize,
+        drawMethod: generatePreview.drawMethod === "custom" ? "standard" : generatePreview.drawMethod,
+        numberOfSeeds: generatePreview.drawMethod === "random" ? 0 : generatePreview.drawMethod === "standard" || generatePreview.drawMethod === "custom" ? generatePreview.players.length : numberOfSeeds,
+        // Pass explicit scheduling params from preview
+        courtCount: _courts,
+        matchDurationMinutes: _matchDur,
+        gapMinutes: _gap,
         schedule: (() => {
-          // Build per-round payload with cascading defaults (Bo3 30/20 early,
-          // Bo5 50/40 SF, Bo7 80/60 Final). Keeps standalone bracket scheduling
-          // sensible across rounds without requiring a per-round UI on this page.
-          const totalRounds = Math.ceil(Math.log2(drawSize || 2));
+          const totalRounds = Math.ceil(Math.log2(generatePreview.drawSize || 2));
           const rounds = buildRequestRounds({
             customizeRounds: true,
             totalRounds,
-            roundOverrides: buildDefaultRoundsArray(totalRounds),
+            roundOverrides: buildDefaultRoundsArray(totalRounds).map((round) => ({
+              ...round,
+              slotDurationMinutes: _matchDur + _gap,
+              matchDurationMinutes: _matchDur,
+            })),
           });
           return {
-            startDate: new Date().toISOString().split("T")[0],
+            // Local calendar date — toISOString() would send the UTC day, which
+            // in IST is yesterday until 05:30.
+            startDate: localDateStr(),
             startTime: "09:00",
             rounds,
-            breakBetweenRoundsMinutes: 5,
+            // breakBetweenRoundsMinutes prefers explicit gap if provided
+            breakBetweenRoundsMinutes: _gap || 5,
             courtNumber: "1",
           };
         })(),
+        confirm: true, // backend guard — explicit confirmation
       });
 
       if (res.data.success) {
@@ -478,6 +689,7 @@ export default function MDirectKnockout() {
       toast.error(err.response?.data?.message || err.message);
     } finally {
       setGenerating(false);
+      setGeneratePreview(null);
     }
   };
 
@@ -487,13 +699,19 @@ export default function MDirectKnockout() {
     const sportLabel = tournament?.sports?.length > 1
       ? ` for ${tournament.sports.find((s) => String(s.sportId) === String(activeSportId))?.sportName || "this sport"}`
       : "";
-    if (!confirm(`Reset the entire bracket${sportLabel}? All its match data will be lost.`)) return;
+    // Scope the reset to the category tab in view — otherwise clearing the
+    // Open draw would also wipe Above-40 and every other sibling bracket.
+    const catScope = bracketCategory && bracketCategory !== "ALL" ? bracketCategory : null;
+    const catLabel = catScope ? ` (${catScope} only)` : "";
+    if (!confirm(`Reset the bracket${sportLabel}${catLabel}? All its match data will be lost.`)) return;
     try {
-      const sportQuery = activeSportId ? `?sportId=${activeSportId}` : "";
-      await axios.delete(`/api/tournaments/direct-knockout/${tournamentId}/reset${sportQuery}`);
-      setMatches([]);
-      setMatchesByRound({});
-      toast.success("Bracket reset");
+      const params = new URLSearchParams();
+      if (activeSportId) params.set("sportId", activeSportId);
+      if (catScope) params.set("category", catScope);
+      const query = params.toString() ? `?${params.toString()}` : "";
+      await axios.delete(`/api/tournaments/direct-knockout/${tournamentId}/reset${query}`);
+      toast.success(catScope ? `${catScope} bracket reset` : "Bracket reset");
+      fetchMatches();
     } catch (err) {
       toast.error("Failed to reset");
     }
@@ -576,6 +794,7 @@ export default function MDirectKnockout() {
       "round-of-4": "Round of 4",
       "quarter-final": "Quarter-Finals",
       "semi-final": "Semi-Finals",
+      "third-place": "3rd Place Play-off",
       final: "Final",
     };
     return names[roundName] || roundName;
@@ -589,6 +808,117 @@ export default function MDirectKnockout() {
       CANCELLED: "bg-white/[0.06] text-gray-500",
     };
     return styles[status] || "bg-white/[0.06] text-gray-500";
+  };
+
+  // Reopen a completed match so its score can be corrected.
+  //
+  // The server refuses with 409 when later matches were already played on the
+  // back of this result, listing them — we surface that as a second, explicit
+  // confirmation rather than cascading silently, because those results are
+  // destroyed.
+  const [reopenLoading, setReopenLoading] = useState(null);
+
+  const handleReopen = async (match) => {
+    const label = `${match.player1?.playerName || "P1"} vs ${match.player2?.playerName || "P2"}`;
+    if (!confirm(`Reopen "${label}"?\n\nThe result will be cleared and the winner removed from the next round.`)) return;
+
+    setReopenLoading(match.matchId);
+    try {
+      const url = `/api/tournaments/direct-knockout/matches/${match.matchId}/reopen`;
+      try {
+        const res = await axios.post(url, {});
+        toast.info(res.data.message);
+      } catch (err) {
+        const data = err.response?.data;
+        if (err.response?.status === 409 && data?.cascadeRequired) {
+          const list = (data.affectedMatches || [])
+            .map((m) => `• ${m.player1} vs ${m.player2}${m.winner ? ` (won by ${m.winner})` : ""}`)
+            .join("\n");
+          if (!confirm(`${data.message}\n\nThese results will be cleared:\n${list}`)) return;
+          const res2 = await axios.post(url, { cascade: true });
+          toast.info(res2.data.message);
+        } else {
+          throw err;
+        }
+      }
+      fetchMatches();
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message);
+    } finally {
+      setReopenLoading(null);
+    }
+  };
+
+  // ── Third-place play-off ────────────────────────────────────────────────
+  // Offered only once both semis are done and no play-off exists yet, since
+  // those are exactly the conditions the server enforces.
+  const [thirdPlaceLoading, setThirdPlaceLoading] = useState(false);
+
+  // `matches` is scoped to the active SPORT but not the CATEGORY, so in a
+  // multi-category bracket the raw semi-final count is never 2 and the
+  // third-place lookup would hit the wrong category. Scope the play-off logic to
+  // the selected category (or the sole category when "ALL" is chosen and there
+  // is only one). Under "ALL" with genuinely multiple categories the play-off is
+  // ambiguous, so we require the manager to pick a category first.
+  const matchCategoryOf = (m) =>
+    m.category || m.categoryName || getPlayerCategory(m.player1) || getPlayerCategory(m.player2) || null;
+  const distinctBracketCats = [...new Set(matches.map(matchCategoryOf).filter(Boolean))];
+  const singleCategory = distinctBracketCats.length <= 1;
+  const scopeCategory =
+    bracketCategory && bracketCategory !== "ALL"
+      ? bracketCategory
+      : (singleCategory ? (distinctBracketCats[0] || null) : null);
+  const scopedMatches =
+    bracketCategory && bracketCategory !== "ALL"
+      ? matches.filter((m) => matchCategoryOf(m) === bracketCategory)
+      : (singleCategory ? matches : []);
+
+  const semiFinals = scopedMatches.filter((m) => m.round === "semi-final");
+  const thirdPlaceMatch = scopedMatches.find((m) => m.round === "third-place") || null;
+  const canOfferThirdPlace =
+    !thirdPlaceMatch &&
+    semiFinals.length === 2 &&
+    semiFinals.every((m) => m.status === "COMPLETED");
+
+  const handleCreateThirdPlace = async () => {
+    if (!confirm("Add a 3rd place play-off?\n\nThe two semi-final losers will play one more match, and its winner takes 3rd place.")) return;
+    setThirdPlaceLoading(true);
+    try {
+      const res = await axios.post(
+        `/api/tournaments/direct-knockout/${tournamentId}/third-place`,
+        {
+          sportId: activeSportId || tournament?.sports?.[0]?.sportId || null,
+          category: scopeCategory,
+          gapMinutes: 30,
+        }
+      );
+      toast.info(res.data.message);
+      fetchMatches();
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message);
+    } finally {
+      setThirdPlaceLoading(false);
+    }
+  };
+
+  const handleRemoveThirdPlace = async () => {
+    if (!confirm("Remove the 3rd place play-off?")) return;
+    setThirdPlaceLoading(true);
+    try {
+      const params = new URLSearchParams();
+      const sid = activeSportId || tournament?.sports?.[0]?.sportId;
+      if (sid) params.set("sportId", sid);
+      if (scopeCategory) params.set("category", scopeCategory);
+      const res = await axios.delete(
+        `/api/tournaments/direct-knockout/${tournamentId}/third-place?${params.toString()}`
+      );
+      toast.info(res.data.message);
+      fetchMatches();
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message);
+    } finally {
+      setThirdPlaceLoading(false);
+    }
   };
 
   // BYE handler
@@ -658,6 +988,49 @@ export default function MDirectKnockout() {
   );
 
   // ── Edit player name in bracket ──────────────────────────────────────────
+  /**
+   * Swap two players between bracket slots (drag-and-drop, or click/Enter to
+   * pick up then drop).
+   *
+   * Deliberately NOT handleUpdatePlayerName: renaming rewrites a label, this
+   * moves the whole slot including playerId. The server refuses the swap when
+   * either match is live or completed (409) and when the target is in another
+   * tournament (403), so the failure paths below surface the real reason
+   * rather than a generic error.
+   *
+   * The bracket is re-fetched rather than patched locally: a cross-match swap
+   * touches two matches and the server is the authority on the result.
+   */
+  const handleSwapPlayers = async ({ from, to }) => {
+    const fromMatchId = from.match.matchId || from.match._id;
+    const toMatchId = to.match.matchId || to.match._id;
+
+    try {
+      const res = await axios.put(
+        `/api/tournaments/direct-knockout/matches/${fromMatchId}/swap-player`,
+        { fromSlot: from.slot, toMatchId, toSlot: to.slot }
+      );
+      if (res.data?.success) {
+        toast.success(res.data.message || "Players swapped");
+        await fetchMatches();
+      } else {
+        toast.error(res.data?.message || "Could not swap players");
+      }
+    } catch (err) {
+      const status = err.response?.status;
+      const message = err.response?.data?.message;
+      if (status === 409) {
+        toast.warn(message || "That match has already started — reset it first.");
+      } else if (status === 403) {
+        toast.error(message || "Both players must be in the same tournament.");
+      } else {
+        toast.error(message || "Could not swap players");
+      }
+      // Re-sync so the bracket never shows a swap the server rejected.
+      await fetchMatches();
+    }
+  };
+
   const handleUpdatePlayerName = async (match, playerSlot, newPlayerName) => {
     try {
       const matchId = match.matchId || match._id;
@@ -834,6 +1207,49 @@ export default function MDirectKnockout() {
       {/* TAB: Bracket View */}
       {activeTab === "bracket" && (
         <div>
+          {/* 3rd place play-off — offered once both semis are done. Removable
+              while unplayed; the server refuses once it has a result. */}
+          {(canOfferThirdPlace || thirdPlaceMatch) && (
+            <div
+              className="px-4 py-3 rounded-md flex items-center gap-3 mb-6"
+              style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
+            >
+              <span className="w-7 h-7 rounded-md bg-orange-500/15 grid place-items-center flex-shrink-0">
+                <Crown className="w-3.5 h-3.5 text-orange-400" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[13px] font-medium text-white">3rd place play-off</p>
+                <p className="text-[12px] text-gray-400">
+                  {!thirdPlaceMatch
+                    ? "Both semi-finals are done. The two losing semi-finalists can play one more match to decide 3rd place."
+                    : thirdPlaceMatch.status === "COMPLETED"
+                    ? `${thirdPlaceMatch.result?.winner?.playerName || "—"} finishes 3rd.`
+                    : `${thirdPlaceMatch.player1?.playerName} vs ${thirdPlaceMatch.player2?.playerName} — not yet played.`}
+                </p>
+              </div>
+              {!thirdPlaceMatch ? (
+                <button
+                  onClick={handleCreateThirdPlace}
+                  disabled={thirdPlaceLoading}
+                  className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-md bg-orange-500 hover:bg-orange-600 text-white text-[13px] font-semibold transition active:scale-[0.98] shadow-sm shadow-orange-500/30 disabled:opacity-50 w-auto flex-shrink-0"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  {thirdPlaceLoading ? "Adding…" : "Add play-off"}
+                </button>
+              ) : thirdPlaceMatch.status !== "COMPLETED" ? (
+                <button
+                  onClick={handleRemoveThirdPlace}
+                  disabled={thirdPlaceLoading}
+                  className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-md text-[13px] font-semibold text-gray-400 hover:text-white hover:bg-white/[0.04] transition disabled:opacity-50 w-auto flex-shrink-0"
+                  style={{ border: "1px solid rgba(255,255,255,0.06)" }}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Remove
+                </button>
+              ) : null}
+            </div>
+          )}
+
           {/* Bracket Category Filter Tabs */}
           {bracketCategories.length > 1 && (
             <div className="bg-[#181A22] rounded-xl p-4 border border-white/[0.06] mb-6">
@@ -948,6 +1364,7 @@ export default function MDirectKnockout() {
               tournamentTitle={tournament?.title}
               sportName={bracketCategory || _shellTournament?.sportName || tournament?.sport}
               onEditPlayerName={handleUpdatePlayerName}
+              onSwapPlayers={handleSwapPlayers}
             />
           ) : (
             <div className="space-y-6">
@@ -1104,6 +1521,19 @@ export default function MDirectKnockout() {
                                 >
                                   <UserPlus className="w-3 h-3" />
                                   Assign
+                                </button>
+                              )}
+                              {/* Correct a wrong score. Hidden for automatic
+                                  BYEs — those have no opponent to replay. */}
+                              {isComp && playersReady && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleReopen(match); }}
+                                  disabled={reopenLoading === match.matchId}
+                                  className="flex items-center gap-0.5 text-[10px] font-bold text-gray-400 hover:text-white px-1.5 py-0.5 rounded hover:bg-white/[0.06] disabled:opacity-50 w-auto"
+                                  title="Reopen this match to correct the score"
+                                >
+                                  <RotateCcw className="w-3 h-3" />
+                                  {reopenLoading === match.matchId ? "Reopening…" : "Reopen"}
                                 </button>
                               )}
                             </div>
@@ -1463,6 +1893,47 @@ export default function MDirectKnockout() {
                   </div>
                 )}
 
+                {/* Draw source — the fix for "53 registered, 22 turned up".
+                    Defaults to the checked-in list once the desk has started. */}
+                {attendance.loaded && (attendance.summary.total || 0) > 0 && (
+                  <div className="flex flex-wrap items-center gap-2 mb-3">
+                    <span className="text-[11px] font-bold uppercase tracking-wide text-gray-500">
+                      Build draw from
+                    </span>
+                    <button
+                      onClick={() => setPlayerSource("checked_in")}
+                      className={`w-auto px-3 py-1.5 rounded-lg text-[12px] font-bold ${
+                        playerSource === "checked_in"
+                          ? "bg-emerald-500 text-white"
+                          : "bg-[#12141B] text-gray-300 border border-white/[0.06] hover:bg-white/[0.04]"
+                      }`}
+                    >
+                      Checked in ({attendance.summary.checkedIn || 0})
+                    </button>
+                    <button
+                      onClick={() => setPlayerSource("all")}
+                      className={`w-auto px-3 py-1.5 rounded-lg text-[12px] font-bold ${
+                        playerSource === "all"
+                          ? "bg-white/[0.12] text-white border border-white/[0.16]"
+                          : "bg-[#12141B] text-gray-300 border border-white/[0.06] hover:bg-white/[0.04]"
+                      }`}
+                    >
+                      All registered ({attendance.summary.total || 0})
+                    </button>
+                    {(attendance.summary.unmarked || 0) > 0 && playerSource === "checked_in" && (
+                      <span className="text-[11px] text-amber-400">
+                        {attendance.summary.unmarked} not yet marked — they are excluded
+                      </span>
+                    )}
+                    <button
+                      onClick={() => navigate(`/tournament-management/check-in?tournamentId=${tournamentId}`)}
+                      className="w-auto ml-auto px-3 py-1.5 rounded-lg text-[12px] font-semibold text-emerald-300 bg-emerald-500/10 border border-emerald-500/25 hover:bg-emerald-500/20"
+                    >
+                      Open check-in
+                    </button>
+                  </div>
+                )}
+
                 <div className="flex gap-3 mb-3">
                   <div className="flex-1 relative">
                     <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -1698,7 +2169,8 @@ export default function MDirectKnockout() {
                     onClick={async () => {
                       // Fetch fresh match data
                       try {
-                        const res = await axios.get(`/api/tournaments/direct-knockout/${tournamentId}/matches`);
+                        const sportQuery = activeSportId ? `?sportId=${activeSportId}` : "";
+                        const res = await axios.get(`/api/tournaments/direct-knockout/${tournamentId}/matches${sportQuery}`);
                         if (res.data.success) {
                           const fresh = res.data.matches.find((m) => m.matchId === match.matchId);
                           setActiveMatch(fresh || match);
@@ -1735,13 +2207,22 @@ export default function MDirectKnockout() {
               </div>
             ) : (() => {
               const mf = activeMatch.matchFormat || {};
-              const maxSets = mf.maxSets || getMatchFormatHelper(tournament)?.totalSets || 5;
-              const setsToWin = mf.setsToWin || Math.ceil(maxSets / 2);
+              // Prefer this match's own container. maxSets alone is wrong on a
+              // knockout bracket, where each round escalates Bo3 → Bo5 → Bo7.
+              const maxSets = mf.totalSets || mf.maxSets || getMatchFormatHelper(tournament)?.totalSets || 5;
+              const setsToWin = resolveSetsToWin(mf) || Math.ceil(maxSets / 2);
               const pointsToWin = mf.pointsToWinGame || null;
               const sets = activeMatch.sets || [];
               const p1Name = activeMatch.player1?.playerName || "Player 1";
               const p2Name = activeMatch.player2?.playerName || "Player 2";
-              const gamesPerSet = mf.gamesToWin || 3;
+              // Only Tennis-style formats have a games layer between set and
+              // point. Mirrors hasNestedGames() on the server — a flat-set sport
+              // (badminton, TT) has no "games per set" to show, and printing
+              // gamesToWin under that label claimed a structure that isn't there.
+              const isNested =
+                Number(mf.gamesPerSet) > 0 ||
+                (Number(mf.totalGames) > 1 && Number(mf.totalGames) !== Number(mf.totalSets));
+              const gamesPerSet = mf.totalGames || mf.gamesToWin || null;
 
               // Count set wins
               const p1SetsWon = sets.filter(s => s.winner?.playerName === p1Name).length;
@@ -1757,7 +2238,9 @@ export default function MDirectKnockout() {
                           {getRoundDisplayName(activeMatch.round)} • Match {activeMatch.matchNumber}
                         </p>
                         <p className="text-sm text-orange-100 mt-0.5">
-                          Best of {maxSets} sets • {gamesPerSet} games per set • {pointsToWin} points per game
+                          Best of {maxSets} sets (first to {setsToWin})
+                          {isNested && gamesPerSet ? ` • ${gamesPerSet} games per set` : ""}
+                          {pointsToWin ? ` • ${pointsToWin} points per set` : ""}
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
@@ -1937,6 +2420,135 @@ export default function MDirectKnockout() {
         </div>
       )}
 
+      {/* Confirm Generate Bracket Modal */}
+      <Modal
+        open={showGenerateModal}
+        onClose={() => setShowGenerateModal(false)}
+        title="Confirm bracket generation"
+        size="md"
+        theme="dark"
+        footer={
+          <>
+            {/* Manager-standard pair: ghost secondary + orange primary. The
+                primary was emerald, which is the only green CTA in the app —
+                orange-500 is the accent everywhere else. */}
+            <button
+              onClick={() => setShowGenerateModal(false)}
+              className="h-9 px-3.5 inline-flex items-center justify-center rounded-md text-[13px] font-semibold text-gray-400 hover:text-white hover:bg-white/[0.04] transition w-auto"
+              style={{ border: "1px solid rgba(255,255,255,0.06)" }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={doGenerate}
+              disabled={generating || !!scheduleFieldError}
+              title={scheduleFieldError || undefined}
+              className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-md bg-orange-500 hover:bg-orange-600 text-white text-[13px] font-semibold transition active:scale-[0.98] shadow-sm shadow-orange-500/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 w-auto"
+            >
+              {generating ? (
+                <>
+                  <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Generating…
+                </>
+              ) : (
+                <>
+                  <Trophy className="w-3.5 h-3.5" />
+                  Confirm and generate
+                </>
+              )}
+            </button>
+          </>
+        }
+      >
+        {generatePreview ? (
+          <div className="space-y-4">
+            {/* Draw summary — mirrors the stat-tile pattern used across the
+                manager pages (BulkBookingUpload results, scoreboard headers). */}
+            <div className="grid grid-cols-3 gap-3">
+              <PreviewStat label="Draw size" value={generatePreview.drawSize} />
+              <PreviewStat label="Players" value={generatePreview.playerCount} />
+              <PreviewStat label="BYEs" value={generatePreview.byes} muted={generatePreview.byes === 0} />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Draw method</span>
+              <span className="inline-flex items-center h-6 px-2 rounded-md bg-orange-500/15 text-orange-300 text-[11px] font-bold capitalize">
+                {generatePreview.drawMethod}
+              </span>
+              {generatePreview.category && generatePreview.category !== "ALL" && (
+                <>
+                  <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider ml-1">Category</span>
+                  <span className="inline-flex items-center h-6 px-2 rounded-md bg-white/[0.06] text-gray-200 text-[11px] font-bold">
+                    {generatePreview.category}
+                  </span>
+                </>
+              )}
+            </div>
+
+            {/* Scheduling panel — the page's standard inset card. Each field is
+                a label-over-input block so the three columns line up; the court
+                label and input used to be separate grid cells, which pushed the
+                gap field onto its own row. */}
+            <div className="bg-white/[0.04] rounded-xl p-4 border border-white/[0.06]">
+              <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-3">Scheduling</p>
+              {/* Labels kept short enough to stay on one line at this modal
+                  width — "Gap on same court (min)" wrapped and dropped its
+                  input below the other two. Full wording lives in the hint. */}
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-3 md:gap-4">
+                <PreviewField
+                  label="Courts"
+                  hint="How many courts run in parallel"
+                  value={previewCourtCount}
+                  min={1}
+                  onChange={setPreviewCourtCount}
+                />
+                <PreviewField
+                  label="Duration (min)"
+                  hint="Playing time allotted to each match"
+                  value={previewMatchDuration}
+                  min={1}
+                  onChange={setPreviewMatchDuration}
+                />
+                <PreviewField
+                  label="Gap (min)"
+                  hint="Break between consecutive matches on the same court"
+                  value={previewGapMinutes}
+                  min={0}
+                  onChange={setPreviewGapMinutes}
+                />
+              </div>
+            </div>
+
+            {scheduleFieldError ? (
+              <div
+                className="px-4 py-3 rounded-md flex items-start gap-3"
+                style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.20)" }}
+              >
+                <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                <p className="text-[13px] text-amber-300">{scheduleFieldError}</p>
+              </div>
+            ) : (
+              <div
+                className="px-4 py-3 rounded-md flex items-start gap-3"
+                style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
+              >
+                <Clock className="w-4 h-4 text-orange-400 flex-shrink-0 mt-0.5" />
+                <p className="text-[13px] text-gray-300 leading-relaxed">
+                  Starts <strong className="text-white">{localDateStr()}</strong> at{" "}
+                  <strong className="text-white">09:00</strong>. Each match gets{" "}
+                  <strong className="text-white">{previewMatchDuration}</strong> min of play in a{" "}
+                  <strong className="text-white">{Number(previewMatchDuration) + Number(previewGapMinutes)}</strong> min
+                  slot, across <strong className="text-white">{previewCourtCount}</strong> court
+                  {Number(previewCourtCount) === 1 ? "" : "s"}.
+                </p>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="text-[13px] text-gray-400">Preparing preview…</div>
+        )}
+      </Modal>
+
       {/* Bulk Score Upload Modal */}
       <BulkScoreUploadModal
         isOpen={showBulkUpload}
@@ -1980,7 +2592,13 @@ export default function MDirectKnockout() {
         const isBye = dm.notes?.includes("BYE");
 
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setDetailMatch(null)}>
+          <div
+        role="dialog"
+        aria-modal="true"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+        onClick={() => setDetailMatch(null)}
+      >
+        <DialogA11y onClose={() => setDetailMatch(null)} />
             <div className="bg-[#181A22] rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
               {/* Header */}
               <div className={`px-6 py-4 text-white ${isCompleted ? "bg-gradient-to-r from-green-600 to-emerald-600" : "bg-gradient-to-r from-orange-500 to-[#0059aa]"}`}>
@@ -2189,3 +2807,52 @@ export default function MDirectKnockout() {
 }
 
 // SeedPositionsPreview moved to ./components/SeedPositionsPreview.jsx
+
+// ── Generate-modal presentational bits ──────────────────────────────────────
+// Kept local to this file: they exist only to hold the confirm modal to the
+// manager theme (tile + inset panel + orange accent) and have no use elsewhere.
+
+/** Stat tile — same shape as the upload-results tiles. */
+function PreviewStat({ label, value, muted = false }) {
+  return (
+    <div
+      className="rounded-md p-3 text-center"
+      style={{
+        background: muted ? "rgba(255,255,255,0.03)" : "rgba(249,115,22,0.10)",
+        border: `1px solid ${muted ? "rgba(255,255,255,0.06)" : "rgba(249,115,22,0.25)"}`,
+      }}
+    >
+      <p className={`text-[22px] font-semibold tabular-nums leading-none ${muted ? "text-gray-400" : "text-orange-300"}`}>
+        {value}
+      </p>
+      <p className={`text-[11px] font-medium mt-1.5 ${muted ? "text-gray-500" : "text-orange-300/80"}`}>{label}</p>
+    </div>
+  );
+}
+
+/**
+ * Number field for the scheduling panel. Keeps "" as a distinct empty state
+ * rather than coercing to 0 — 0 is a value the backend silently accepts and
+ * then overrides, so the validator needs to be able to tell the two apart.
+ *
+ * Layout: full-height flex column with the input pushed down by `mt-auto`, so
+ * the inputs bottom-align across the row even if one label wraps to two lines.
+ * Without this a longer label shunts its own input below its neighbours'.
+ */
+function PreviewField({ label, hint, value, min, onChange }) {
+  return (
+    <div className="h-full flex flex-col">
+      <label className="block text-[11px] font-semibold text-gray-400 leading-snug" title={hint || undefined}>
+        {label}
+      </label>
+      <input
+        type="number"
+        min={min}
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value === "" ? "" : Number(e.target.value))}
+        title={hint || undefined}
+        className="mt-auto w-full h-9 px-3 rounded-md bg-[#12141B] border border-white/[0.06] text-[13px] text-gray-100 tabular-nums outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
+      />
+    </div>
+  );
+}

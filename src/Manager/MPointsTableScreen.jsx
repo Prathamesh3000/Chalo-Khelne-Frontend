@@ -7,6 +7,7 @@ import { useNavigate, useParams, useLocation } from "react-router-dom";
 import axios from "axios";
 import BulkScoreUploadModal from "./BulkScoreUploadModal";
 import { getResultLabels } from "../shared/utils/matchResultUtils";
+import { resolveSetsToWin } from "../utils/sportTrack";
 import { Breadcrumbs } from "../shared/ui";
 
 const MPointsTableScreen = () => {
@@ -424,7 +425,15 @@ const MPointsTableScreen = () => {
     }
   };
 
-  // Save Super Players separately
+  // ⚠️ INCOMPLETE FEATURE — Super Players (parallel to the working "Top Players"
+  // flow below). saveSuperPlayersToDatabase + handleSelectSuperPlayers are NOT
+  // wired to any button/modal yet and are never called. They reference four
+  // state vars that are not declared here — superPlayers/setSuperPlayers,
+  // superPlayersCount/setSuperPlayersCount, setShowSuperPlayersModal — so they
+  // would throw ReferenceError if invoked (hence the 4 no-undef lint errors).
+  // To finish: declare that state (mirror topPlayers*), add the modal + opener
+  // button, then flip the lint gate. Backend route /api/tournaments/superplayers/save
+  // and the SuperPlayers model already exist. Kept intentionally (2026-07-14).
   const saveSuperPlayersToDatabase = async (selectedSuperPlayers) => {
     try {
       const response = await axios.post(
@@ -866,8 +875,12 @@ Please complete all group stage matches first.`);
         tournamentId={tournamentId}
         groupId={groupId}
         matchType="player"
-        maxSets={5}
-        setsToWin={3}
+        // Read the format off the matches themselves — this screen has no
+        // tournament object. setsToWin was hardcoded to 3, which rejected a
+        // legitimate 2-0 in any best-of-3. The {totalSets: 5} fallback keeps
+        // the previous behaviour when no match carries a format.
+        maxSets={matches[0]?.matchFormat?.totalSets || matches[0]?.matchFormat?.maxSets || 5}
+        setsToWin={resolveSetsToWin(matches[0]?.matchFormat || { totalSets: 5 })}
         title={`Bulk Score Upload — ${isRound2 ? 'Round 2' : 'Group Stage'}`}
       />
     </div>

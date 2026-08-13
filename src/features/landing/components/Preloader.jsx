@@ -62,7 +62,7 @@ export function Preloader() {
       {/* front dark panel with content */}
       <div ref={darkRef} className="absolute inset-0 flex items-center justify-center bg-[#0A0A0A]">
         <div ref={groupRef} className="flex flex-col items-center px-8">
-          <img ref={logoRef} src="/CK.png" alt="Chalo Khelne" className="h-24 w-auto sm:h-28" />
+          <img loading="lazy" ref={logoRef} src="/CK.png" alt="Chalo Khelne" className="h-24 w-auto sm:h-28" />
           <span ref={wordRef} className="mt-5 text-lg font-black uppercase tracking-[0.4em] text-white sm:text-xl">
             Chalo&nbsp;Khelne
           </span>

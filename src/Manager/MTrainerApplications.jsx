@@ -2,6 +2,7 @@ import { toast } from "react-toastify";
 import React, { useState, useEffect, useContext } from "react";
 import { AuthContext } from "../context/AuthContext";
 
+import { getAuthToken } from "../shared/api/authToken";
 const MTrainerApplications = () => {
   const { auth } = useContext(AuthContext);
   const [applications, setApplications] = useState([]);
@@ -24,7 +25,7 @@ const MTrainerApplications = () => {
         return;
       }
 
-      const token = localStorage.getItem("token");
+      const token = getAuthToken();
       const response = await fetch(
         `/api/manager/trainer-applications?managerId=${managerId}&status=${filter}`,
         {
@@ -53,7 +54,7 @@ const MTrainerApplications = () => {
     rejectionReason = ""
   ) => {
     try {
-      const token = localStorage.getItem("token");
+      const token = getAuthToken();
       const response = await fetch(
         `/api/manager/trainer-applications/${applicationId}/${action}`,
         {

@@ -8,6 +8,7 @@ import Breadcrumbs from "./Breadcrumbs";
 import TournamentStepper from "./TournamentStepper";
 import refereeApi from "../../features/referee/refereeApi";
 
+import DialogA11y from "../../shared/components/DialogA11y";
 const SIG = "#5E6AD2";
 
 // Preset court-type options with a "Custom..." escape hatch (Q3 = preset dropdown).
@@ -816,9 +817,12 @@ function BulkAddModal({ onClose, onSubmit }) {
 
   return (
     <div
-      className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-      onClick={onClose}
-    >
+        role="dialog"
+        aria-modal="true"
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        onClick={onClose}
+      >
+        <DialogA11y onClose={onClose} />
       <div
         className="bg-white rounded-2xl shadow-2xl w-full max-w-[560px] max-h-[90vh] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
@@ -852,10 +856,10 @@ function BulkAddModal({ onClose, onSubmit }) {
           />
 
           <div className="flex items-center gap-2 flex-wrap">
-            <label className="text-[11px] font-semibold uppercase tracking-[0.06em] text-neutral-500">
+            <label className="text-[11px] font-semibold uppercase tracking-[0.06em] text-neutral-500" htmlFor="type-for-all">
               Type for all
             </label>
-            <select
+            <select id="type-for-all"
               value={type}
               onChange={(e) => setType(e.target.value)}
               disabled={submitting}

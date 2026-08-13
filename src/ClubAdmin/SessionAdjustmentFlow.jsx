@@ -3,6 +3,7 @@ import axios from "axios";
 import { toast } from "react-toastify";
 import { Loader2, Check, X, CalendarClock, UserCog } from "lucide-react";
 
+import DialogA11y from "../shared/components/DialogA11y";
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const inputStyle = { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", colorScheme: "dark" };
 const field = "h-9 px-3 rounded-md text-[13px] text-gray-200 focus:outline-none w-full";
@@ -119,7 +120,13 @@ export default function SessionAdjustmentFlow({ coaches = [], onChanged }) {
 
       {/* Modal */}
       {modal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setModal(null)}>
+        <div
+        role="dialog"
+        aria-modal="true"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+        onClick={() => setModal(null)}
+      >
+        <DialogA11y onClose={() => setModal(null)} />
           <div className="w-full max-w-sm rounded-xl bg-[#181A22] border border-white/10 p-5" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h4 className="text-[14px] font-semibold text-white">{modal.type === "reschedule" ? "Reschedule" : "Assign New Coach"}</h4>
@@ -127,18 +134,18 @@ export default function SessionAdjustmentFlow({ coaches = [], onChanged }) {
             </div>
             {modal.type === "reschedule" ? (
               <>
-                <label className="block text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-1.5">New Day</label>
-                <select value={modal.newDay} onChange={(e) => setModal((m) => ({ ...m, newDay: e.target.value }))} className={field} style={inputStyle}>
+                <label className="block text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-1.5" htmlFor="new-day">New Day</label>
+                <select id="new-day" value={modal.newDay} onChange={(e) => setModal((m) => ({ ...m, newDay: e.target.value }))} className={field} style={inputStyle}>
                   {DAYS.map((d) => <option key={d} value={d}>{d}</option>)}
                 </select>
                 <div className="grid grid-cols-2 gap-3 mt-3">
                   <div>
-                    <label className="block text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-1.5">Start</label>
-                    <input type="time" value={modal.newStart} onChange={(e) => setModal((m) => ({ ...m, newStart: e.target.value }))} className={field} style={inputStyle} />
+                    <label className="block text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-1.5" htmlFor="start">Start</label>
+                    <input id="start" type="time" value={modal.newStart} onChange={(e) => setModal((m) => ({ ...m, newStart: e.target.value }))} className={field} style={inputStyle} />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-1.5">End</label>
-                    <input type="time" value={modal.newEnd} onChange={(e) => setModal((m) => ({ ...m, newEnd: e.target.value }))} className={field} style={inputStyle} />
+                    <label className="block text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-1.5" htmlFor="end">End</label>
+                    <input id="end" type="time" value={modal.newEnd} onChange={(e) => setModal((m) => ({ ...m, newEnd: e.target.value }))} className={field} style={inputStyle} />
                   </div>
                 </div>
                 <button onClick={() => act(modal.req, { action: "reschedule", newDay: modal.newDay, newStartTime: modal.newStart, newEndTime: modal.newEnd })}
@@ -146,8 +153,8 @@ export default function SessionAdjustmentFlow({ coaches = [], onChanged }) {
               </>
             ) : (
               <>
-                <label className="block text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-1.5">Coach</label>
-                <select value={modal.coach} onChange={(e) => setModal((m) => ({ ...m, coach: e.target.value }))} className={field} style={inputStyle}>
+                <label className="block text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-1.5" htmlFor="coach">Coach</label>
+                <select id="coach" value={modal.coach} onChange={(e) => setModal((m) => ({ ...m, coach: e.target.value }))} className={field} style={inputStyle}>
                   <option value="">Select Coach</option>
                   {coaches.map((c) => <option key={c._id} value={c._id}>{c.name}</option>)}
                 </select>

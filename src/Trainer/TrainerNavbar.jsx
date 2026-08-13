@@ -180,7 +180,7 @@ const TrainerNavbar = () => {
   return (
     <div className={`navbar ${darkMode ? "navbar-dark" : ""}`}>
       <div className="flex items-center w-full md:w-auto navbar1">
-        <img
+        <img loading="lazy"
           src="/sportapp_logo.png"
           alt="Logo"
           className="w-[45.811px] h-[35.481px]"

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { Star, Plus, X, Trash2, CornerDownRight, Send } from "lucide-react";
 
+import DialogA11y from "../shared/components/DialogA11y";
 const TARGETS = ["Club", "Coach", "Court"];
 const TARGET_BADGE = { Club: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30", Coach: "bg-blue-500/15 text-blue-300 border-blue-500/30", Court: "bg-violet-500/15 text-violet-300 border-violet-500/30" };
 
@@ -107,7 +108,13 @@ export default function Reviews() {
       </div>
 
       {addOpen && (
-        <div onClick={() => setAddOpen(false)} className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+        <div
+        role="dialog"
+        aria-modal="true"
+        onClick={() => setAddOpen(false)}
+        className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+      >
+        <DialogA11y onClose={() => setAddOpen(false)} />
           <div onClick={(e) => e.stopPropagation()} className="bg-[#181A22] rounded-2xl max-w-md w-full overflow-hidden border border-white/[0.1] shadow-2xl">
             <div className="p-5 border-b border-white/[0.08] flex justify-between items-center bg-[#0a0d14]">
               <div><span className="text-[10px] font-mono tracking-wider font-bold text-emerald-400 uppercase">Reviews</span><h3 className="text-[17px] font-bold text-white mt-0.5">Record a Review</h3></div>
@@ -115,14 +122,14 @@ export default function Reviews() {
             </div>
             <form onSubmit={addReview} className="p-5 space-y-3.5">
               <div className="grid grid-cols-2 gap-3">
-                <div><label className={label}>Author *</label><input className={input} value={form.author} onChange={(e) => set("author", e.target.value)} required /></div>
-                <div><label className={label}>Rating</label><select className={input} value={form.rating} onChange={(e) => set("rating", e.target.value)}>{[5, 4, 3, 2, 1].map((n) => <option key={n} value={n} className="bg-[#181A22]">{n} Star{n > 1 ? "s" : ""}</option>)}</select></div>
+                <div><label className={label} htmlFor="author">Author *</label><input id="author" className={input} value={form.author} onChange={(e) => set("author", e.target.value)} required /></div>
+                <div><label className={label} htmlFor="rating">Rating</label><select id="rating" className={input} value={form.rating} onChange={(e) => set("rating", e.target.value)}>{[5, 4, 3, 2, 1].map((n) => <option key={n} value={n} className="bg-[#181A22]">{n} Star{n > 1 ? "s" : ""}</option>)}</select></div>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div><label className={label}>Target</label><select className={input} value={form.targetType} onChange={(e) => set("targetType", e.target.value)}>{TARGETS.map((t) => <option key={t} value={t} className="bg-[#181A22]">{t}</option>)}</select></div>
-                <div><label className={label}>Target Name</label><input className={input} value={form.targetName} onChange={(e) => set("targetName", e.target.value)} placeholder="e.g. Coach Vik" /></div>
+                <div><label className={label} htmlFor="target">Target</label><select id="target" className={input} value={form.targetType} onChange={(e) => set("targetType", e.target.value)}>{TARGETS.map((t) => <option key={t} value={t} className="bg-[#181A22]">{t}</option>)}</select></div>
+                <div><label className={label} htmlFor="target-name">Target Name</label><input id="target-name" className={input} value={form.targetName} onChange={(e) => set("targetName", e.target.value)} placeholder="e.g. Coach Vik" /></div>
               </div>
-              <div><label className={label}>Comment</label><textarea className={`${input} resize-none`} rows={3} value={form.comment} onChange={(e) => set("comment", e.target.value)} placeholder="What did they say?" /></div>
+              <div><label className={label} htmlFor="comment">Comment</label><textarea id="comment" className={`${input} resize-none`} rows={3} value={form.comment} onChange={(e) => set("comment", e.target.value)} placeholder="What did they say?" /></div>
               <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[13px] py-2.5 rounded-lg">Add Review</button>
             </form>
           </div>

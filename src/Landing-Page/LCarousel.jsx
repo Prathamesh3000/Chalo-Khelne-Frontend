@@ -115,7 +115,7 @@ export default function Carousel() {
                   <div className="relative rounded-2xl overflow-hidden border border-gray-200 hover:border-orange-300 hover:shadow-lg transition-all h-full bg-white">
                     {/* Card Image */}
                     <div className="relative h-48">
-                      <img
+                      <img loading="lazy"
                         src={hasImage ? slide.tournamentLogo : defaultTournamentImg}
                         alt={slide.title}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"

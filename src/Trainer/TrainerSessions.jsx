@@ -245,10 +245,10 @@ const TrainerSessions = () => {
           <form onSubmit={handleSubmit}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block mb-1" style={{ color: colors.text }}>
+                <label className="block mb-1" style={{ color: colors.text }} htmlFor="session-title">
                   Session Title
                 </label>
-                <input
+                <input id="session-title"
                   type="text"
                   name="title"
                   value={newSession.title}
@@ -260,10 +260,10 @@ const TrainerSessions = () => {
               </div>
 
               <div>
-                <label className="block mb-1" style={{ color: colors.text }}>
+                <label className="block mb-1" style={{ color: colors.text }} htmlFor="session-type">
                   Session Type
                 </label>
-                <select
+                <select id="session-type"
                   name="type"
                   value={newSession.type}
                   onChange={handleInputChange}
@@ -278,10 +278,10 @@ const TrainerSessions = () => {
               </div>
 
               <div>
-                <label className="block mb-1" style={{ color: colors.text }}>
+                <label className="block mb-1" style={{ color: colors.text }} htmlFor="start-time">
                   Start Time
                 </label>
-                <input
+                <input id="start-time"
                   type="datetime-local"
                   name="startTime"
                   value={newSession.startTime}
@@ -293,10 +293,10 @@ const TrainerSessions = () => {
               </div>
 
               <div>
-                <label className="block mb-1" style={{ color: colors.text }}>
+                <label className="block mb-1" style={{ color: colors.text }} htmlFor="end-time">
                   End Time
                 </label>
-                <input
+                <input id="end-time"
                   type="datetime-local"
                   name="endTime"
                   value={newSession.endTime}
@@ -308,10 +308,10 @@ const TrainerSessions = () => {
               </div>
 
               <div>
-                <label className="block mb-1" style={{ color: colors.text }}>
+                <label className="block mb-1" style={{ color: colors.text }} htmlFor="location">
                   Location
                 </label>
-                <input
+                <input id="location"
                   type="text"
                   name="location"
                   value={newSession.location}
@@ -324,10 +324,10 @@ const TrainerSessions = () => {
             </div>
 
             <div className="mt-6">
-              <label className="block mb-1" style={{ color: colors.text }}>
+              <label className="block mb-1" style={{ color: colors.text }} htmlFor="notes">
                 Notes
               </label>
-              <textarea
+              <textarea id="notes"
                 name="notes"
                 value={newSession.notes}
                 onChange={handleInputChange}

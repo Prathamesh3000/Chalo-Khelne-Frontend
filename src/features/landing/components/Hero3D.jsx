@@ -1,3 +1,4 @@
+/* eslint-disable react/no-unknown-property -- react-three-fiber intrinsics (position, args, toneMapped, etc.) are valid R3F props, not DOM attributes. */
 import { useEffect, useMemo, useRef } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 

@@ -109,7 +109,7 @@ export default function ProfileView({ userId, currentUserId, onOpenProfile, dark
           {shown.map((p) => (
             <div key={p._id} className={`rounded-lg overflow-hidden ${t.tile}`}>
               {p.videoThumbnail ? (
-                <img src={assetUrl(p.videoThumbnail)} alt="" className="w-full h-24 object-cover" />
+                <img loading="lazy" src={assetUrl(p.videoThumbnail)} alt="" className="w-full h-24 object-cover" />
               ) : (
                 <div className="p-2.5 h-24 flex flex-col justify-between">
                   {p.tournamentName && (

@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import axios from "axios";
 
+import { getAuthToken } from "../shared/api/authToken";
 const API = import.meta.env.VITE_API_BASE_URL;
 
 const NEWS_TYPES = [
@@ -86,7 +87,7 @@ export default function NewsManagement() {
   const [saving, setSaving] = useState(false);
   const [actionLoading, setActionLoading] = useState(null);
 
-  const token = localStorage.getItem("token");
+  const token = getAuthToken();
   const headers = { Authorization: `Bearer ${token}` };
 
   // Fetch news
@@ -408,7 +409,7 @@ export default function NewsManagement() {
                 {/* Thumbnail */}
                 {news.thumbnail && (
                   <div className="h-40 overflow-hidden">
-                    <img
+                    <img loading="lazy"
                       src={news.thumbnail}
                       alt={news.title}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
@@ -745,7 +746,7 @@ export default function NewsManagement() {
                   </label>
                   {modalMode === "view" ? (
                     form.thumbnail ? (
-                      <img
+                      <img loading="lazy"
                         src={form.thumbnail}
                         alt="Thumbnail"
                         className="w-full h-40 object-cover rounded-xl"

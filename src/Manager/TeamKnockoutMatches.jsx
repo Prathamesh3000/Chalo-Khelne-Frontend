@@ -29,6 +29,7 @@ import BulkScoreUploadModal from "./BulkScoreUploadModal";
 import BulkResultUploadModal from "./BulkResultUploadModal";
 import AssignUmpireModal from "./Tournament/AssignUmpireModal";
 
+import { getAuthToken } from "../shared/api/authToken";
 // Resolves a referee's display name from match.referee (handles nested
 // object and bare ObjectId shapes — same helper as MDirectKnockout).
 const getUmpireName = (referee) => {
@@ -145,7 +146,6 @@ const TeamKnockoutMatches = () => {
       };
 
       initializeTournamentData();
-    } else {
     }
 
     return () => {
@@ -251,7 +251,7 @@ const TeamKnockoutMatches = () => {
 
   const fetchTournamentStatistics = async () => {
     try {
-      const token = localStorage.getItem("token");
+      const token = getAuthToken();
       const response = await fetch(
         `/api/tournaments/team-knockout/tournaments/${tournamentId}/stats`,
         {
@@ -287,7 +287,7 @@ const TeamKnockoutMatches = () => {
 
     try {
       const liveUpdates = new Map();
-      const token = localStorage.getItem("token");
+      const token = getAuthToken();
 
       for (const match of inProgressMatches) {
         try {
@@ -328,7 +328,7 @@ const TeamKnockoutMatches = () => {
 
   const fetchTournamentDetails = async () => {
     try {
-      const token = localStorage.getItem("token");
+      const token = getAuthToken();
       const response = await fetch(
         `/api/tournaments/${tournamentId}`,
         {
@@ -363,7 +363,7 @@ const TeamKnockoutMatches = () => {
     try {
       setFetchingMatches(true);
       const url = `/api/tournaments/team-knockout/matches/${tournamentId}`;
-      const token = localStorage.getItem("token");
+      const token = getAuthToken();
       const response = await fetch(url, {
         headers: {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -442,7 +442,7 @@ const TeamKnockoutMatches = () => {
       // CORRECTED: Use the actual route from your router
       const previousRoundUrl = `/api/tournaments/team-knockout/matches-by-round?tournamentId=${tournamentId}&round=${round - 1}`;
 
-      const token = localStorage.getItem("token");
+      const token = getAuthToken();
       const response = await fetch(previousRoundUrl, {
         headers: {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -545,7 +545,7 @@ const TeamKnockoutMatches = () => {
           format, // ✅ now sending correct format string
         };
 
-        const token = localStorage.getItem("token");
+        const token = getAuthToken();
         const response = await fetch(
           `/api/tournaments/team-knockout/next-round`,
           {
@@ -598,7 +598,7 @@ const TeamKnockoutMatches = () => {
     if (!tournamentId || !teamId) return;
 
     try {
-      const token = localStorage.getItem("token");
+      const token = getAuthToken();
       const response = await fetch(
         `/api/tournaments/team-knockout/teams/${teamId}/swap-players`,
         {
@@ -737,10 +737,10 @@ const TeamKnockoutMatches = () => {
 
             {/* Match Interval */}
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-900">
+              <label className="block text-sm font-medium text-gray-900" htmlFor="match-interval-minutes">
                 Match Interval (minutes)
               </label>
-              <input
+              <input id="match-interval-minutes"
                 type="number"
                 value={
                   roundSchedules?.[currentSchedulingRound]?.matchInterval || ""
@@ -763,10 +763,10 @@ const TeamKnockoutMatches = () => {
 
             {/* Court Number */}
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-900">
+              <label className="block text-sm font-medium text-gray-900" htmlFor="starting-court-number">
                 Starting Court Number
               </label>
-              <input
+              <input id="starting-court-number"
                 type="number"
                 value={
                   roundSchedules?.[currentSchedulingRound]?.courtNumber || ""

@@ -30,6 +30,29 @@ export function getMatchFormat(tournament, sportId) {
   return getSportTrack(tournament, sportId)?.matchFormat || null;
 }
 
+/**
+ * How many set wins actually decide a match. Mirrors resolveSetsToWin in
+ * server/utils/matchFormatUtils.js — keep the two in step.
+ *
+ * Best-of-N is first to ceil(N/2): 2 of 3, 3 of 5, 4 of 7 — never all N. A
+ * stored setsToWin larger than that is a stale default (every match model
+ * defaults it to 3, paired with maxSets: 5), so it is clamped to the container.
+ * Passing the raw value through made a legitimate 2-0 in a best-of-3 look
+ * incomplete.
+ */
+export function resolveSetsToWin(format) {
+  const f = format || {};
+  const num = (v) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : null);
+
+  const container = num(f.totalSets) ?? num(f.maxSets);
+  const stored = num(f.setsToWin);
+
+  if (!container) return stored || 1;
+  const derived = Math.ceil(container / 2);
+  if (!stored) return derived;
+  return Math.min(stored, derived);
+}
+
 export function getCategories(tournament, sportId) {
   const cats = getSportTrack(tournament, sportId)?.categories;
   return Array.isArray(cats) ? cats : [];

@@ -1,5 +1,6 @@
 import { X } from "lucide-react";
 
+import DialogA11y from "../../shared/components/DialogA11y";
 /**
  * Shared overlay modal for the Social module (search, follow lists, profile).
  * Props: open, onClose, title, dark, children, maxWidth (Tailwind class)
@@ -11,7 +12,13 @@ export default function SocialModal({ open, onClose, title, dark = false, childr
     : { card: "bg-white shadow-xl", header: "border-b border-gray-100", title: "text-gray-900", close: "text-gray-500 hover:bg-gray-100" };
 
   return (
-    <div className="fixed inset-0 z-[55] flex items-center justify-center p-4 bg-black/60" onClick={onClose}>
+    <div
+        role="dialog"
+        aria-modal="true"
+        className="fixed inset-0 z-[55] flex items-center justify-center p-4 bg-black/60"
+        onClick={onClose}
+      >
+        <DialogA11y onClose={onClose} />
       <div
         className={`w-full ${maxWidth} max-h-[85vh] flex flex-col rounded-2xl overflow-hidden ${t.card}`}
         onClick={(e) => e.stopPropagation()}

@@ -84,7 +84,7 @@ export default function SubstitutesAdmin() {
       className="rounded-xl bg-[#181A22] border border-white/[0.06] p-4 flex items-center gap-3 cursor-pointer hover:bg-[#1C1E27] hover:border-white/[0.1] transition"
     >
       <div className="w-12 h-12 rounded-lg bg-white/[0.04] overflow-hidden flex items-center justify-center flex-shrink-0">
-        {imgSrc(s.photo) ? <img src={imgSrc(s.photo)} alt="" className="w-full h-full object-cover" /> : <UserCheck className="w-5 h-5 text-gray-600" />}
+        {imgSrc(s.photo) ? <img loading="lazy" src={imgSrc(s.photo)} alt="" className="w-full h-full object-cover" /> : <UserCheck className="w-5 h-5 text-gray-600" />}
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">

@@ -16,7 +16,7 @@ export default function RefereeDetailModal({ referee, onClose }) {
           </button>
           <div className="flex items-center gap-4">
             {referee.profileImage ? (
-              <img src={referee.profileImage} alt={name} className="w-16 h-16 rounded-full object-cover border-3 border-white/30" />
+              <img loading="lazy" src={referee.profileImage} alt={name} className="w-16 h-16 rounded-full object-cover border-3 border-white/30" />
             ) : (
               <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center text-2xl font-bold">
                 {name.charAt(0)}

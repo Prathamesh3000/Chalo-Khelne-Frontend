@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 import { ClubAdminShell } from "../shared/layout";
 
+import { getAuthToken } from "../shared/api/authToken";
+import DialogA11y from "../shared/components/DialogA11y";
 const ViewTurf = () => {
   const { id } = useParams();
   const { auth } = useContext(AuthContext);
@@ -39,7 +41,7 @@ const ViewTurf = () => {
   const fetchTurf = async () => {
     try {
       setIsLoading(true);
-      const token = localStorage.getItem("token");
+      const token = getAuthToken();
       const response = await axios.get(`/api/turfs/${id}?userId=${auth._id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -57,7 +59,7 @@ const ViewTurf = () => {
   const fetchAvailableManagers = async () => {
     try {
       setManagersLoading(true);
-      const token = localStorage.getItem("token");
+      const token = getAuthToken();
       const response = await axios.get(`/api/manager/club-admin/managers?clubId=${auth._id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -76,7 +78,7 @@ const ViewTurf = () => {
     if (!selectedManagerForAssignment) return;
     try {
       setIsAssigning(true);
-      const token = localStorage.getItem("token");
+      const token = getAuthToken();
       await axios.post(`/api/turfs/${id}/assign-manager`,
         { managerId: selectedManagerForAssignment._id },
         { headers: { Authorization: `Bearer ${token}` } }
@@ -96,7 +98,7 @@ const ViewTurf = () => {
   const handleRemoveManager = async () => {
     if (!selectedManagerForRemoval) return;
     try {
-      const token = localStorage.getItem("token");
+      const token = getAuthToken();
       await axios.delete(`/api/turfs/${id}/remove-manager/${selectedManagerForRemoval._id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -117,7 +119,7 @@ const ViewTurf = () => {
     }
     try {
       setIsDeleting(true);
-      const token = localStorage.getItem("token");
+      const token = getAuthToken();
       await axios.delete(`/api/turfs/${id}?userId=${auth._id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -218,7 +220,7 @@ const ViewTurf = () => {
             {turf.images && turf.images.length > 0 ? (
               <>
                 <div className="relative mb-3">
-                  <img src={assetUrl(turf.images[activeImageIndex])} alt={`${turf.name} view`}
+                  <img loading="lazy" src={assetUrl(turf.images[activeImageIndex])} alt={`${turf.name} view`}
                     className="w-full h-56 object-cover rounded-md" style={{ border: "1px solid rgba(255,255,255,0.06)" }} />
                   <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-sm text-white text-[11px] px-2 py-1 rounded font-mono tabular-nums">
                     {activeImageIndex + 1} / {turf.images.length}
@@ -231,7 +233,7 @@ const ViewTurf = () => {
                         className={`rounded-md overflow-hidden transition w-auto ${
                           index === activeImageIndex ? "ring-2 ring-orange-500" : "opacity-70 hover:opacity-100"
                         }`}>
-                        <img src={assetUrl(image)} alt={`Thumbnail ${index + 1}`} className="w-full h-14 object-cover" />
+                        <img loading="lazy" src={assetUrl(image)} alt={`Thumbnail ${index + 1}`} className="w-full h-14 object-cover" />
                       </button>
                     ))}
                   </div>
@@ -547,7 +549,13 @@ function DarkButton({ children, onClick, variant = "primary", type = "button", d
 function DarkModal({ title, subtitle, onClose, size = "md", children }) {
   const sizes = { sm: "max-w-sm", md: "max-w-md", lg: "max-w-lg" };
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
+    <div
+        role="dialog"
+        aria-modal="true"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+        onClick={onClose}
+      >
+        <DialogA11y onClose={onClose} />
       <div
         className={`bg-[#181A22] border border-white/[0.06] rounded-lg shadow-[0_24px_64px_rgba(0,0,0,0.5)] w-full ${sizes[size]} max-h-[85vh] flex flex-col overflow-hidden`}
         onClick={(e) => e.stopPropagation()}

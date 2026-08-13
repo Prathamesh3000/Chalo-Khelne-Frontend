@@ -1,10 +1,14 @@
 import { toast } from "react-toastify";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import {
-  MessageSquare, X, CheckCircle, Loader2, Copy,
+  MessageSquare, X, CheckCircle, Loader2, Copy, Search,
 } from "lucide-react";
 import { SuperAdminShell } from "../shared/layout";
+import { Pagination } from "../shared/ui";
+
+import DialogA11y from "../shared/components/DialogA11y";
+const PAGE_SIZE = 10;
 
 const EMPTY_FORM = {
   name: "", email: "", phone: "",
@@ -16,6 +20,11 @@ const EMPTY_FORM = {
 export default function Inquiries() {
   const [inquiries, setInquiries] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [debounced, setDebounced] = useState("");
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [selectedInquiry, setSelectedInquiry] = useState(null);
   const [formData, setFormData] = useState(EMPTY_FORM);
@@ -23,18 +32,29 @@ export default function Inquiries() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [generatedCredentials, setGeneratedCredentials] = useState(null);
 
-  useEffect(() => { fetchInquiries(); }, []);
+  // Debounce the search box; reset to page 1 whenever the term changes.
+  useEffect(() => {
+    const t = setTimeout(() => { setDebounced(search.trim()); setPage(1); }, 350);
+    return () => clearTimeout(t);
+  }, [search]);
 
-  const fetchInquiries = async () => {
+  const fetchInquiries = useCallback(async () => {
+    setLoading(true);
     try {
-      const res = await axios.get("/api/inquiries");
-      setInquiries(res.data);
+      const params = { page, limit: PAGE_SIZE };
+      if (debounced) params.q = debounced;
+      const res = await axios.get("/api/inquiries", { params });
+      setInquiries(res.data.items || []);
+      setTotal(res.data.total || 0);
+      setTotalPages(res.data.totalPages || 1);
     } catch (error) {
       console.error("Error fetching inquiries:", error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, debounced]);
+
+  useEffect(() => { fetchInquiries(); }, [fetchInquiries]);
 
   const handleOpenModal = (inquiry) => {
     setSelectedInquiry(inquiry);
@@ -83,17 +103,32 @@ export default function Inquiries() {
 
   return (
     <SuperAdminShell searchPlaceholder="Search inquiries…">
-      <header className="mb-6">
-        <p className="inline-flex items-center gap-1.5 text-[12px] text-gray-400">
-          <MessageSquare className="w-3.5 h-3.5" />
-          Club approvals · Inquiries
-        </p>
-        <h1 className="mt-2 text-[26px] font-medium text-white leading-tight">
-          Inquiries
-        </h1>
-        <p className="mt-1 text-[13px] text-gray-400">
-          Onboard new corporate and club admins from inbound inquiries.
-        </p>
+      <header className="flex items-start justify-between gap-4 mb-6 flex-wrap">
+        <div className="min-w-0">
+          <p className="inline-flex items-center gap-1.5 text-[12px] text-gray-400">
+            <MessageSquare className="w-3.5 h-3.5" />
+            Club approvals · Inquiries
+          </p>
+          <h1 className="mt-2 text-[26px] font-medium text-white leading-tight">
+            Inquiries
+          </h1>
+          <p className="mt-1 text-[13px] text-gray-400">
+            <span className="font-mono tabular-nums">{total}</span> inquir{total === 1 ? "y" : "ies"} · onboard new corporate and club admins.
+          </p>
+        </div>
+        {(total > 0 || debounced) && (
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by name, email or message…"
+              className="w-full h-9 pl-9 pr-3 rounded-md text-[13px] text-gray-200 placeholder:text-gray-500 focus:outline-none"
+              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}
+            />
+          </div>
+        )}
       </header>
 
       {loading ? (
@@ -150,9 +185,24 @@ export default function Inquiries() {
         </div>
       )}
 
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        total={total}
+        limit={PAGE_SIZE}
+        onPage={setPage}
+        loading={loading}
+      />
+
       {/* Onboard Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setShowModal(false)}>
+        <div
+        role="dialog"
+        aria-modal="true"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+        onClick={() => setShowModal(false)}
+      >
+        <DialogA11y onClose={() => setShowModal(false)} />
           <div className="bg-[#181A22] border border-white/[0.06] rounded-lg shadow-[0_24px_64px_rgba(0,0,0,0.5)] w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between px-5 py-4 border-b border-white/[0.06]">
               <div>
@@ -232,8 +282,8 @@ export default function Inquiries() {
                       <div className="grid grid-cols-2 gap-3">
                         <DarkInput label="Industry type *" name="industryType" value={formData.industryType} onChange={handleChange} placeholder="e.g. IT, Finance" required />
                         <div>
-                          <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-500 mb-1.5">Company size *</label>
-                          <select name="companySize" required value={formData.companySize} onChange={handleChange}
+                          <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-500 mb-1.5" htmlFor="company-size">Company size *</label>
+                          <select id="company-size" name="companySize" required value={formData.companySize} onChange={handleChange}
                             className="w-full h-9 px-3 rounded-md text-[13px] text-gray-200 focus:outline-none"
                             style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
                             <option value=""        className="bg-[#181A22]">Select size</option>

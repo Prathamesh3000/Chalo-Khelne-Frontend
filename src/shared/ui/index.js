@@ -18,4 +18,5 @@ export { default as Skeleton } from "./Skeleton";
 export { default as BrandMark } from "./BrandMark";
 export { default as TabBar, SubTabs } from "./TabBar";
 export { default as Breadcrumbs } from "./Breadcrumbs";
+export { default as Pagination } from "./Pagination";
 export { default as theme } from "./theme";

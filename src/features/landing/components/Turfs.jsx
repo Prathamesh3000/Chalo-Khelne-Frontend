@@ -76,7 +76,7 @@ export function Turfs() {
         {/* Featured panel */}
         <div ref={featRef} className="relative h-[460px] overflow-hidden rounded-3xl border border-white/10 lg:h-[540px]">
           <div className={`absolute inset-0 bg-gradient-to-br ${t.grad}`} />
-          <img
+          <img loading="lazy"
             key={t.image}
             src={t.image}
             alt={t.name}
@@ -136,7 +136,7 @@ export function Turfs() {
               >
                 <div className="relative h-16 w-20 shrink-0 overflow-hidden rounded-xl">
                   <div className={`absolute inset-0 bg-gradient-to-br ${turf.grad}`} />
-                  <img src={turf.image} alt="" onError={(e) => { e.currentTarget.style.display = "none"; }} className="absolute inset-0 h-full w-full object-cover" />
+                  <img loading="lazy" src={turf.image} alt="" onError={(e) => { e.currentTarget.style.display = "none"; }} className="absolute inset-0 h-full w-full object-cover" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2">

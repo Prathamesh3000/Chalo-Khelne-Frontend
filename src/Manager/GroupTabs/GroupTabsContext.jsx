@@ -138,7 +138,9 @@ export function GroupTabsProvider({ tournamentId: propTournamentId, children }) 
             if (mRes.data.success) {
               setRound2MatchesData((prev) => ({ ...prev, [g._id]: mRes.data.matches || [] }));
             }
-          } catch {}
+          } catch (err) {
+            console.warn(`Round 2 match fetch failed for group ${g._id}:`, err.message);
+          }
         }
       }
     } catch (err) {
@@ -163,7 +165,9 @@ export function GroupTabsProvider({ tournamentId: propTournamentId, children }) 
         });
         setKnockoutMatchesByRound(byRound);
       }
-    } catch {}
+    } catch (err) {
+      console.warn("Error fetching knockout matches:", err.message);
+    }
     // STEP 11c: activeSportId in deps for sport-switch re-fetches.
   }, [tournamentId, activeSportId]);
 
@@ -174,7 +178,9 @@ export function GroupTabsProvider({ tournamentId: propTournamentId, children }) 
       if (res.data.success) {
         setAvailablePlayersForKnockout(res.data.players || []);
       }
-    } catch {}
+    } catch (err) {
+      console.warn("Error fetching available players:", err.message);
+    }
     // STEP 11c: activeSportId in deps for sport-switch re-fetches.
   }, [tournamentId, activeSportId]);
 

@@ -1,5 +1,5 @@
 import { toast } from "react-toastify";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import {
   ExternalLink,
@@ -15,8 +15,11 @@ import {
   Package,
 } from "lucide-react";
 import { SuperAdminShell } from "../shared/layout";
+import { Pagination } from "../shared/ui";
 import VendorsListTab from "./vendors/VendorsListTab";
 import CreateVendorTab from "./vendors/CreateVendorTab";
+
+const PAGE_SIZE = 15;
 
 const CATEGORIES = [
   "Racket",
@@ -76,7 +79,9 @@ export default function VendorMarketplace() {
   const [stats, setStats] = useState({});
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
+  const [debounced, setDebounced] = useState("");
   const [sportFilter, setSportFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [vendorFilter, setVendorFilter] = useState("");
@@ -91,30 +96,34 @@ export default function VendorMarketplace() {
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState("vendors"); // "vendors" | "create" | "links"
 
+  // Debounce the search box; reset to page 1 whenever the term changes.
   useEffect(() => {
-    fetchListings();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, sportFilter, categoryFilter, vendorFilter]);
+    const t = setTimeout(() => { setDebounced(search.trim()); setPage(1); }, 350);
+    return () => clearTimeout(t);
+  }, [search]);
 
-  const fetchListings = async () => {
+  const fetchListings = useCallback(async () => {
     setLoading(true);
     try {
-      const params = { page, limit: 15 };
+      const params = { page, limit: PAGE_SIZE };
       if (sportFilter) params.sport = sportFilter;
       if (categoryFilter) params.category = categoryFilter;
       if (vendorFilter) params.hasVendor = vendorFilter;
-      if (search) params.search = search;
+      if (debounced) params.search = debounced;
 
       const res = await axios.get("/api/equipment", { params });
       setListings(res.data.listings || []);
       setTotalPages(res.data.totalPages || 1);
+      setTotal(res.data.total || 0);
       setStats(res.data.stats || {});
     } catch (err) {
       console.error("Fetch error:", err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, sportFilter, categoryFilter, vendorFilter, debounced]);
+
+  useEffect(() => { fetchListings(); }, [fetchListings]);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -160,7 +169,9 @@ export default function VendorMarketplace() {
     if (!confirm("Remove vendor link from this equipment?")) return;
     try {
       await axios.delete(`/api/equipment/vendor-link/${id}`);
-      fetchListings();
+      // If this was the last row on a non-first page, step back a page.
+      if (listings.length === 1 && page > 1) setPage((p) => p - 1);
+      else fetchListings();
     } catch (err) {
       toast.error(err.response?.data?.message || err.message);
     }
@@ -376,7 +387,7 @@ export default function VendorMarketplace() {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2.5">
                         {item.images?.[0] ? (
-                          <img
+                          <img loading="lazy"
                             src={item.images[0]}
                             alt=""
                             className="w-9 h-9 rounded-md object-cover border border-white/[0.06]"
@@ -494,26 +505,15 @@ export default function VendorMarketplace() {
           </div>
 
           {totalPages > 1 && (
-            <div className="px-4 py-3 border-t border-white/[0.06] flex items-center justify-between">
-              <span className="text-[12px] text-gray-500">
-                Page {page} of {totalPages}
-              </span>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                  className="h-8 px-3 bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] rounded-md text-[12px] text-gray-200 disabled:opacity-40"
-                >
-                  Previous
-                </button>
-                <button
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page === totalPages}
-                  className="h-8 px-3 bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] rounded-md text-[12px] text-gray-200 disabled:opacity-40"
-                >
-                  Next
-                </button>
-              </div>
+            <div className="px-4 py-3 border-t border-white/[0.06]">
+              <Pagination
+                page={page}
+                totalPages={totalPages}
+                total={total}
+                limit={PAGE_SIZE}
+                onPage={setPage}
+                loading={loading}
+              />
             </div>
           )}
         </div>
@@ -548,7 +548,7 @@ export default function VendorMarketplace() {
             <div className="p-6 space-y-4">
               <div className="bg-[#0F1117] border border-white/[0.06] rounded-md p-3 flex items-center gap-3">
                 {selectedItem.images?.[0] ? (
-                  <img
+                  <img loading="lazy"
                     src={selectedItem.images[0]}
                     alt=""
                     className="w-11 h-11 rounded-md object-cover border border-white/[0.06]"

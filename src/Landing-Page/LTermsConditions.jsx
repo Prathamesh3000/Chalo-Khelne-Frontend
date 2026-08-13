@@ -877,7 +877,7 @@
 // export default LTerms_Conditions;
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import PrivacyImage from '../assets/PrivacyPolicy.jpg'; // adjust the path if necessary
+const PrivacyImage = '/images/PrivacyPolicy.jpg'; // §4.1 — out of the bundle
 
 function LTerms_Conditions() {
   const navigate = useNavigate();

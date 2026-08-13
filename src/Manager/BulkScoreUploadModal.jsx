@@ -2,6 +2,7 @@ import { toast } from "react-toastify";
 import { useState, useEffect } from "react";
 import { FiX, FiCheck } from "react-icons/fi";
 import axios from "axios";
+import { resolveSetsToWin } from "../utils/sportTrack";
 
 /**
  * Reusable Bulk Score Upload Modal
@@ -38,14 +39,30 @@ export default function BulkScoreUploadModal({
 
   const [bulkScores, setBulkScores] = useState({});
   const [loading, setLoading] = useState(false);
+  // Outcome of the last submit. Rendered as a readable panel in place of the
+  // form — previously every result was concatenated into a single toast, which
+  // with a full round of doubles became an unreadable wall of text.
+  const [uploadResult, setUploadResult] = useState(null);
+
+  // Clear the last outcome only when the modal is (re)opened. Deliberately NOT
+  // keyed on `matches`: submitting calls onSuccess, the parent refetches, and
+  // the new `matches` array would otherwise wipe the results panel the instant
+  // it appeared.
+  useEffect(() => {
+    if (isOpen) setUploadResult(null);
+  }, [isOpen]);
 
   // Re-initialize scores when matches change or modal opens
   useEffect(() => {
     if (isOpen && matches.length > 0) {
       const initial = {};
       matches.forEach((match) => {
+        // Row count comes from THIS match's format — a Bo5 semi needs 5 rows,
+        // not the tournament-wide default.
+        const f = match?.matchFormat;
+        const rows = Number(f?.totalSets) || Number(f?.maxSets) || maxSets;
         initial[match._id] = {
-          sets: Array.from({ length: maxSets }, () => ({
+          sets: Array.from({ length: rows }, () => ({
             player1Score: "",
             player2Score: "",
           })),
@@ -57,7 +74,10 @@ export default function BulkScoreUploadModal({
 
   if (!isOpen) return null;
 
-  if (matches.length === 0) {
+  // `!uploadResult` matters: scoring the last pending match empties `matches`,
+  // and without this the results panel would be replaced by "nothing to score"
+  // the moment the upload succeeded.
+  if (matches.length === 0 && !uploadResult) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
         <div className="bg-white rounded-2xl w-full max-w-md p-6 text-center">
@@ -69,6 +89,22 @@ export default function BulkScoreUploadModal({
       </div>
     );
   }
+
+  // ── Per-match format ────────────────────────────────────────────────────
+  // Knockout brackets escalate per round: Bo3 early, Bo5 semi, Bo7 final. The
+  // maxSets/setsToWin PROPS carry one tournament-level format, so using them
+  // for every match mislabels a Bo5 semi as "Best of 3 (need 2 to win)" AND
+  // renders only 3 input rows — making it impossible to enter the 3 set wins
+  // the server correctly requires. Each match's own matchFormat wins; the props
+  // remain the fallback for matches that carry none.
+  const formatFor = (match) => {
+    const f = match?.matchFormat;
+    const container = Number(f?.totalSets) || Number(f?.maxSets) || 0;
+    if (container > 0) {
+      return { maxSets: container, setsToWin: resolveSetsToWin(f) };
+    }
+    return { maxSets, setsToWin };
+  };
 
   // Name resolvers
   const getName = (match, side) => {
@@ -121,10 +157,12 @@ export default function BulkScoreUploadModal({
         else p2Wins++;
       }
 
-      if (p1Wins < setsToWin && p2Wins < setsToWin) {
-        const match = matches.find((m) => m._id === matchId);
+      // Validate against THIS match's requirement, not a tournament-wide one.
+      const match = matches.find((m) => m._id === matchId);
+      const { setsToWin: needed } = formatFor(match);
+      if (p1Wins < needed && p2Wins < needed) {
         toast.info(
-          `Match ${getName(match, 1)} vs ${getName(match, 2)}: Not enough sets filled. Need ${setsToWin} set wins to determine a winner.`
+          `${getName(match, 1)} vs ${getName(match, 2)}: needs ${needed} set win${needed === 1 ? "" : "s"} to decide the match — got ${p1Wins}-${p2Wins}.`
         );
         return;
       }
@@ -151,38 +189,29 @@ export default function BulkScoreUploadModal({
       });
 
       if (response.data.success) {
-        const resultText = (response.data.results || [])
-          .map((r) => {
-            const p1 = r.player1 || r.team1 || "Team 1";
-            const p2 = r.player2 || r.team2 || "Team 2";
-            return `${p1} vs ${p2}: ${r.winner} wins (${r.finalScore})`;
-          })
-          .join("\n");
-
-        // Surface per-match errors so a "0 updated, N errors" response
-        // explains what failed instead of leaving the manager guessing.
+        const results = (response.data.results || []).map((r) => ({
+          winner: r.winner,
+          // The loser is whichever side isn't the winner.
+          loser: (r.winner === (r.player1 || r.team1))
+            ? (r.player2 || r.team2 || "—")
+            : (r.player1 || r.team1 || "—"),
+          score: r.finalScore,
+        }));
         const errs = Array.isArray(response.data.errors) ? response.data.errors : [];
-        const errText = errs
-          .map((e) => {
-            const id = e.matchId || e.id || "(unknown)";
-            return `• ${id}: ${e.error || "unknown error"}`;
-          })
-          .join("\n");
 
+        // Detail goes into the panel below; the toast stays to one line, since
+        // a toast cannot render a list legibly (it collapses newlines).
+        setUploadResult({ results, errors: errs });
         if (errs.length > 0) {
-          toast.error(
-            `${response.data.message}\n\n${errText}${
-              resultText ? `\n\nUpdated:\n${resultText}` : ""
-            }`,
-            { autoClose: 8000 }
-          );
+          toast.warn(`${results.length} scored, ${errs.length} failed`);
         } else {
-          toast.info(`${response.data.message}\n\n${resultText}`);
+          toast.success(`${results.length} match${results.length === 1 ? "" : "es"} scored`);
         }
+
         onSuccess?.();
-        // Keep the modal open if there were errors so the manager can
-        // adjust the offending rows and retry without re-entering the rest.
-        if (errs.length === 0) onClose();
+        // The modal stays open on the results panel either way — on success so
+        // the manager can see what was recorded, on failure so they can fix the
+        // offending rows without re-entering the rest.
       } else {
         toast.error(response.data.message);
       }
@@ -201,10 +230,12 @@ export default function BulkScoreUploadModal({
         <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 px-6 py-4 flex justify-between items-center">
           <div>
             <h3 className="text-white text-lg font-bold">
-              {title || "Bulk Score Upload"}
+              {uploadResult ? "Upload complete" : (title || "Bulk Score Upload")}
             </h3>
             <p className="text-emerald-200 text-sm">
-              Enter set scores for {matches.length} pending match{matches.length !== 1 ? "es" : ""}
+              {uploadResult
+                ? `${uploadResult.results.length} recorded${uploadResult.errors.length > 0 ? `, ${uploadResult.errors.length} failed` : ""}`
+                : `Enter set scores for ${matches.length} pending match${matches.length !== 1 ? "es" : ""}`}
             </p>
           </div>
           <button
@@ -215,7 +246,85 @@ export default function BulkScoreUploadModal({
           </button>
         </div>
 
-        {/* Body */}
+        {/* Results panel — shown after a submit, in place of the form. */}
+        {uploadResult ? (
+          <div className="overflow-y-auto flex-1 p-6">
+            <div className="grid grid-cols-2 gap-3 mb-5">
+              <div className="rounded-xl p-4 text-center bg-emerald-50 border border-emerald-200">
+                <p className="text-[26px] font-bold text-emerald-700 tabular-nums leading-none">
+                  {uploadResult.results.length}
+                </p>
+                <p className="text-[12px] font-semibold text-emerald-700/80 mt-1.5">Scored</p>
+              </div>
+              <div className={`rounded-xl p-4 text-center border ${
+                uploadResult.errors.length > 0
+                  ? "bg-red-50 border-red-200"
+                  : "bg-gray-50 border-gray-200"
+              }`}>
+                <p className={`text-[26px] font-bold tabular-nums leading-none ${
+                  uploadResult.errors.length > 0 ? "text-red-700" : "text-gray-400"
+                }`}>
+                  {uploadResult.errors.length}
+                </p>
+                <p className={`text-[12px] font-semibold mt-1.5 ${
+                  uploadResult.errors.length > 0 ? "text-red-700/80" : "text-gray-400"
+                }`}>
+                  Failed
+                </p>
+              </div>
+            </div>
+
+            {uploadResult.errors.length > 0 && (
+              <div className="mb-5">
+                <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">
+                  Not recorded
+                </p>
+                <div className="space-y-2">
+                  {uploadResult.errors.map((e, i) => (
+                    <div key={i} className="rounded-lg px-3 py-2.5 bg-red-50 border border-red-200">
+                      <p className="text-[12px] font-mono text-red-900 break-all">
+                        {e.matchId || e.id || "(unknown match)"}
+                      </p>
+                      <p className="text-[13px] text-red-700 mt-0.5">{e.error || "Unknown error"}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {uploadResult.results.length > 0 && (
+              <div>
+                <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">
+                  Recorded
+                </p>
+                {/* One row per match. The winner sits on its own line above the
+                    loser — doubles pair names are long, and putting them on one
+                    "A vs B: A wins" line is what made this unreadable. */}
+                <div className="divide-y divide-gray-100 border border-gray-200 rounded-xl overflow-hidden">
+                  {uploadResult.results.map((r, i) => (
+                    <div key={i} className="flex items-start gap-3 px-4 py-3 bg-white">
+                      <span className="mt-0.5 w-5 h-5 rounded-full bg-emerald-100 grid place-items-center flex-shrink-0">
+                        <FiCheck className="text-emerald-600" size={12} />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[13px] font-semibold text-gray-900 leading-snug">
+                          {r.winner}
+                        </p>
+                        <p className="text-[12px] text-gray-500 leading-snug">
+                          def. {r.loser}
+                        </p>
+                      </div>
+                      <span className="flex-shrink-0 px-2 py-0.5 rounded-md bg-gray-100 text-gray-700 text-[12px] font-bold tabular-nums">
+                        {r.score}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+        /* Body */
         <div className="overflow-y-auto flex-1 p-6 space-y-6">
           {matches.map((match) => {
             const scoreData = bulkScores[match._id];
@@ -223,6 +332,9 @@ export default function BulkScoreUploadModal({
 
             const name1 = getName(match, 1);
             const name2 = getName(match, 2);
+            // This match's own format — a Bo5 semi and a Bo3 quarter can sit
+            // side by side in the same list.
+            const { maxSets: mMaxSets, setsToWin: mSetsToWin } = formatFor(match);
 
             return (
               <div
@@ -235,7 +347,7 @@ export default function BulkScoreUploadModal({
                     {match.matchNumber ? `M${match.matchNumber}` : `Match`}
                   </span>
                   <span className="text-xs text-gray-500">
-                    Best of {maxSets} (need {setsToWin} to win)
+                    Best of {mMaxSets} (need {mSetsToWin} to win)
                   </span>
                 </div>
 
@@ -267,8 +379,9 @@ export default function BulkScoreUploadModal({
                         }
                       }
                     }
-                    // Hide if match already decided
-                    if (p1Wins >= setsToWin || p2Wins >= setsToWin) return null;
+                    // Hide once THIS match is decided — a Bo5 must still show
+                    // sets 3-5 after a 2-0, which the global value hid.
+                    if (p1Wins >= mSetsToWin || p2Wins >= mSetsToWin) return null;
 
                     return (
                       <div
@@ -318,14 +431,14 @@ export default function BulkScoreUploadModal({
                       }
                     }
                   });
-                  if (p1W >= setsToWin) {
+                  if (p1W >= mSetsToWin) {
                     return (
                       <div className="mt-2 text-center text-green-600 text-xs font-semibold bg-green-50 rounded-lg py-1">
                         Winner: {name1} ({p1W}-{p2W})
                       </div>
                     );
                   }
-                  if (p2W >= setsToWin) {
+                  if (p2W >= mSetsToWin) {
                     return (
                       <div className="mt-2 text-center text-green-600 text-xs font-semibold bg-green-50 rounded-lg py-1">
                         Winner: {name2} ({p1W}-{p2W})
@@ -335,7 +448,7 @@ export default function BulkScoreUploadModal({
                   if (p1W > 0 || p2W > 0) {
                     return (
                       <div className="mt-2 text-center text-orange-500 text-xs font-medium">
-                        Sets: {p1W}-{p2W} (need {setsToWin} to win)
+                        Sets: {p1W}-{p2W} (need {mSetsToWin} to win)
                       </div>
                     );
                   }
@@ -345,9 +458,28 @@ export default function BulkScoreUploadModal({
             );
           })}
         </div>
+        )}
 
         {/* Footer */}
         <div className="border-t border-gray-200 px-6 py-4 flex justify-between items-center bg-gray-50">
+          {uploadResult ? (
+            <>
+              <button
+                onClick={() => setUploadResult(null)}
+                className="px-6 py-2 rounded-lg border border-gray-300 text-gray-600 text-sm font-medium hover:bg-gray-100 bg-white w-auto"
+              >
+                {uploadResult.errors.length > 0 ? "Back to scores" : "Enter more"}
+              </button>
+              <button
+                onClick={onClose}
+                className="px-6 py-2 rounded-lg bg-gradient-to-r from-emerald-500 to-emerald-600 text-white text-sm font-semibold hover:from-emerald-600 hover:to-emerald-700 w-auto flex items-center gap-2"
+              >
+                <FiCheck />
+                Done
+              </button>
+            </>
+          ) : (
+          <>
           <button
             onClick={onClose}
             className="px-6 py-2 rounded-lg border border-gray-300 text-gray-600 text-sm font-medium hover:bg-gray-100 bg-white w-auto"
@@ -386,6 +518,8 @@ export default function BulkScoreUploadModal({
               </>
             )}
           </button>
+          </>
+          )}
         </div>
       </div>
     </div>

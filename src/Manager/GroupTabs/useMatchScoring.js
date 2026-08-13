@@ -90,8 +90,6 @@ export default function useMatchScoring(matchId) {
       });
       await loadMatch(); // Refresh
       return res.data;
-    } catch (err) {
-      throw err;
     } finally {
       setSubmitting(false);
     }
@@ -116,10 +114,12 @@ export default function useMatchScoring(matchId) {
         await new Promise((r) => setTimeout(r, 300));
       }
 
-      // Sync to points table
+      // Sync to points table (best-effort — match already saved above)
       try {
         await axios.post(`/api/tournaments/scores/${matchId}`, {});
-      } catch {}
+      } catch (err) {
+        console.warn("Points-table sync failed:", err.message);
+      }
 
       await loadMatch();
     } finally {
@@ -131,7 +131,9 @@ export default function useMatchScoring(matchId) {
   const syncToPointsTable = async () => {
     try {
       await axios.post(`/api/tournaments/scores/${matchId}`, {});
-    } catch {}
+    } catch (err) {
+      console.warn("Points-table sync failed:", err.message);
+    }
   };
 
   // Derived state

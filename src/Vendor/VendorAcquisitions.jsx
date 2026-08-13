@@ -102,7 +102,7 @@ export default function VendorAcquisitions() {
           {items.map((p) => (
             <div key={p._id} className="bg-white border border-gray-200 rounded-xl p-3 flex items-center gap-3">
               <div className="w-14 h-14 rounded-lg bg-gray-100 flex items-center justify-center overflow-hidden shrink-0">
-                {imgSrc(p.images?.[0]) ? <img src={imgSrc(p.images[0])} alt="" className="w-full h-full object-cover" /> : <Package className="w-6 h-6 text-gray-300" />}
+                {imgSrc(p.images?.[0]) ? <img loading="lazy" src={imgSrc(p.images[0])} alt="" className="w-full h-full object-cover" /> : <Package className="w-6 h-6 text-gray-300" />}
               </div>
               <div className="min-w-0 flex-1">
                 <p className="font-medium text-gray-800 truncate">{p.itemName}</p>

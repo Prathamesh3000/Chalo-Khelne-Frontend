@@ -23,6 +23,7 @@ import {
 import dayjs from "dayjs";
 import { Switch } from "@mui/material";
 import { AuthContext } from "../context/AuthContext";
+import { getAuthToken } from "../shared/api/authToken";
 import {
   generateFormFields,
   validateRuleBookForm,
@@ -872,7 +873,7 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
         await axios.put(`/api/tournaments/edit/${initialData._id}`, tournamentFormData, {
           headers: {
             "Content-Type": "multipart/form-data",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
+            Authorization: `Bearer ${getAuthToken()}`,
           },
         });
         setSuccess("Tournament updated successfully!");
@@ -881,7 +882,7 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
         const createRes = await axios.post(`/api/tournaments/createTournament`, tournamentFormData, {
           headers: {
             "Content-Type": "multipart/form-data",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
+            Authorization: `Bearer ${getAuthToken()}`,
           },
         });
         createdTournament = createRes?.data?.tournament || null;
@@ -1029,7 +1030,7 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
 
           {image ? (
             <div className="relative w-full aspect-square rounded-xl overflow-hidden border border-white/[0.08] bg-white/[0.03]">
-              <img src={image} alt="Tournament logo" className="w-full h-full object-cover" />
+              <img loading="lazy" src={image} alt="Tournament logo" className="w-full h-full object-cover" />
               <button
                 type="button"
                 onClick={removeImage}

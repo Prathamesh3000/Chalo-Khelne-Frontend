@@ -13,7 +13,7 @@ export default function Avatar({ user, size = 40, dark = false, onClick, ring = 
   const dim = { width: size, height: size };
 
   const inner = img ? (
-    <img
+    <img loading="lazy"
       src={assetUrl(img)}
       alt={user?.name || "User"}
       className="rounded-full object-cover w-full h-full"

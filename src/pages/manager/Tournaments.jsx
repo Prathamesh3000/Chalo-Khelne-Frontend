@@ -15,6 +15,8 @@ import { useAuth } from "../../features/auth";
 import { useTournaments, resolveManageUrl } from "../../features/tournaments";
 import MCreateTournament from "../../Manager/MCreateTournament";
 
+import { getAuthToken } from "../../shared/api/authToken";
+import DialogA11y from "../../shared/components/DialogA11y";
 const TABS = [
   { key: "all",       label: "All"       },
   { key: "live",      label: "Live"      },
@@ -41,7 +43,7 @@ async function downloadTournamentExport(tournamentId, kind) {
     csv: "results.csv",
   };
   const url = urls[kind];
-  const token = localStorage.getItem("token");
+  const token = getAuthToken();
   try {
     const res = await fetch(url, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -344,9 +346,12 @@ export default function ManagerTournaments() {
           tournaments so the manager picks which phase to manage. */}
       {chooserTournament && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-          onClick={() => setChooserTournament(null)}
-        >
+        role="dialog"
+        aria-modal="true"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+        onClick={() => setChooserTournament(null)}
+      >
+        <DialogA11y onClose={() => setChooserTournament(null)} />
           <div
             className="bg-[#1A1D27] border border-white/[0.08] rounded-2xl shadow-2xl w-full max-w-md p-6 relative"
             onClick={(e) => e.stopPropagation()}

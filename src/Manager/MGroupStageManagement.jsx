@@ -72,7 +72,7 @@ function PlayerAvatar({ player, locked = false }) {
   const opacityClass = locked ? "opacity-60" : "";
   if (!isPlaceholder) {
     return (
-      <img
+      <img loading="lazy"
         src={url}
         alt={name}
         className={`w-9 h-9 rounded-full object-cover ring-1 ring-white/[0.08] ${opacityClass}`}
@@ -123,6 +123,14 @@ const GroupStageManagement = () => {
   const [topPlayers, setTopPlayers] = useState([]);
   const [superPlayers, setSuperPlayers] = useState([]);
   const [selectedPlayers, setSelectedPlayers] = useState([]); // For group creation
+
+  // ── Tournament-day attendance ──────────────────────────────────────────
+  // 53 register, 22 turn up. Groups must be buildable from who is PRESENT.
+  // Defaults to the checked-in list as soon as the desk has marked anyone.
+  const [attendance, setAttendance] = useState({ rows: [], summary: {}, loaded: false });
+  const [playerSource, setPlayerSource] = useState(
+    searchParams.get("source") === "checked_in" ? "checked_in" : "all"
+  );
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
 
   // Pagination and search states
@@ -689,6 +697,25 @@ const GroupStageManagement = () => {
     }
   };
 
+  // Load the tournament-day roster so the group builder can be narrowed to
+  // players who actually turned up.
+  useEffect(() => {
+    if (!tournamentId) return;
+    axios
+      .get(`/api/tournaments/${tournamentId}/attendance`, {
+        params: activeSportId ? { sportId: activeSportId } : {},
+      })
+      .then((res) => {
+        const rows = res.data?.data || [];
+        const summary = res.data?.summary || {};
+        setAttendance({ rows, summary, loaded: true });
+        if ((summary.checkedIn || 0) > 0 && searchParams.get("source") !== "all") {
+          setPlayerSource("checked_in");
+        }
+      })
+      .catch(() => setAttendance((a) => ({ ...a, loaded: true })));
+  }, [tournamentId, activeSportId, searchParams]);
+
   useEffect(() => {
     if (tournamentId) {
 
@@ -791,9 +818,20 @@ const GroupStageManagement = () => {
     // include it in deps so multi-sport switches refetch the right groups.
   }, [tournamentId, activeSportId]);
 
-  // Filter players based on active sport, search term and category
+  // Filter players based on attendance, active sport, search term and category
   useEffect(() => {
     let filtered = registeredPlayers;
+
+    // Tournament-day source: only players marked PRESENT. `id` on these rows is
+    // the booking id, which is what attendance is keyed on.
+    if (playerSource === "checked_in" && attendance.loaded) {
+      const present = new Set(
+        attendance.rows
+          .filter((r) => r.attendanceStatus === "checked_in")
+          .map((r) => String(r.bookingId))
+      );
+      filtered = filtered.filter((p) => present.has(String(p.id)));
+    }
 
     // Sport scope — in a MULTI-sport tournament only show registrants for the
     // ACTIVE sport. Each booking carries the sport(s) it signed up for via
@@ -838,7 +876,7 @@ const GroupStageManagement = () => {
 
     setFilteredPlayers(filtered);
     setCurrentPage(1); // Reset to first page when searching or filtering
-  }, [searchTerm, registeredPlayers, selectedRegisterPlayerCategory, activeSportId, tournament]);
+  }, [searchTerm, registeredPlayers, selectedRegisterPlayerCategory, activeSportId, tournament, playerSource, attendance]);
 
   // Reset pagination when the Round 2 filter chip changes — otherwise a
   // manager on page 3 of "All" who switches to "Top 1" can land on an empty
@@ -2160,6 +2198,37 @@ const GroupStageManagement = () => {
                           ) : (
                             <>Showing {currentPlayers.length} of {filteredPlayers.length} players{searchTerm && ` · filtered from ${registeredPlayers.length}`}</>
                           )}
+                          {/* Draw source — "53 registered, 22 turned up". */}
+                          {!isRound2Mode && attendance.loaded && (attendance.summary.total || 0) > 0 && (
+                            <span className="ml-2 inline-flex items-center gap-1.5 align-middle">
+                              <button
+                                onClick={() => setPlayerSource("checked_in")}
+                                className={`w-auto px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                                  playerSource === "checked_in"
+                                    ? "bg-emerald-500 text-white"
+                                    : "bg-white/[0.06] text-gray-400 hover:bg-white/[0.10]"
+                                }`}
+                              >
+                                Checked in ({attendance.summary.checkedIn || 0})
+                              </button>
+                              <button
+                                onClick={() => setPlayerSource("all")}
+                                className={`w-auto px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                                  playerSource === "all"
+                                    ? "bg-white/[0.14] text-white"
+                                    : "bg-white/[0.06] text-gray-400 hover:bg-white/[0.10]"
+                                }`}
+                              >
+                                All ({attendance.summary.total || 0})
+                              </button>
+                              <button
+                                onClick={() => navigate(`/tournament-management/check-in?tournamentId=${tournamentId}`)}
+                                className="w-auto px-2 py-0.5 rounded-md text-[10px] font-bold text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20"
+                              >
+                                Open check-in
+                              </button>
+                            </span>
+                          )}
                           {!isRound2Mode && (
                             <>
                               <span className="mx-2 text-gray-600">·</span>
@@ -2697,7 +2766,7 @@ const GroupStageManagement = () => {
                             {superPlayers.map((player, index) => (
                               <tr key={player._id || index} className="hover:bg-emerald-500/10">
                                 <td className="px-4 py-3">
-                                  <img
+                                  <img loading="lazy"
                                     src={player.profileImage || player.playerId?.profileImage || `https://i.pravatar.cc/50?img=${Math.floor(Math.random() * 70)}`}
                                     alt={player.userName || player.playerName || player.playerId?.name || 'Player Avatar'}
                                     className="w-10 h-10 rounded-full border-2 border-emerald-500/30"
@@ -2783,8 +2852,8 @@ const GroupStageManagement = () => {
             </p>
 
             <div className="text-center">
-              <label className="block text-sm font-medium mb-2 text-gray-300">Number of Groups:</label>
-              <input
+              <label className="block text-sm font-medium mb-2 text-gray-300" htmlFor="number-of-groups">Number of Groups:</label>
+              <input id="number-of-groups"
                 type="number"
                 min="1"
                 max="10"
@@ -3415,10 +3484,10 @@ const GroupStageManagement = () => {
                 />
               ) : (
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-gray-300 mb-1" htmlFor="court-number">
                     Court Number
                   </label>
-                  <input
+                  <input id="court-number"
                     type="number"
                     min="1"
                     value={knockoutSettings.courtNumber}
@@ -3433,10 +3502,10 @@ const GroupStageManagement = () => {
               )}
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-gray-300 mb-1" htmlFor="match-start-time">
                   Match Start Time
                 </label>
-                <input
+                <input id="match-start-time"
                   type="datetime-local"
                   value={knockoutSettings.matchStartTime}
                   onChange={(e) => setKnockoutSettings(prev => ({
@@ -3852,8 +3921,8 @@ const GroupStageManagement = () => {
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Schedule</p>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   <div>
-                    <label className="block text-[11px] font-semibold text-gray-300 mb-1">Start Date</label>
-                    <input
+                    <label className="block text-[11px] font-semibold text-gray-300 mb-1" htmlFor="start-date">Start Date</label>
+                    <input id="start-date"
                       type="date"
                       value={knockoutSchedule.startDate}
                       onChange={(e) => setKnockoutSchedule((prev) => ({ ...prev, startDate: e.target.value }))}
@@ -3861,8 +3930,8 @@ const GroupStageManagement = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-semibold text-gray-300 mb-1">Start Time</label>
-                    <input
+                    <label className="block text-[11px] font-semibold text-gray-300 mb-1" htmlFor="start-time">Start Time</label>
+                    <input id="start-time"
                       type="time"
                       value={knockoutSchedule.startTime}
                       onChange={(e) => setKnockoutSchedule((prev) => ({ ...prev, startTime: e.target.value }))}
@@ -3871,8 +3940,8 @@ const GroupStageManagement = () => {
                   </div>
                   {tournamentCourts.length === 0 && (
                     <div>
-                      <label className="block text-[11px] font-semibold text-gray-300 mb-1">Court</label>
-                      <input
+                      <label className="block text-[11px] font-semibold text-gray-300 mb-1" htmlFor="court">Court</label>
+                      <input id="court"
                         type="number" min="1" max="10" placeholder="1"
                         value={knockoutSchedule.courtNumber}
                         onChange={(e) => setKnockoutSchedule((prev) => ({ ...prev, courtNumber: parseInt(e.target.value) }))}

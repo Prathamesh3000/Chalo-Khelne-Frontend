@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import axios from "axios";
 
+import { getAuthToken } from "../shared/api/authToken";
 const API = import.meta.env.VITE_API_BASE_URL;
 
 const NEWS_TYPES = [
@@ -108,7 +109,7 @@ export default function MNews({ canManage = true, dark = false }) {
   const [saving, setSaving] = useState(false);
   const [actionLoading, setActionLoading] = useState(null);
 
-  const token = localStorage.getItem("token");
+  const token = getAuthToken();
   const headers = { Authorization: `Bearer ${token}` };
 
   const fetchNews = async (page = 1) => {
@@ -422,10 +423,10 @@ export default function MNews({ canManage = true, dark = false }) {
               <div className="p-6 overflow-y-auto max-h-[calc(85vh-130px)] space-y-5 custom-scrollbar">
                 {/* Title */}
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-1">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-1" htmlFor="title">
                     Title
                   </label>
-                  <input
+                  <input id="title"
                     type="text"
                     value={form.title}
                     onChange={(e) =>
@@ -462,10 +463,10 @@ export default function MNews({ canManage = true, dark = false }) {
 
                 {/* Body */}
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-1">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-1" htmlFor="content">
                     Content
                   </label>
-                  <textarea
+                  <textarea id="content"
                     value={form.body}
                     onChange={(e) =>
                       setForm((p) => ({ ...p, body: e.target.value }))
@@ -502,10 +503,10 @@ export default function MNews({ canManage = true, dark = false }) {
                 {/* Region + Area */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-1">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-1" htmlFor="region">
                       Region
                     </label>
-                    <input
+                    <input id="region"
                       type="text"
                       value={form.region}
                       onChange={(e) =>
@@ -516,10 +517,10 @@ export default function MNews({ canManage = true, dark = false }) {
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-1">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-1" htmlFor="area">
                       Area
                     </label>
-                    <input
+                    <input id="area"
                       type="text"
                       value={form.area}
                       onChange={(e) =>
@@ -533,10 +534,10 @@ export default function MNews({ canManage = true, dark = false }) {
 
                 {/* Thumbnail */}
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-1">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-1" htmlFor="thumbnail-url">
                     Thumbnail URL
                   </label>
-                  <input
+                  <input id="thumbnail-url"
                     type="text"
                     value={form.thumbnail}
                     onChange={(e) =>
@@ -550,10 +551,10 @@ export default function MNews({ canManage = true, dark = false }) {
                 {/* Dates */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-1">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-1" htmlFor="publish-date">
                       Publish Date
                     </label>
-                    <input
+                    <input id="publish-date"
                       type="datetime-local"
                       value={form.publishDate}
                       onChange={(e) =>
@@ -563,10 +564,10 @@ export default function MNews({ canManage = true, dark = false }) {
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-1">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-1" htmlFor="expiry-date">
                       Expiry Date
                     </label>
-                    <input
+                    <input id="expiry-date"
                       type="datetime-local"
                       value={form.expiryDate}
                       onChange={(e) =>

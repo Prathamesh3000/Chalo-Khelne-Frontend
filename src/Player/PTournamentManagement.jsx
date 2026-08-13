@@ -91,7 +91,6 @@ const TournamentList = () => {
         .catch((error) => {
           console.error("Error fetching registered players:", error);
         });
-    } else {
     }
   }, [selectedTournament]);
 
@@ -343,7 +342,7 @@ const TournamentList = () => {
             className="flex items-center justify-between p-3 rounded-lg"
           >
             <div className="flex items-center gap-3">
-              <img
+              <img loading="lazy"
                 src={player.image}
                 alt={player.name}
                 className="w-10 h-10 rounded-full"

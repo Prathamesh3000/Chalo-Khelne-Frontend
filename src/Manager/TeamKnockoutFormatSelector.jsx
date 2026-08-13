@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Users, Swords, Trophy, ChevronRight, Check } from "lucide-react";
 import { getAllTeamKnockoutFormats } from "../config/teamKnockoutFormats";
 
+import { activatable } from "../shared/utils/activatable";
 /**
  * Format selector for Davis Cup / Team Knockout tournaments.
  * Displays predefined formulas as selectable cards.
@@ -95,7 +96,7 @@ function FormatCard({ format, selected, expanded, onSelect, onToggle }) {
       selected ? "border-orange-500 bg-orange-500/5 shadow-sm" : "border-gray-200 bg-white hover:border-gray-300"
     }`}>
       {/* Main Row */}
-      <div className="flex items-center gap-3 p-4 cursor-pointer" onClick={onSelect}>
+      <div className="flex items-center gap-3 p-4 cursor-pointer" {...activatable(onSelect)}>
         {/* Radio */}
         <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition ${
           selected ? "border-orange-500 bg-orange-500" : "border-gray-300"

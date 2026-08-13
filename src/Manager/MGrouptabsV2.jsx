@@ -225,16 +225,16 @@ function TournamentGroupTabs() {
             </div>
             <div className="mt-4 space-y-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700">Court Number</label>
-                <input type="text" className="w-full border p-2 mt-1 rounded" value={courtNumber} onChange={(e) => setCourtNumber(e.target.value)} />
+                <label className="block text-sm font-medium text-gray-700" htmlFor="court-number">Court Number</label>
+                <input id="court-number" type="text" className="w-full border p-2 mt-1 rounded" value={courtNumber} onChange={(e) => setCourtNumber(e.target.value)} />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">Match Interval (minutes)</label>
-                <input type="number" className="w-full border p-2 mt-1 rounded" value={matchInterval} onChange={(e) => setMatchInterval(e.target.value)} />
+                <label className="block text-sm font-medium text-gray-700" htmlFor="match-interval-minutes">Match Interval (minutes)</label>
+                <input id="match-interval-minutes" type="number" className="w-full border p-2 mt-1 rounded" value={matchInterval} onChange={(e) => setMatchInterval(e.target.value)} />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">Match Start Time</label>
-                <input type="time" className="w-full border p-2 mt-1 rounded" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+                <label className="block text-sm font-medium text-gray-700" htmlFor="match-start-time">Match Start Time</label>
+                <input id="match-start-time" type="time" className="w-full border p-2 mt-1 rounded" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
               </div>
               <button
                 className="w-full bg-orange-500 text-white py-2 rounded-lg font-semibold mt-4 hover:bg-gray-800"

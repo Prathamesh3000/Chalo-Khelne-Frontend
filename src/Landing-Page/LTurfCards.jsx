@@ -25,7 +25,7 @@ const TurfCards = ({ turf, onTurfClick }) => {
       {/* Image */}
       <div className="relative h-44 overflow-hidden bg-gray-100">
         {image ? (
-          <img
+          <img loading="lazy"
             src={image}
             alt={name}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"

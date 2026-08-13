@@ -1,5 +1,8 @@
 import React from 'react';
-import Player1 from '../assets/Player1.png'; // Adjust if the path is different
+// §4.1 — served from public/ instead of imported, so this 1.2 MB PNG is no
+// longer compiled into the LandingApp chunk. The browser fetches and caches
+// it independently of the JS.
+const Player1 = '/images/Player1.png';
 import { useNavigate } from "react-router-dom";
 
 const LAboutUs = () => {
@@ -13,7 +16,7 @@ const LAboutUs = () => {
     <div className="flex flex-col md:flex-row items-center md:items-start gap-8 md:gap-16 my-6 px-4">
       {/* Left Image */}
       <div className="w-full md:w-1/2">
-        <img
+        <img loading="lazy"
           className="w-full rounded-[20px]"
           src={Player1}
           alt="Chalo Khelne"

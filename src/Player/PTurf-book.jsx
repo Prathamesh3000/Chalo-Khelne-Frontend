@@ -109,17 +109,17 @@ const PTurfbook = () => {
       <form onSubmit={handleSubmit} className="bg-white p-6 shadow-lg rounded-lg max-w-md w-full">
         <h2 className="text-2xl font-bold mb-4 text-gray-800">Book Turf</h2>
 
-        <label className="block mb-2">Full Name</label>
-        <input type="text" name="name" value={booking.name} onChange={handleChange} required className="w-full p-2 mb-4 border rounded" />
+        <label className="block mb-2" htmlFor="full-name">Full Name</label>
+        <input id="full-name" type="text" name="name" value={booking.name} onChange={handleChange} required className="w-full p-2 mb-4 border rounded" />
 
-        <label className="block mb-2">Email</label>
-        <input type="email" name="email" value={booking.email} onChange={handleChange} required className="w-full p-2 mb-4 border rounded" />
+        <label className="block mb-2" htmlFor="email">Email</label>
+        <input id="email" type="email" name="email" value={booking.email} onChange={handleChange} required className="w-full p-2 mb-4 border rounded" />
 
-        <label className="block mb-2">Mobile Number</label>
-        <input type="tel" name="mobile" value={booking.mobile} onChange={handleChange} required className="w-full p-2 mb-4 border rounded" />
+        <label className="block mb-2" htmlFor="mobile-number">Mobile Number</label>
+        <input id="mobile-number" type="tel" name="mobile" value={booking.mobile} onChange={handleChange} required className="w-full p-2 mb-4 border rounded" />
 
-        <label className="block mb-2">Sport</label>
-        <select name="sport" value={booking.sport} onChange={handleChange} required className="w-full p-2 mb-4 border rounded">
+        <label className="block mb-2" htmlFor="sport">Sport</label>
+        <select id="sport" name="sport" value={booking.sport} onChange={handleChange} required className="w-full p-2 mb-4 border rounded">
           <option value="">Select Sport</option>
           <option value="Table Tennis">Table Tennis</option>
           <option value="Football">Football</option>
@@ -128,25 +128,25 @@ const PTurfbook = () => {
           <option value="Badminton">Badminton</option>
         </select>
 
-        <label className="block mb-2">Date of Booking</label>
-        <input type="date" name="date" value={booking.date} onChange={handleChange} required className="w-full p-2 mb-4 border rounded" />
+        <label className="block mb-2" htmlFor="date-of-booking">Date of Booking</label>
+        <input id="date-of-booking" type="date" name="date" value={booking.date} onChange={handleChange} required className="w-full p-2 mb-4 border rounded" />
 
-        <label className="block mb-2">Start Time</label>
-        <input type="time" name="startTime" value={booking.startTime} onChange={handleChange} required className="w-full p-2 mb-4 border rounded" />
+        <label className="block mb-2" htmlFor="start-time">Start Time</label>
+        <input id="start-time" type="time" name="startTime" value={booking.startTime} onChange={handleChange} required className="w-full p-2 mb-4 border rounded" />
 
-        <label className="block mb-2">Duration (in hours)</label>
-        <input type="number" name="duration" value={booking.duration} onChange={handleChange} min="1" required className="w-full p-2 mb-4 border rounded" />
+        <label className="block mb-2" htmlFor="duration-in-hours">Duration (in hours)</label>
+        <input id="duration-in-hours" type="number" name="duration" value={booking.duration} onChange={handleChange} min="1" required className="w-full p-2 mb-4 border rounded" />
 
-        <label className="block mb-2">End Time</label>
-        <input type="time" name="endTime" value={booking.endTime} readOnly className="w-full p-2 mb-4 border rounded bg-gray-100" />
+        <label className="block mb-2" htmlFor="end-time">End Time</label>
+        <input id="end-time" type="time" name="endTime" value={booking.endTime} readOnly className="w-full p-2 mb-4 border rounded bg-gray-100" />
 
         <div className="flex items-center mb-4">
           <input type="checkbox" name="equipment" checked={booking.equipment} onChange={handleChange} className="mr-2" />
           <label>Require Equipment?</label>
         </div>
 
-        <label className="block mb-2">Special Requests</label>
-        <textarea name="requests" value={booking.requests} onChange={handleChange} className="w-full p-2 mb-4 border rounded"></textarea>
+        <label className="block mb-2" htmlFor="special-requests">Special Requests</label>
+        <textarea id="special-requests" name="requests" value={booking.requests} onChange={handleChange} className="w-full p-2 mb-4 border rounded"></textarea>
 
         <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition">
           Confirm Booking

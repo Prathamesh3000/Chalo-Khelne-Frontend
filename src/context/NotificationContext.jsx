@@ -3,6 +3,7 @@ import { io } from "socket.io-client";
 import { toast } from "react-toastify";
 import { AuthContext } from "./AuthContext";
 
+import { getAuthToken } from "../shared/api/authToken";
 const NotificationContext = createContext(null);
 
 export const useNotifications = () => useContext(NotificationContext);
@@ -21,7 +22,7 @@ export const NotificationProvider = ({ children }) => {
   const { isAuthenticated } = useContext(AuthContext);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
+    const token = getAuthToken();
     if (!token || !isAuthenticated) {
       // Disconnect existing socket on logout
       if (socketRef.current) {

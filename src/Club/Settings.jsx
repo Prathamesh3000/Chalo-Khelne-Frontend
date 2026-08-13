@@ -67,11 +67,11 @@ export default function Settings() {
         <div className="space-y-5">
           <Section icon={Building2} title="Club Profile">
             <div className="space-y-3.5">
-              <div><label className={label}>Club Name</label><input className={input} value={form.name} onChange={(e) => set("name", e.target.value)} /></div>
-              <div><label className={label}>Address</label><input className={input} value={form.address} onChange={(e) => set("address", e.target.value)} /></div>
+              <div><label className={label} htmlFor="club-name">Club Name</label><input id="club-name" className={input} value={form.name} onChange={(e) => set("name", e.target.value)} /></div>
+              <div><label className={label} htmlFor="address">Address</label><input id="address" className={input} value={form.address} onChange={(e) => set("address", e.target.value)} /></div>
               <div className="grid grid-cols-2 gap-3">
-                <div><label className={label}>Phone</label><input className={input} value={form.phone} onChange={(e) => set("phone", e.target.value)} /></div>
-                <div><label className={label}>Email</label><input className={input} value={form.email} onChange={(e) => set("email", e.target.value)} /></div>
+                <div><label className={label} htmlFor="phone">Phone</label><input id="phone" className={input} value={form.phone} onChange={(e) => set("phone", e.target.value)} /></div>
+                <div><label className={label} htmlFor="email">Email</label><input id="email" className={input} value={form.email} onChange={(e) => set("email", e.target.value)} /></div>
               </div>
               <div>
                 <label className={label}>Sports Supported</label>
@@ -82,10 +82,10 @@ export default function Settings() {
 
           <Section icon={Clock} title="Operations">
             <div className="grid grid-cols-2 gap-3">
-              <div><label className={label}>Opening Hour</label><input className={input} type="time" value={form.operatingHoursStart} onChange={(e) => set("operatingHoursStart", e.target.value)} /></div>
-              <div><label className={label}>Closing Hour</label><input className={input} type="time" value={form.operatingHoursEnd} onChange={(e) => set("operatingHoursEnd", e.target.value)} /></div>
-              <div><label className={label}>Booking Window (days)</label><input className={input} type="number" min="0" value={form.bookingWindowDays} onChange={(e) => set("bookingWindowDays", e.target.value)} /></div>
-              <div><label className={label}>Cancellation Policy (hrs)</label><input className={input} type="number" min="0" value={form.cancellationPolicyHours} onChange={(e) => set("cancellationPolicyHours", e.target.value)} /></div>
+              <div><label className={label} htmlFor="opening-hour">Opening Hour</label><input id="opening-hour" className={input} type="time" value={form.operatingHoursStart} onChange={(e) => set("operatingHoursStart", e.target.value)} /></div>
+              <div><label className={label} htmlFor="closing-hour">Closing Hour</label><input id="closing-hour" className={input} type="time" value={form.operatingHoursEnd} onChange={(e) => set("operatingHoursEnd", e.target.value)} /></div>
+              <div><label className={label} htmlFor="booking-window-days">Booking Window (days)</label><input id="booking-window-days" className={input} type="number" min="0" value={form.bookingWindowDays} onChange={(e) => set("bookingWindowDays", e.target.value)} /></div>
+              <div><label className={label} htmlFor="cancellation-policy-hrs">Cancellation Policy (hrs)</label><input id="cancellation-policy-hrs" className={input} type="number" min="0" value={form.cancellationPolicyHours} onChange={(e) => set("cancellationPolicyHours", e.target.value)} /></div>
             </div>
           </Section>
         </div>
@@ -93,8 +93,8 @@ export default function Settings() {
         <div className="space-y-5">
           <Section icon={Percent} title="Tax & Currency">
             <div className="grid grid-cols-2 gap-3">
-              <div><label className={label}>GST / Tax Rate (%)</label><input className={input} type="number" min="0" value={form.taxRatePercent} onChange={(e) => set("taxRatePercent", e.target.value)} /></div>
-              <div><label className={label}>Currency</label><input className={input} value={form.currency} onChange={(e) => set("currency", e.target.value)} /></div>
+              <div><label className={label} htmlFor="gst-tax-rate">GST / Tax Rate (%)</label><input id="gst-tax-rate" className={input} type="number" min="0" value={form.taxRatePercent} onChange={(e) => set("taxRatePercent", e.target.value)} /></div>
+              <div><label className={label} htmlFor="currency">Currency</label><input id="currency" className={input} value={form.currency} onChange={(e) => set("currency", e.target.value)} /></div>
             </div>
             <p className="text-[11px] text-gray-500 mt-2">Applied to income entries in the finance ledger.</p>
           </Section>

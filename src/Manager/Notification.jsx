@@ -53,7 +53,9 @@ const NotificationPage = () => {
             }));
             allNotifs = [...allNotifs, ...bookingMapped];
           }
-        } catch {}
+        } catch (err) {
+          console.warn("Failed to load booking notifications:", err.message);
+        }
 
         allNotifs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
         setNotifications(allNotifs);

@@ -11,6 +11,7 @@ import ExpandableSection from "./ExpandableSection";
 import OptionCard from "./OptionCard";
 import DashedAddButton from "./DashedAddButton";
 import SportNumberBadge from "./SportNumberBadge";
+import { getAuthToken } from "../../shared/api/authToken";
 import {
   isTeamOnlySport,
   isIndividualOnlySport,
@@ -34,7 +35,7 @@ function fetchCategoryTemplates() {
   if (CATEGORY_TEMPLATES_INFLIGHT) return CATEGORY_TEMPLATES_INFLIGHT;
   CATEGORY_TEMPLATES_INFLIGHT = axios
     .get("/api/category-templates", {
-      headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
+      headers: { Authorization: `Bearer ${getAuthToken() || ""}` },
     })
     .then((r) => {
       CATEGORY_TEMPLATES_CACHE = r.data?.templates || [];

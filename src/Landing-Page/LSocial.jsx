@@ -22,7 +22,7 @@ import {
   LogIn,
   UserPlus
 } from "lucide-react";
-import PostImg from '../assets/post1.jpg';
+const PostImg = '/images/post1.jpg'; // §4.1 — out of the bundle
 
 const LSocial = () => {
   const [posts, setPosts] = useState([]);
@@ -164,7 +164,7 @@ const LSocial = () => {
                     <div className="p-8 pb-0 flex items-center justify-between">
                       <div className="flex items-center gap-5">
                         <div className="w-16 h-16 rounded-[1.5rem] overflow-hidden border-2 border-gray-100 shadow-inner">
-                          <img src={post.user.image} alt={post.user.name} className="w-full h-full object-cover" />
+                          <img loading="lazy" src={post.user.image} alt={post.user.name} className="w-full h-full object-cover" />
                         </div>
                         <div>
                           <h3 className="text-xl font-black italic uppercase tracking-tight text-gray-900 leading-none mb-1">{post.user.name}</h3>
@@ -191,7 +191,7 @@ const LSocial = () => {
                         className="relative rounded-[2rem] overflow-hidden cursor-zoom-in aspect-video shadow-2xl"
                         onClick={() => { setSelectedPost(post); setShowMediaModal(true); }}
                       >
-                        <img
+                        <img loading="lazy"
                           src={post.images?.[0] || post.videoThumbnail}
                           alt="Intel Media"
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000"

@@ -4,6 +4,7 @@ import axios from "axios";
 import { QRCodeSVG } from "qrcode.react";
 import { ClipboardCheck, QrCode, Check, X, ScanLine } from "lucide-react";
 
+import DialogA11y from "../shared/components/DialogA11y";
 const badge = {
   Approved: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
   Pending: "bg-amber-500/15 text-amber-300 border-amber-500/30",
@@ -160,7 +161,13 @@ export default function Registrations() {
 
       {/* QR pass modal */}
       {qr && (
-        <div onClick={() => setQr(null)} className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+        <div
+        role="dialog"
+        aria-modal="true"
+        onClick={() => setQr(null)}
+        className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"
+      >
+        <DialogA11y onClose={() => setQr(null)} />
           <div onClick={(e) => e.stopPropagation()} className="bg-[#181A22] border border-white/[0.1] rounded-2xl p-6 w-full max-w-[320px] text-center">
             <div className="flex items-center justify-center gap-2 text-gray-400 text-[12px] font-bold uppercase tracking-wider mb-4"><ScanLine size={14} /> Access Pass</div>
             <div className="bg-white rounded-xl p-4 inline-block">

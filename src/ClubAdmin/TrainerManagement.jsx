@@ -169,19 +169,19 @@ export default function TrainerManagement() {
                 <form onSubmit={addTrainer}>
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
                     <div>
-                      <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-500 mb-1.5">Role</label>
-                      <select value={form.staffRole} onChange={(e) => setForm((f) => ({ ...f, staffRole: e.target.value }))} className={field} style={inputStyle}>
+                      <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-500 mb-1.5" htmlFor="role">Role</label>
+                      <select id="role" value={form.staffRole} onChange={(e) => setForm((f) => ({ ...f, staffRole: e.target.value }))} className={field} style={inputStyle}>
                         <option value="trainer">Trainer</option>
                         <option value="coach">Coach</option>
                       </select>
                     </div>
                     <div>
-                      <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-500 mb-1.5">Name</label>
-                      <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Full name" className={field} style={inputStyle} />
+                      <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-500 mb-1.5" htmlFor="name">Name</label>
+                      <input id="name" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Full name" className={field} style={inputStyle} />
                     </div>
                     <div>
-                      <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-500 mb-1.5">Email</label>
-                      <input type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} placeholder="trainer@example.com" className={field} style={inputStyle} />
+                      <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-500 mb-1.5" htmlFor="email">Email</label>
+                      <input id="email" type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} placeholder="trainer@example.com" className={field} style={inputStyle} />
                     </div>
                     <div>
                       <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-500 mb-1.5">Password</label>

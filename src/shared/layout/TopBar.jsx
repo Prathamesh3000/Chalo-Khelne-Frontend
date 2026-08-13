@@ -8,6 +8,10 @@ const SIG = "#5E6AD2";
 const PAGE_META = {
   "/mdashboard": { title: "Dashboard", crumbs: [] },
   "/mtournament-management": { title: "Tournaments", crumbs: [] },
+  "/tournament-management/check-in": {
+    title: "Check-in",
+    crumbs: [{ label: "Tournaments", path: "/mtournament-management" }],
+  },
   "/invite-employees": { title: "Invite employees", crumbs: [{ label: "Tournaments", path: "/mtournament-management" }] },
   "/mslot-Booking": { title: "Slot booking", crumbs: [] },
   "/msocial": { title: "Social feed", crumbs: [] },

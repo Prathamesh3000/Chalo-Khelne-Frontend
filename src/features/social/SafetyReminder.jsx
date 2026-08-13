@@ -1,5 +1,6 @@
 import { ShieldCheck, UserX, AlertCircle, Hand, Flag } from "lucide-react";
 
+import DialogA11y from "../../shared/components/DialogA11y";
 /**
  * In-app safety reminder (Families Policy) — shown to MINOR users before they
  * exchange freeform media or information (creating a post or a story). Mirrors
@@ -22,7 +23,13 @@ export default function SafetyReminder({ open, onAcknowledge, onCancel, dark = f
     : { card: "bg-white shadow-xl", title: "text-gray-900", sub: "text-gray-500", tip: "text-gray-700", secondary: "text-gray-500 hover:text-gray-800" };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60" onClick={onCancel}>
+    <div
+        role="dialog"
+        aria-modal="true"
+        className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60"
+        onClick={onCancel}
+      >
+        <DialogA11y onClose={onCancel} />
       <div
         className={`w-full max-w-md rounded-2xl p-6 ${t.card}`}
         onClick={(e) => e.stopPropagation()}

@@ -14,6 +14,7 @@ import { AuthContext } from "../context/AuthContext";
 import { useNotifications } from "../context/NotificationContext";
 import "../App.css";
 
+import { activatable } from "../shared/utils/activatable";
 const ClubAdminNavbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
@@ -72,7 +73,7 @@ const ClubAdminNavbar = () => {
   return (
     <div className="navbar">
       <div className="flex items-center w-full md:w-auto navbar1">
-        <img src="/sportapp_logo.png" alt="Logo" className="w-[45.811px] h-[35.481px]" />
+        <img loading="lazy" src="/sportapp_logo.png" alt="Logo" className="w-[45.811px] h-[35.481px]" />
         <div className="search-container ml-2">
           <input type="text" placeholder="Search" className="bg-white searchinput" />
           <FiSearch className="search-icon" />
@@ -88,7 +89,7 @@ const ClubAdminNavbar = () => {
       <div className={`right-section md:flex ${isOpen ? "flex flex-col items-start p-4 absolute top-16 right-4 bg-white shadow-md rounded-lg w-48 z-50" : "hidden"}`}>
         {/* Notification Bell */}
         <div className="relative" ref={notificationRef}>
-          <div className="notification-icon cursor-pointer" onClick={handleNotificationClick}>
+          <div className="notification-icon cursor-pointer" aria-label="Notifications" {...activatable(handleNotificationClick)}>
             <FiBell className="text-gray-600 text-2xl" />
             {unreadCount > 0 && (
               <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full border-2 border-white px-1">
@@ -152,7 +153,7 @@ const ClubAdminNavbar = () => {
 
         {/* Profile Icon with Dropdown */}
         <div className="relative" ref={dropdownRef}>
-          <div className="profile-icon cursor-pointer" onClick={handleProfileClick}>
+          <div className="profile-icon cursor-pointer" aria-label="Your profile" {...activatable(handleProfileClick)}>
             <FaUserCircle className="text-gray-600 text-2xl" />
           </div>
 

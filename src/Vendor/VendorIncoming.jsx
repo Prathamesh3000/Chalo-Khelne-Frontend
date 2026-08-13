@@ -109,7 +109,7 @@ export default function VendorIncoming() {
             <button key={p._id} onClick={() => open(p)} className="w-auto text-left bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-md transition">
               <div className="h-36 bg-gray-100 flex items-center justify-center overflow-hidden">
                 {imgSrc(p.images?.[0]) ? (
-                  <img src={imgSrc(p.images[0])} alt="" className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                  <img loading="lazy" src={imgSrc(p.images[0])} alt="" className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = "none"; }} />
                 ) : <Package className="w-8 h-8 text-gray-300" />}
               </div>
               <div className="p-3">
@@ -155,7 +155,7 @@ export default function VendorIncoming() {
               {mode === "view" && (
                 <>
                   <div className="h-40 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden mb-3">
-                    {imgSrc(sel.images?.[0]) ? <img src={imgSrc(sel.images[0])} alt="" className="w-full h-full object-cover" /> : <Package className="w-10 h-10 text-gray-300" />}
+                    {imgSrc(sel.images?.[0]) ? <img loading="lazy" src={imgSrc(sel.images[0])} alt="" className="w-full h-full object-cover" /> : <Package className="w-10 h-10 text-gray-300" />}
                   </div>
                   <dl className="text-sm space-y-1.5">
                     <Row label="Item" value={sel.itemName} />

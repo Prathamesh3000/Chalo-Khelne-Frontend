@@ -187,7 +187,7 @@ const MPayments = ({ tournamentId }) => {
                   className="relative aspect-square group rounded-md overflow-hidden"
                   style={{ border: "1px solid rgba(255,255,255,0.06)" }}
                 >
-                  <img
+                  <img loading="lazy"
                     src={URL.createObjectURL(file)}
                     alt="qr preview"
                     className="w-full h-full object-cover"
@@ -214,7 +214,7 @@ const MPayments = ({ tournamentId }) => {
                   className="relative aspect-square group rounded-md overflow-hidden"
                   style={{ border: "1px solid rgba(255,255,255,0.06)" }}
                 >
-                  <img
+                  <img loading="lazy"
                     src={assetUrl(qr.imageUrl)}
                     alt="uploaded qr"
                     className="w-full h-full object-cover"

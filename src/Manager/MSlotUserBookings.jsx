@@ -2,6 +2,7 @@ import { toast } from "react-toastify";
 import React, { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
+import { getAuthToken } from "../shared/api/authToken";
 const UserBookings = () => {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -209,7 +210,7 @@ const UserBookings = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const token = localStorage.getItem("token");
+        const token = getAuthToken();
         const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
         // Fetch turf details
         const turfResponse = await fetch(
@@ -291,7 +292,7 @@ const UserBookings = () => {
         localStorage.getItem("managerId") ||
         sessionStorage.getItem("managerId");
 
-      const token = localStorage.getItem("token");
+      const token = getAuthToken();
       const response = await fetch(
         `/api/manager/turf-bookings/${bookingId}/payment-status`,
         {
@@ -427,10 +428,10 @@ const UserBookings = () => {
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
+              <label className="block text-sm font-medium text-slate-700 mb-2" htmlFor="date">
                 Date
               </label>
-              <input
+              <input id="date"
                 type="date"
                 value={filters.date}
                 onChange={(e) =>
@@ -440,10 +441,10 @@ const UserBookings = () => {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
+              <label className="block text-sm font-medium text-slate-700 mb-2" htmlFor="booking-status">
                 Booking Status
               </label>
-              <select
+              <select id="booking-status"
                 value={filters.status}
                 onChange={(e) =>
                   setFilters({ ...filters, status: e.target.value })

@@ -10,39 +10,65 @@
  *   // result.labels → { round, score, result }
  */
 
-const SPORT_SCORING_TYPES = {
-  "Table Tennis": "sets",
-  "Badminton": "sets",
-  "Tennis": "sets",
-  "Pickleball": "sets",
-  "Volleyball": "sets",
-  "Squash": "sets",
-  "Cricket": "innings",
-  "Football": "time",
-  "Basketball": "time",
-  "Hockey": "time",
-  "Kabaddi": "time",
-  "Chess": "single",
-  "Carrom": "single",
-  "Snooker": "single",
-  "Turf Games": "single",
-  "Cricket Nets": "single",
-};
+// §6.1 — the sport→scoringType map and the label table used to be hardcoded
+// HERE, and again in the mobile app, and again on the server; the three had
+// drifted. They now come from the server via shared/utils/scoringConfig.js.
+// Re-inlining either table here is how §6.1 comes back.
+import { getScoringType, getLabelsFor } from "./scoringConfig";
 
-function getScoringType(sportName) {
-  if (!sportName) return null;
-  const key = Object.keys(SPORT_SCORING_TYPES).find(
-    (k) => k.toLowerCase() === sportName.toLowerCase()
-  );
-  return SPORT_SCORING_TYPES[key] || null;
+export { getScoringType };
+
+const KNOWN_SCORING_TYPES = ["sets", "time", "innings", "board", "single"];
+
+
+/**
+ * Normalize the winner from any match schema — mirrors the server's
+ * utils/matchUtils.js#getWinner, which handles five different shapes:
+ *
+ *   Match, DirectKnockoutMatch → result.winner.playerId
+ *   SuperMatch, KnockoutMatch  → winner.playerId
+ *   TeamKnockoutMatch          → winnerId (bare ObjectId, no name)
+ *   legacy semifinal           → winner as a plain team-name String
+ *
+ * Returns null when the match genuinely has no winner yet.
+ */
+export function resolveWinner(match) {
+  if (!match) return null;
+
+  if (match.result?.winner?.playerId) {
+    return {
+      playerId: match.result.winner.playerId,
+      playerName: match.result.winner.playerName || null,
+    };
+  }
+  // Some payloads carry result.winner as an object without playerId.
+  if (match.result?.winner && typeof match.result.winner === "object") {
+    return match.result.winner;
+  }
+
+  if (match.winner?.playerId) {
+    return {
+      playerId: match.winner.playerId,
+      playerName: match.winner.playerName || null,
+    };
+  }
+
+  // TeamKnockoutMatch — a bare ObjectId ref to the winning TEAM.
+  if (match.winnerId) {
+    return {
+      playerId: match.winnerId,
+      playerName: match.winnerTeamName || match.winnerName || null,
+      isTeam: true,
+    };
+  }
+
+  // Legacy semifinal schema — winner is the team name itself.
+  if (typeof match.winner === "string" && match.winner) {
+    return { playerId: null, playerName: match.winner, isTeam: true };
+  }
+
+  return null;
 }
-
-const LABELS = {
-  sets:    { round: "Set", subRound: "Game", score: "Points", result: "Sets" },
-  time:    { round: "Period", subRound: null, score: "Goals", result: "Score" },
-  innings: { round: "Innings", subRound: "Over", score: "Runs", result: "Score" },
-  single:  { round: "Game", subRound: null, score: "Result", result: "Result" },
-};
 
 /**
  * Read normalized match result.
@@ -57,7 +83,7 @@ export function readMatchResult(match, opts = {}) {
   if (match.matchResult && match.matchResult.type) {
     return {
       ...match.matchResult,
-      labels: LABELS[match.matchResult.type] || LABELS.sets,
+      labels: getLabelsFor(match.matchResult.type),
     };
   }
 
@@ -65,7 +91,7 @@ export function readMatchResult(match, opts = {}) {
   if (match._normalizedResult && match._normalizedResult.type) {
     return {
       ...match._normalizedResult,
-      labels: LABELS[match._normalizedResult.type] || LABELS.sets,
+      labels: getLabelsFor(match._normalizedResult.type),
     };
   }
 
@@ -92,9 +118,15 @@ export function readMatchResult(match, opts = {}) {
     p2Score = match.setsWon.away || 0;
   }
 
-  let winner = null;
-  if (match.result?.winner) winner = match.result.winner;
-  else if (match.winner) winner = match.winner;
+  // §6.2 — resolve the winner from every shape the server can store.
+  //
+  // Five match schemas record the winner differently, and the server's
+  // getWinner (utils/matchUtils.js) handles all five. This handled two, so a
+  // completed TeamKnockoutMatch — which carries `winnerId` as a bare ObjectId
+  // and neither `result.winner` nor `winner` — fell through to null and the UI
+  // showed no winner at all for a finished team tie. That is the Davis Cup
+  // format the corporate and corporate-league tournaments are built on.
+  const winner = resolveWinner(match);
 
   return {
     type: scoringType,
@@ -102,7 +134,7 @@ export function readMatchResult(match, opts = {}) {
     player1Score: p1Score,
     player2Score: p2Score,
     winner,
-    labels: LABELS[scoringType] || LABELS.sets,
+    labels: getLabelsFor(scoringType),
   };
 }
 
@@ -119,10 +151,13 @@ export function getScoreDisplay(match, opts = {}) {
  * Get labels for a sport/scoringType.
  */
 export function getResultLabels(scoringTypeOrSportName) {
-  const st = LABELS[scoringTypeOrSportName]
-    ? scoringTypeOrSportName
-    : getScoringType(scoringTypeOrSportName) || "sets";
-  return LABELS[st] || LABELS.sets;
-}
+  // Accepts either a scoring type ("board") or a sport name ("Carrom").
+  const asType = getLabelsFor(scoringTypeOrSportName);
+  const isKnownType = KNOWN_SCORING_TYPES.includes(scoringTypeOrSportName);
+  if (isKnownType) return asType;
 
-export { getScoringType, LABELS };
+  // Not a type — treat it as a sport name. An unknown sport falls back to the
+  // neutral "single" rendering, never to "sets" (§6.1: that fallback is what
+  // labelled a Foosball match with racquet headings).
+  return getLabelsFor(getScoringType(scoringTypeOrSportName));
+}

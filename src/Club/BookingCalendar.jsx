@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import axios from "axios";
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Plus, Clock, User, Phone, DollarSign, X, Check, Ban, RefreshCw, Trash2, MapPin } from "lucide-react";
 
+import DialogA11y from "../shared/components/DialogA11y";
 const SOURCES = ["Walk-in", "Admin Booking", "Corporate Booking", "School Booking", "Mobile App"];
 const SOURCE_BADGE = {
   "Mobile App": "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
@@ -158,7 +159,13 @@ export default function BookingCalendar() {
 
       {/* New booking modal */}
       {addOpen && (
-        <div onClick={() => setAddOpen(false)} className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+        <div
+        role="dialog"
+        aria-modal="true"
+        onClick={() => setAddOpen(false)}
+        className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+      >
+        <DialogA11y onClose={() => setAddOpen(false)} />
           <div onClick={(e) => e.stopPropagation()} className="bg-[#181A22] rounded-2xl max-w-md w-full overflow-hidden border border-white/[0.1] shadow-2xl">
             <div className="p-5 border-b border-white/[0.08] flex justify-between items-center bg-[#0a0d14]">
               <div><span className="text-[10px] font-mono tracking-wider font-bold text-emerald-400 uppercase">Reservation</span><h3 className="text-[17px] font-bold text-white mt-0.5">New Booking · {date}</h3></div>
@@ -166,16 +173,16 @@ export default function BookingCalendar() {
             </div>
             <form onSubmit={addBooking} className="p-5 space-y-3.5">
               <div className="grid grid-cols-2 gap-3">
-                <div><label className={label}>Customer Name *</label><input className={input} value={form.customerName} onChange={(e) => set("customerName", e.target.value)} placeholder="Rahul Sharma" required /></div>
-                <div><label className={label}>Phone</label><input className={input} value={form.customerPhone} onChange={(e) => set("customerPhone", e.target.value)} placeholder="+91 …" /></div>
+                <div><label className={label} htmlFor="customer-name">Customer Name *</label><input id="customer-name" className={input} value={form.customerName} onChange={(e) => set("customerName", e.target.value)} placeholder="Rahul Sharma" required /></div>
+                <div><label className={label} htmlFor="phone">Phone</label><input id="phone" className={input} value={form.customerPhone} onChange={(e) => set("customerPhone", e.target.value)} placeholder="+91 …" /></div>
               </div>
-              <div><label className={label}>Court *</label><select className={input} value={form.courtId} onChange={(e) => set("courtId", e.target.value)} required><option value="" className="bg-[#181A22]">Select court…</option>{courts.map((c) => <option key={c._id} value={c._id} className="bg-[#181A22]">{c.name} — {c.sport} ({money(c.pricePerHour)}/hr)</option>)}</select></div>
+              <div><label className={label} htmlFor="court">Court *</label><select id="court" className={input} value={form.courtId} onChange={(e) => set("courtId", e.target.value)} required><option value="" className="bg-[#181A22]">Select court…</option>{courts.map((c) => <option key={c._id} value={c._id} className="bg-[#181A22]">{c.name} — {c.sport} ({money(c.pricePerHour)}/hr)</option>)}</select></div>
               <div className="grid grid-cols-3 gap-3">
-                <div><label className={label}>Time</label><input className={input} type="time" value={form.startTime} onChange={(e) => set("startTime", e.target.value)} /></div>
-                <div><label className={label}>Hours</label><input className={input} type="number" min="1" value={form.duration} onChange={(e) => set("duration", e.target.value)} /></div>
-                <div><label className={label}>Source</label><select className={input} value={form.source} onChange={(e) => set("source", e.target.value)}>{SOURCES.map((s) => <option key={s} value={s} className="bg-[#181A22]">{s}</option>)}</select></div>
+                <div><label className={label} htmlFor="time">Time</label><input id="time" className={input} type="time" value={form.startTime} onChange={(e) => set("startTime", e.target.value)} /></div>
+                <div><label className={label} htmlFor="hours">Hours</label><input id="hours" className={input} type="number" min="1" value={form.duration} onChange={(e) => set("duration", e.target.value)} /></div>
+                <div><label className={label} htmlFor="source">Source</label><select id="source" className={input} value={form.source} onChange={(e) => set("source", e.target.value)}>{SOURCES.map((s) => <option key={s} value={s} className="bg-[#181A22]">{s}</option>)}</select></div>
               </div>
-              <div><label className={label}>Notes</label><input className={input} value={form.notes} onChange={(e) => set("notes", e.target.value)} placeholder="Optional" /></div>
+              <div><label className={label} htmlFor="notes">Notes</label><input id="notes" className={input} value={form.notes} onChange={(e) => set("notes", e.target.value)} placeholder="Optional" /></div>
               <div className="flex items-center justify-between bg-[#12141B] border border-white/[0.08] rounded-lg px-3 py-2.5">
                 <label className="flex items-center gap-2 text-[13px] text-gray-300"><input type="checkbox" checked={form.isPaid} onChange={(e) => set("isPaid", e.target.checked)} className="w-auto accent-emerald-500" /> Paid now</label>
                 <div className="text-right"><div className="text-[10px] text-gray-500 uppercase font-bold">Amount</div><div className="text-[16px] font-black text-emerald-300">{money(estAmount)}</div></div>

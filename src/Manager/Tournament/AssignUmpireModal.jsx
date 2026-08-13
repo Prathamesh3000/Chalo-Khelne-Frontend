@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { X, Check, Award, Loader2, AlertCircle, Shield } from "lucide-react";
 import refereeApi from "../../features/referee/refereeApi";
 
+import DialogA11y from "../../shared/components/DialogA11y";
 const SIG = "#5E6AD2";
 
 export default function AssignUmpireModal({
@@ -75,9 +76,12 @@ export default function AssignUmpireModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/40 backdrop-blur-sm p-4"
-      onClick={onClose}
-    >
+        role="dialog"
+        aria-modal="true"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/40 backdrop-blur-sm p-4"
+        onClick={onClose}
+      >
+        <DialogA11y onClose={onClose} />
       <div
         className="bg-white rounded-2xl border border-neutral-200 shadow-[0_24px_64px_rgba(0,0,0,0.16)] max-w-md w-full max-h-[85vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}

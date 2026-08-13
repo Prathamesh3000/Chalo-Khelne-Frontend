@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { initSocket, disconnectSocket } from "../../realtime";
 import { registerLogout, refreshAccessToken } from "../../../shared/api";
 
 export const AuthContext = createContext(null);
@@ -65,9 +66,42 @@ export function AuthProvider({ children }) {
     localStorage.removeItem("user");
     localStorage.removeItem("loginTime");
     localStorage.removeItem("refreshToken");
+
+    // §4.4 — tear the socket down WITH the session.
+    //
+    // Logging out cleared three localStorage keys and called this function,
+    // and left the authenticated socket connected with all its room
+    // memberships intact. On a shared machine — a club laptop at the
+    // registration desk is exactly that — the next person to sign in inherited
+    // the previous user's live socket and kept receiving their chat and match
+    // traffic.
+    try {
+      disconnectSocket();
+    } catch (_) {
+      /* never let socket teardown block a logout */
+    }
+
     setAuth(null);
     setIsAuthenticated(false);
   }, []);
+
+  // §4.4 — the socket is created and destroyed by the AUTH lifecycle.
+  //
+  // It used to be initialised at module scope in main.jsx from a raw
+  // localStorage read, which ran before this provider mounted, inside a
+  // try/catch whose comment claimed "polling fallback handles it" — there is no
+  // polling fallback. Owning it here means the socket exists exactly when a
+  // session does.
+  useEffect(() => {
+    if (isAuthenticated) {
+      try {
+        initSocket();
+      } catch (err) {
+        console.error("[auth] socket init failed:", err);
+      }
+    }
+    return undefined;
+  }, [isAuthenticated]);
 
   useEffect(() => {
     registerLogout(logout);
@@ -115,7 +149,9 @@ export function AuthProvider({ children }) {
         }
       }, Math.min(Math.max(remaining, 0), MAX));
       return () => { cancelled = true; clearTimeout(id); };
-    } catch {}
+    } catch (err) {
+      console.warn("Token refresh scheduling skipped (unparseable token):", err.message);
+    }
   }, [auth, logout]);
 
   const login = (data) => {

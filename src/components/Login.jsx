@@ -104,7 +104,7 @@ const LoginForm = ({ onClose, switchToForgot }) => {
       {/* Header */}
       <div className="text-center mb-8">
         <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4">
-          <img src="/sportapp_logo.png" alt="Chalo Khelne" className="w-full h-full object-contain" />
+          <img loading="lazy" src="/sportapp_logo.png" alt="Chalo Khelne" className="w-full h-full object-contain" />
         </div>
         <h2 className="text-2xl font-bold text-gray-900">Welcome back</h2>
         <p className="text-sm text-gray-400 mt-1">Sign in to your Chalo Khelne account</p>

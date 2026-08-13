@@ -165,7 +165,7 @@ export default function PostCard({
       {/* Media */}
       {post.videoThumbnail && (
         <div className="px-5 pb-3">
-          <img
+          <img loading="lazy"
             src={post.videoThumbnail}
             alt="Post media"
             className="w-full rounded-xl object-cover max-h-80"

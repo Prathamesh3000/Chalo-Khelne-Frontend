@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { X, Type, Image as ImageIcon } from "lucide-react";
 
+import DialogA11y from "../../shared/components/DialogA11y";
 const BG_COLORS = ["#2D3E4E", "#F97316", "#2DA5FF", "#16A34A", "#DB2777", "#7C3AED", "#0F172A", "#DC2626"];
 
 /**
@@ -47,7 +48,13 @@ export default function StoryComposer({ open, onClose, onCreateText, onCreateIma
   const canSubmit = mode === "text" ? !!text.trim() : !!file;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70" onClick={close}>
+    <div
+        role="dialog"
+        aria-modal="true"
+        className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70"
+        onClick={close}
+      >
+        <DialogA11y onClose={close} />
       <div className="w-full max-w-sm rounded-2xl bg-[#181A22] border border-white/[0.08] overflow-hidden" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
@@ -104,7 +111,7 @@ export default function StoryComposer({ open, onClose, onCreateText, onCreateIma
             <>
               {preview ? (
                 <div className="rounded-xl overflow-hidden mb-3 bg-black flex items-center justify-center h-56">
-                  <img src={preview} alt="preview" className="max-h-56 object-contain" />
+                  <img loading="lazy" src={preview} alt="preview" className="max-h-56 object-contain" />
                 </div>
               ) : (
                 <button

@@ -13,7 +13,7 @@ const ProfilePage = () => {
       {/* Profile Card */}
       <div className="bg-white text-black p-4 rounded-xl flex items-center gap-4 shadow-lg border h-auto">
         {/* Profile Image */}
-        <img
+        <img loading="lazy"
           src={auth.image || "https://via.placeholder.com/120"} // Default if no image
           alt="Profile"
           className="w-32 h-32 rounded-lg object-cover border-4 border-gray-300"

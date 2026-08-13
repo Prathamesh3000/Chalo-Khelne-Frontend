@@ -116,15 +116,15 @@ export default function SyllabusAdmin() {
         </h3>
         <div className="flex flex-wrap items-end gap-3">
           <div>
-            <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-500 mb-1.5">Sport</label>
-            <select value={sport} onChange={(e) => setSport(e.target.value)} className={`${field} w-44`} style={inputStyle}>
+            <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-500 mb-1.5" htmlFor="sport">Sport</label>
+            <select id="sport" value={sport} onChange={(e) => setSport(e.target.value)} className={`${field} w-44`} style={inputStyle}>
               <option value="">Select sport…</option>
               {clubSports.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-500 mb-1.5">Standard</label>
-            <input value={standard} onChange={(e) => setStandard(e.target.value)} placeholder="e.g. V" className={`${field} w-28`} style={inputStyle} />
+            <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-500 mb-1.5" htmlFor="standard">Standard</label>
+            <input id="standard" value={standard} onChange={(e) => setStandard(e.target.value)} placeholder="e.g. V" className={`${field} w-28`} style={inputStyle} />
           </div>
         </div>
         {clubSports.length === 0 && (

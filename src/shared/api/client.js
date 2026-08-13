@@ -1,6 +1,7 @@
 import axios from "axios";
 import { toast } from "react-toastify";
 
+import { getAuthToken } from "../../shared/api/authToken";
 export const USE_MOCK = import.meta.env.VITE_USE_MOCK === "true";
 
 const baseURL = import.meta.env.VITE_API_BASE_URL || "/api";
@@ -101,7 +102,7 @@ export function setupApiInterceptors() {
   targets.forEach(({ request, response }) => {
     request.use(
       (config) => {
-        const token = localStorage.getItem("token");
+        const token = getAuthToken();
         if (token) {
           // If the access token is expired but we have a refresh token, let the
           // request proceed — it will 401 and the response handler will refresh.

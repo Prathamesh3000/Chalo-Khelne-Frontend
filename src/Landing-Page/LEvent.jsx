@@ -9,6 +9,7 @@ import Carousel from "./LCarousel.jsx";
 import { getTournamentType } from "../utils/sportTrack";
 import defaultImg from "../assets/tournament.avif";
 
+import { getAuthToken } from "../shared/api/authToken";
 // ─── Tournament Detail Modal ─────────────────────────────────
 const TournamentDetailModal = ({ tournament, onClose, onSignInPrompt }) => {
   if (!tournament) return null;
@@ -40,7 +41,7 @@ const TournamentDetailModal = ({ tournament, onClose, onSignInPrompt }) => {
 
         {/* Hero Image */}
         <div className="relative h-56 md:h-64 overflow-hidden">
-          <img
+          <img loading="lazy"
             src={tournament.tournamentLogo ? assetUrl('tournaments/' + tournament.tournamentLogo.split("\\").pop()) : defaultImg}
             alt={tournament.title}
             className="w-full h-full object-cover"
@@ -197,7 +198,7 @@ const Event = () => {
 
       (async () => {
         try {
-          const token = localStorage.getItem("token");
+          const token = getAuthToken();
           const res = await fetch(`/api/tournaments/${deepLinkedTournamentId}`, {
             headers: {
               ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -306,7 +307,7 @@ const TournamentCards = ({ onTournamentClick }) => {
   useEffect(() => {
     (async () => {
       try {
-        const token = localStorage.getItem("token");
+        const token = getAuthToken();
         const res = await fetch("/api/tournaments", {
           headers: {
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -356,7 +357,7 @@ const TournamentCards = ({ onTournamentClick }) => {
         >
           {/* Image */}
           <div className="relative h-48 overflow-hidden">
-            <img
+            <img loading="lazy"
               src={tournament.tournamentLogo ? assetUrl('tournaments/' + tournament.tournamentLogo.split("\\").pop()) : defaultImg}
               alt={tournament.title}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"

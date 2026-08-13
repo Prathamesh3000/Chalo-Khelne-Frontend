@@ -3,6 +3,7 @@ import axios from "axios";
 import { toast } from "react-toastify";
 import { TrendingUp, Loader2, X, FileDown, Star } from "lucide-react";
 
+import DialogA11y from "../shared/components/DialogA11y";
 const inputStyle = { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", colorScheme: "dark" };
 const field = "h-9 px-3 rounded-md text-[13px] text-gray-200 placeholder:text-gray-500 focus:outline-none";
 
@@ -101,15 +102,15 @@ export default function ProgressAdmin() {
         </h3>
         <div className="flex flex-wrap items-end gap-3">
           <div>
-            <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-500 mb-1.5">Sport</label>
-            <select value={sport} onChange={(e) => setSport(e.target.value)} className={`${field} w-44`} style={inputStyle}>
+            <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-500 mb-1.5" htmlFor="sport">Sport</label>
+            <select id="sport" value={sport} onChange={(e) => setSport(e.target.value)} className={`${field} w-44`} style={inputStyle}>
               <option value="">Select sport…</option>
               {clubSports.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-500 mb-1.5">Standard</label>
-            <input value={standard} onChange={(e) => setStandard(e.target.value)} placeholder="e.g. V" className={`${field} w-28`} style={inputStyle} />
+            <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-500 mb-1.5" htmlFor="standard">Standard</label>
+            <input id="standard" value={standard} onChange={(e) => setStandard(e.target.value)} placeholder="e.g. V" className={`${field} w-28`} style={inputStyle} />
           </div>
         </div>
         {syllabi.length > 0 && (
@@ -234,7 +235,13 @@ export default function ProgressAdmin() {
 // ── Read-only frozen session report ──
 function SnapshotModal({ data, loading, onClose }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+    <div
+        role="dialog"
+        aria-modal="true"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+        onClick={onClose}
+      >
+        <DialogA11y onClose={onClose} />
       <div className="w-full max-w-2xl max-h-[88vh] overflow-y-auto rounded-xl bg-[#181A22] border border-white/[0.08]" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06] sticky top-0 bg-[#181A22]">
           <div className="flex items-center gap-2">
@@ -299,7 +306,13 @@ function ReportModal({ report, loading, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+    <div
+        role="dialog"
+        aria-modal="true"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+        onClick={onClose}
+      >
+        <DialogA11y onClose={onClose} />
       <div className="w-full max-w-2xl max-h-[88vh] overflow-y-auto rounded-xl bg-[#181A22] border border-white/[0.08]" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06] sticky top-0 bg-[#181A22]">
           <h3 className="text-[15px] font-semibold text-white">Progress report</h3>

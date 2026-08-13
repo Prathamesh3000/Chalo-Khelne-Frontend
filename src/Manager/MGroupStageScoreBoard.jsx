@@ -4,6 +4,7 @@ import { useLocation } from "react-router-dom";
 import { Switch } from "@mui/material";
 import { getSportConfig } from "../features/scoring/sportUIConfig";
 
+import { getAuthToken } from "../shared/api/authToken";
 const MGroupStageScoreBoard = () => {
     // Route parameters
     const location = useLocation();
@@ -82,7 +83,7 @@ const MGroupStageScoreBoard = () => {
 
                 setMessage(`Submitting game ${i + 1} of ${gamesToSubmit.length}...`);
 
-                const token = localStorage.getItem("token");
+                const token = getAuthToken();
                 const response = await fetch(
                     `/api/tournaments/matches/${matchId}/complete-game`,
                     {
@@ -150,7 +151,7 @@ const MGroupStageScoreBoard = () => {
             setLoading(true);
 
             // Get current live state from backend - ONLY auto-init when explicitly starting a match
-            const token = localStorage.getItem("token");
+            const token = getAuthToken();
             const response = await fetch(
                 `/api/tournaments/matches/${matchId}/live-state?autoInit=false`,
                 {
@@ -229,7 +230,6 @@ const MGroupStageScoreBoard = () => {
 
                             // Calculate total games won across all sets (we'll update this after processing all sets)
                             setCurrentGameNumber((currentSet.games.filter(g => g.status === 'COMPLETED').length) + 1);
-                        } else {
                         }
 
                         // Calculate completed sets from sets data
@@ -307,7 +307,6 @@ const MGroupStageScoreBoard = () => {
                     // If match is completed, show winner
                     if (match.status === 'COMPLETED' && match.result && match.result.winner) {
                         setWinner(match.result.winner.playerName);
-                    } else if (match.status === 'COMPLETED') {
                     }
                 }
             }
@@ -344,7 +343,7 @@ const MGroupStageScoreBoard = () => {
     // Update live score via backend
     const updateLiveScore = async (playerA_points, playerB_points, autoCheck = true) => {
         try {
-            const token = localStorage.getItem("token");
+            const token = getAuthToken();
             const response = await fetch(
                 `/api/tournaments/matches/${matchId}/live-score`,
                 {
@@ -433,7 +432,7 @@ const MGroupStageScoreBoard = () => {
     // Complete current game and handle set/match progression
     const completeCurrentGame = async (playerA_points, playerB_points) => {
         try {
-            const token = localStorage.getItem("token");
+            const token = getAuthToken();
             const response = await fetch(
                 `/api/tournaments/matches/${matchId}/complete-game`,
                 {
@@ -690,7 +689,7 @@ const MGroupStageScoreBoard = () => {
 
 
             // Use the endpoint from groupStageScoreboardController
-            const token = localStorage.getItem("token");
+            const token = getAuthToken();
             const response = await fetch(
                 `/api/tournaments/matches/${matchId}/sync-scores`,
                 {

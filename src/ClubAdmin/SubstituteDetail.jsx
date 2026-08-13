@@ -157,7 +157,7 @@ export default function SubstituteDetail({ subId, onClose, onChanged }) {
               <div className="flex items-start gap-4">
                 <div className="w-20 h-20 rounded-xl bg-white/[0.04] overflow-hidden flex items-center justify-center flex-shrink-0 border border-white/[0.06]">
                   {imgSrc(sub.photo) ? (
-                    <img src={imgSrc(sub.photo)} alt="" className="w-full h-full object-cover" />
+                    <img loading="lazy" src={imgSrc(sub.photo)} alt="" className="w-full h-full object-cover" />
                   ) : (
                     <UserCheck className="w-8 h-8 text-gray-600" />
                   )}

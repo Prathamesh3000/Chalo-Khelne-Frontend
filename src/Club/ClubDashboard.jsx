@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { activatable } from "../shared/utils/activatable";
 import {
   CalendarCheck, Tv, Users, TrendingUp, AlertCircle, Trophy, Dribbble,
   GraduationCap, UserCheck, UserPlus, PlusCircle, ArrowRight, Sparkles, FileText, Clock,
@@ -93,7 +94,7 @@ export default function ClubDashboard() {
           {cards.map((c) => {
             const Icon = c.icon;
             return (
-              <div key={c.title} onClick={() => go(c.tab)}
+              <div key={c.title} {...activatable(() => go(c.tab))}
                 className="bg-[#181A22] p-5 rounded-2xl border border-white/[0.06] flex flex-col justify-between hover:border-white/20 transition cursor-pointer group">
                 <div className="flex items-center justify-between">
                   <span className="text-gray-500 text-[10px] font-bold uppercase tracking-wider">{c.title}</span>

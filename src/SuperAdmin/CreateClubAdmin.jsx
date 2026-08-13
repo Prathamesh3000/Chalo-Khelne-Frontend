@@ -168,8 +168,8 @@ export default function CreateClubAdmin() {
           <Section icon={Building2} title="Organization details">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
-                <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-500 mb-1.5">Organization type *</label>
-                <select name="orgType" value={formData.orgType} onChange={handleChange} required
+                <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-500 mb-1.5" htmlFor="organization-type">Organization type *</label>
+                <select id="organization-type" name="orgType" value={formData.orgType} onChange={handleChange} required
                   className="w-full h-9 px-3 rounded-md text-[13px] text-gray-200 focus:outline-none"
                   style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", colorScheme: "dark" }}>
                   <option value="club">Club</option>
@@ -184,8 +184,8 @@ export default function CreateClubAdmin() {
             </div>
             {formData.orgType !== "agency" && agencies.length > 0 && (
               <div className="mt-3">
-                <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-500 mb-1.5">Assign to agency (optional)</label>
-                <select name="agencyId" value={formData.agencyId} onChange={handleChange}
+                <label className="block text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-500 mb-1.5" htmlFor="assign-to-agency-optional">Assign to agency (optional)</label>
+                <select id="assign-to-agency-optional" name="agencyId" value={formData.agencyId} onChange={handleChange}
                   className="w-full h-9 px-3 rounded-md text-[13px] text-gray-200 focus:outline-none"
                   style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", colorScheme: "dark" }}>
                   <option value="">— No agency (independent) —</option>

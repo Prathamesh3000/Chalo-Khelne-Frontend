@@ -30,6 +30,8 @@ import TeamKnockoutsScoreboard from "./Manager/TeamKnockoutsScoreboard";
 import MGroupStageScoreBoard from "./Manager/MGroupStageScoreBoard";
 import MGroupStageManagement from "./Manager/MGroupStageManagement";
 import MDirectKnockout from "./Manager/MDirectKnockout";
+import MSwiss from "./Manager/MSwiss";
+import MCheckIn from "./Manager/MCheckIn";
 import MPointsTableScreen from "./Manager/MPointsTableScreen";
 import MatchScoringPage from "./Manager/GroupTabs/MatchScoringPage";
 
@@ -75,6 +77,9 @@ const ManagerApp = () => {
         <Route path="/tournament-management/group-stage" element={<MGroupStageManagement />} />
         <Route path="/tournament-management/team-knockouts" element={<TeamKnockouts />} />
         <Route path="/tournament-management/direct-knockout" element={<MDirectKnockout />} />
+        <Route path="/tournament-management/swiss" element={<MSwiss />} />
+        {/* Tournament-day check-in — the draw is built from who is present. */}
+        <Route path="/tournament-management/check-in" element={<MCheckIn />} />
         {/* Pages that own their dark ManagerShell chrome — must stay outside AppLayout to avoid double sidebar. */}
         <Route path="/mcoupons"      element={<MCoupons />} />
         <Route path="/msettings"     element={<MSettings />} />

@@ -13,6 +13,7 @@ import {
 import MNavbar from "../Manager/MNavbar";
 import { AuthContext } from "../context/AuthContext";
 
+import DialogA11y from "../shared/components/DialogA11y";
 export default function CorporateLayout() {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const location = useLocation();
@@ -37,9 +38,12 @@ export default function CorporateLayout() {
             {/* Mobile sidebar overlay */}
             {sidebarOpen && (
                 <div
-                    className="fixed inset-0 z-40 bg-gray-600 bg-opacity-75 lg:hidden"
-                    onClick={() => setSidebarOpen(false)}
-                ></div>
+        role="dialog"
+        aria-modal="true"
+        className="fixed inset-0 z-40 bg-gray-600 bg-opacity-75 lg:hidden"
+        onClick={() => setSidebarOpen(false)}
+      >
+        <DialogA11y onClose={() => setSidebarOpen(false)} /></div>
             )}
 
             {/* Sidebar */}

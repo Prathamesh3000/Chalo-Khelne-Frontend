@@ -5,6 +5,7 @@ import { AuthContext } from "../../context/AuthContext";
 import { getSidebarForRole } from "./sidebarConfig";
 import SidebarSection from "./SidebarSection";
 
+import DialogA11y from "../../shared/components/DialogA11y";
 const SIG = "#5E6AD2";
 
 export default function Sidebar({ role = "manager", mobileOpen = false, onMobileClose }) {
@@ -32,7 +33,7 @@ export default function Sidebar({ role = "manager", mobileOpen = false, onMobile
       >
         {isExpanded ? (
           <div className="flex items-center gap-2.5 min-w-0">
-            <img
+            <img loading="lazy"
               src="/sportapp_logo.png"
               alt="ChaloKhelne"
               className="w-7 h-7 rounded-md object-contain flex-shrink-0"
@@ -47,7 +48,7 @@ export default function Sidebar({ role = "manager", mobileOpen = false, onMobile
             </div>
           </div>
         ) : (
-          <img
+          <img loading="lazy"
             src="/sportapp_logo.png"
             alt="ChaloKhelne"
             className="w-7 h-7 rounded-md object-contain"
@@ -137,7 +138,13 @@ export default function Sidebar({ role = "manager", mobileOpen = false, onMobile
       </aside>
 
       {mobileOpen && (
-        <div className="fixed inset-0 z-40 md:hidden" onClick={onMobileClose}>
+        <div
+        role="dialog"
+        aria-modal="true"
+        className="fixed inset-0 z-40 md:hidden"
+        onClick={onMobileClose}
+      >
+        <DialogA11y onClose={onMobileClose} />
           <div className="absolute inset-0 bg-neutral-950/40 backdrop-blur-sm" />
           <aside
             className="absolute left-0 top-0 bottom-0 w-[260px] bg-white border-r border-neutral-200 shadow-[0_24px_64px_rgba(0,0,0,0.16)]"

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { GraduationCap, Plus, X, Star, Trash2, Zap } from "lucide-react";
 
+import DialogA11y from "../shared/components/DialogA11y";
 const SPORTS = ["Tennis", "Badminton", "Padel", "Cricket", "Swimming", "Football", "Pickleball", "Table Tennis"];
 const money = (n) => `₹${(Number(n) || 0).toLocaleString()}`;
 const ATT = ["Present", "Absent", "On Leave"];
@@ -106,19 +107,25 @@ export default function Coaches() {
       )}
 
       {addOpen && (
-        <div onClick={() => setAddOpen(false)} className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+        <div
+        role="dialog"
+        aria-modal="true"
+        onClick={() => setAddOpen(false)}
+        className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+      >
+        <DialogA11y onClose={() => setAddOpen(false)} />
           <div onClick={(e) => e.stopPropagation()} className="bg-[#181A22] rounded-2xl max-w-md w-full overflow-hidden border border-white/[0.1] shadow-2xl">
             <div className="p-5 border-b border-white/[0.08] flex justify-between items-center bg-[#0a0d14]">
               <div><span className="text-[10px] font-mono tracking-wider font-bold text-emerald-400 uppercase">Roster</span><h3 className="text-[17px] font-bold text-white mt-0.5">Add Coach</h3></div>
               <button onClick={() => setAddOpen(false)} className="text-gray-500 hover:text-white w-auto bg-transparent"><X size={18} /></button>
             </div>
             <form onSubmit={addCoach} className="p-5 space-y-3.5">
-              <div><label className={label}>Name *</label><input className={input} value={form.name} onChange={(e) => set("name", e.target.value)} required /></div>
+              <div><label className={label} htmlFor="name">Name *</label><input id="name" className={input} value={form.name} onChange={(e) => set("name", e.target.value)} required /></div>
               <div className="grid grid-cols-2 gap-3">
-                <div><label className={label}>Sport</label><select className={input} value={form.sport} onChange={(e) => set("sport", e.target.value)}>{SPORTS.map((s) => <option key={s} value={s} className="bg-[#181A22]">{s}</option>)}</select></div>
-                <div><label className={label}>Hourly Rate (₹)</label><input className={input} type="number" min="0" value={form.hourlyRate} onChange={(e) => set("hourlyRate", e.target.value)} /></div>
+                <div><label className={label} htmlFor="sport">Sport</label><select id="sport" className={input} value={form.sport} onChange={(e) => set("sport", e.target.value)}>{SPORTS.map((s) => <option key={s} value={s} className="bg-[#181A22]">{s}</option>)}</select></div>
+                <div><label className={label} htmlFor="hourly-rate">Hourly Rate (₹)</label><input id="hourly-rate" className={input} type="number" min="0" value={form.hourlyRate} onChange={(e) => set("hourlyRate", e.target.value)} /></div>
               </div>
-              <div><label className={label}>Availability (comma-separated days)</label><input className={input} value={form.availability} onChange={(e) => set("availability", e.target.value)} placeholder="Monday, Wednesday, Friday" /></div>
+              <div><label className={label} htmlFor="availability-comma-separated">Availability (comma-separated days)</label><input id="availability-comma-separated" className={input} value={form.availability} onChange={(e) => set("availability", e.target.value)} placeholder="Monday, Wednesday, Friday" /></div>
               <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[13px] py-2.5 rounded-lg">Add Coach</button>
             </form>
           </div>

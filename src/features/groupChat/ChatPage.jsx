@@ -6,9 +6,10 @@ import { useChat, useMessages, useSendMessage, useAddMember, useRemoveMember, us
 import useRealtimeGroupChat from "./useRealtimeGroupChat";
 import groupChatApi from "./groupChatApi";
 
-// Reuse MessageBubble and MessageInput from forumChat
-import MessageBubble from "../forumChat/MessageBubble";
-import MessageInput from "../forumChat/MessageInput";
+// MessageBubble/MessageInput moved here when the dead forumChat feature was
+// removed (§3.8) — groupChat was their only consumer.
+import MessageBubble from "./MessageBubble";
+import MessageInput from "./MessageInput";
 
 /**
  * Props:

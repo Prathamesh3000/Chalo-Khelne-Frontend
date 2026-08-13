@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { Users, Search, Plus, X, RefreshCw, Ban, ArrowUpCircle, Undo2, Trash2, CreditCard, Check } from "lucide-react";
 
+import DialogA11y from "../shared/components/DialogA11y";
 const money = (n) => `₹${(Number(n) || 0).toLocaleString()}`;
 const STATUS_BADGE = {
   Active: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
@@ -147,17 +148,17 @@ export default function Members() {
         <Modal title="Enroll New Member" tag="Membership" onClose={() => setAddMemberOpen(false)}>
           <form onSubmit={addMember} className="p-5 space-y-3.5">
             <div className="grid grid-cols-2 gap-3">
-              <div><label className={label}>Name *</label><input className={input} value={mForm.name} onChange={(e) => setMForm((f) => ({ ...f, name: e.target.value }))} required /></div>
-              <div><label className={label}>Phone</label><input className={input} value={mForm.phone} onChange={(e) => setMForm((f) => ({ ...f, phone: e.target.value }))} /></div>
+              <div><label className={label} htmlFor="name">Name *</label><input id="name" className={input} value={mForm.name} onChange={(e) => setMForm((f) => ({ ...f, name: e.target.value }))} required /></div>
+              <div><label className={label} htmlFor="phone">Phone</label><input id="phone" className={input} value={mForm.phone} onChange={(e) => setMForm((f) => ({ ...f, phone: e.target.value }))} /></div>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div><label className={label}>Email</label><input className={input} value={mForm.email} onChange={(e) => setMForm((f) => ({ ...f, email: e.target.value }))} /></div>
-              <div><label className={label}>Gender</label><select className={input} value={mForm.gender} onChange={(e) => setMForm((f) => ({ ...f, gender: e.target.value }))}>{["Male", "Female", "Other"].map((g) => <option key={g} className="bg-[#181A22]">{g}</option>)}</select></div>
+              <div><label className={label} htmlFor="email">Email</label><input id="email" className={input} value={mForm.email} onChange={(e) => setMForm((f) => ({ ...f, email: e.target.value }))} /></div>
+              <div><label className={label} htmlFor="gender">Gender</label><select id="gender" className={input} value={mForm.gender} onChange={(e) => setMForm((f) => ({ ...f, gender: e.target.value }))}>{["Male", "Female", "Other"].map((g) => <option key={g} className="bg-[#181A22]">{g}</option>)}</select></div>
             </div>
-            <div><label className={label}>Package</label><select className={input} value={mForm.packageId} onChange={(e) => setMForm((f) => ({ ...f, packageId: e.target.value }))}><option value="" className="bg-[#181A22]">No plan (enroll only)</option>{packages.map((p) => <option key={p._id} value={p._id} className="bg-[#181A22]">{p.name} — {money(p.price)}</option>)}</select></div>
+            <div><label className={label} htmlFor="package">Package</label><select id="package" className={input} value={mForm.packageId} onChange={(e) => setMForm((f) => ({ ...f, packageId: e.target.value }))}><option value="" className="bg-[#181A22]">No plan (enroll only)</option>{packages.map((p) => <option key={p._id} value={p._id} className="bg-[#181A22]">{p.name} — {money(p.price)}</option>)}</select></div>
             <div className="grid grid-cols-2 gap-3">
-              <div><label className={label}>Emergency Contact</label><input className={input} value={mForm.emergencyContact.name} onChange={(e) => setMForm((f) => ({ ...f, emergencyContact: { ...f.emergencyContact, name: e.target.value } }))} placeholder="Name" /></div>
-              <div><label className={label}>&nbsp;</label><input className={input} value={mForm.emergencyContact.phone} onChange={(e) => setMForm((f) => ({ ...f, emergencyContact: { ...f.emergencyContact, phone: e.target.value } }))} placeholder="Phone" /></div>
+              <div><label className={label} htmlFor="emergency-contact">Emergency Contact</label><input id="emergency-contact" className={input} value={mForm.emergencyContact.name} onChange={(e) => setMForm((f) => ({ ...f, emergencyContact: { ...f.emergencyContact, name: e.target.value } }))} placeholder="Name" /></div>
+              <div><label className={label} htmlFor="nbsp">&nbsp;</label><input id="nbsp" className={input} value={mForm.emergencyContact.phone} onChange={(e) => setMForm((f) => ({ ...f, emergencyContact: { ...f.emergencyContact, phone: e.target.value } }))} placeholder="Phone" /></div>
             </div>
             {mForm.packageId && <div className="text-[12px] text-gray-500">Plan fee <span className="text-emerald-300 font-bold">{money(packages.find((p) => p._id === mForm.packageId)?.price)}</span> will be posted to finance.</div>}
             <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[13px] py-2.5 rounded-lg">Enroll Member</button>
@@ -170,15 +171,15 @@ export default function Members() {
         <Modal title="New Membership Package" tag="Plans" onClose={() => setAddPkgOpen(false)}>
           <form onSubmit={addPkg} className="p-5 space-y-3.5">
             <div className="grid grid-cols-2 gap-3">
-              <div><label className={label}>Name *</label><input className={input} value={pForm.name} onChange={(e) => setPForm((f) => ({ ...f, name: e.target.value }))} placeholder="Gold Annual" required /></div>
-              <div><label className={label}>Price (₹)</label><input className={input} type="number" min="0" value={pForm.price} onChange={(e) => setPForm((f) => ({ ...f, price: e.target.value }))} /></div>
+              <div><label className={label} htmlFor="name-1">Name *</label><input id="name-1" className={input} value={pForm.name} onChange={(e) => setPForm((f) => ({ ...f, name: e.target.value }))} placeholder="Gold Annual" required /></div>
+              <div><label className={label} htmlFor="price">Price (₹)</label><input id="price" className={input} type="number" min="0" value={pForm.price} onChange={(e) => setPForm((f) => ({ ...f, price: e.target.value }))} /></div>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div><label className={label}>Validity</label><select className={input} value={pForm.validity} onChange={(e) => setPForm((f) => ({ ...f, validity: e.target.value }))}>{VALIDITY.map((v) => <option key={v} className="bg-[#181A22]">{v}</option>)}</select></div>
-              <div><label className={label}>Booking Limit</label><input className={input} value={pForm.bookingLimit} onChange={(e) => setPForm((f) => ({ ...f, bookingLimit: e.target.value }))} /></div>
+              <div><label className={label} htmlFor="validity">Validity</label><select id="validity" className={input} value={pForm.validity} onChange={(e) => setPForm((f) => ({ ...f, validity: e.target.value }))}>{VALIDITY.map((v) => <option key={v} className="bg-[#181A22]">{v}</option>)}</select></div>
+              <div><label className={label} htmlFor="booking-limit">Booking Limit</label><input id="booking-limit" className={input} value={pForm.bookingLimit} onChange={(e) => setPForm((f) => ({ ...f, bookingLimit: e.target.value }))} /></div>
             </div>
             <label className="flex items-center gap-2 text-[13px] text-gray-300"><input type="checkbox" checked={pForm.guestAccess} onChange={(e) => setPForm((f) => ({ ...f, guestAccess: e.target.checked }))} className="w-auto accent-emerald-500" /> Guest access included</label>
-            <div><label className={label}>Benefits (comma-separated)</label><input className={input} value={pForm.benefits} onChange={(e) => setPForm((f) => ({ ...f, benefits: e.target.value }))} placeholder="Free racket, Priority booking" /></div>
+            <div><label className={label} htmlFor="benefits-comma-separated">Benefits (comma-separated)</label><input id="benefits-comma-separated" className={input} value={pForm.benefits} onChange={(e) => setPForm((f) => ({ ...f, benefits: e.target.value }))} placeholder="Free racket, Priority booking" /></div>
             <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[13px] py-2.5 rounded-lg">Save Package</button>
           </form>
         </Modal>
@@ -230,7 +231,13 @@ function ManageModal({ member, packages, onClose, onAction }) {
 
 function Modal({ title, tag, onClose, children }) {
   return (
-    <div onClick={onClose} className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+    <div
+        role="dialog"
+        aria-modal="true"
+        onClick={onClose}
+        className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+      >
+        <DialogA11y onClose={onClose} />
       <div onClick={(e) => e.stopPropagation()} className="bg-[#181A22] rounded-2xl max-w-md w-full overflow-hidden border border-white/[0.1] shadow-2xl">
         <div className="p-5 border-b border-white/[0.08] flex justify-between items-center bg-[#0a0d14]">
           <div><span className="text-[10px] font-mono tracking-wider font-bold text-emerald-400 uppercase">{tag}</span><h3 className="text-[17px] font-bold text-white mt-0.5">{title}</h3></div>
