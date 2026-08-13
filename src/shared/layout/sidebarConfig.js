@@ -3,7 +3,7 @@ import {
   Newspaper, MessageSquare, Shield, CreditCard, Tag,
   Settings, BarChart3, Dumbbell, MapPin, MessageCircle, Briefcase,
   Home, ClipboardCheck, CheckCircle, HelpCircle, BookOpen, ShieldCheck, Store,
-  Calendar, User, Building2, UserCheck, ReceiptText, Package, Plus,
+  Calendar, User, Building2, UserCheck, ReceiptText, Package, Plus, Upload,
 } from "lucide-react";
 
 /**
@@ -116,6 +116,7 @@ export const SIDEBAR_SECTIONS = [
       { key: "approved", label: "Approved Users", icon: CheckCircle, path: "/approved", roles: ["superadmin"] },
       { key: "inquiries", label: "Inquiries", icon: HelpCircle, path: "/inquiries", roles: ["superadmin"] },
       { key: "rbac", label: "Roles & Permissions", icon: ShieldCheck, path: "/rbac", roles: ["superadmin"] },
+      { key: "bulk-user-upload", label: "Bulk User Upload", icon: Upload, path: "/bulk-user-upload", roles: ["superadmin"] },
     ],
   },
 

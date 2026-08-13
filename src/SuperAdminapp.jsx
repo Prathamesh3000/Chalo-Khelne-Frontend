@@ -12,6 +12,7 @@ import VendorMarketplace from "./SuperAdmin/VendorMarketplace";
 import TurfApprovals from "./SuperAdmin/TurfApprovals";
 import CreateClubAdmin from "./SuperAdmin/CreateClubAdmin";
 import ManageClubs from "./SuperAdmin/ManageClubs";
+import BulkUserUpload from "./SuperAdmin/BulkUserUpload";
 import SuGroupChatList from "./SuperAdmin/SuGroupChatList";
 import SuGroupChatPage from "./SuperAdmin/SuGroupChatPage";
 import SuNotification from "./SuperAdmin/SuNotification";
@@ -37,6 +38,7 @@ const SuperAdminapp = () => {
         <Route path="/rule-books"         element={<SportRuleBooks />} />
         <Route path="/category-templates" element={<CategoryTemplates />} />
         <Route path="/rbac"               element={<RbacManagement />} />
+        <Route path="/bulk-user-upload"   element={<BulkUserUpload />} />
         <Route path="/vendor-marketplace" element={<VendorMarketplace />} />
         <Route path="/turf-approvals"     element={<TurfApprovals />} />
         <Route path="/notification"       element={<SuNotification />} />
