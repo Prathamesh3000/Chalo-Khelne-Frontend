@@ -1,7 +1,9 @@
 import { useEffect } from "react";
+// Header and footer now come from LandingLayout, which wraps every /l/* route —
+// rendering them here as well would stack two of each.
 import {
-  Preloader, LandingHeader, Hero, ScrollingSportStrip, Tournaments, Turfs, Social,
-  Coaching, WhyChaloKhelne, HowItWorks, SportsGrid, ForClubs, Inquiry, CTABanner, LandingFooter,
+  Preloader, Hero, ScrollingSportStrip, Tournaments, Turfs, Social,
+  Coaching, WhyChaloKhelne, HowItWorks, SportsGrid, ForClubs, Inquiry, CTABanner,
 } from "../../features/landing";
 import { useSmoothScroll } from "../../features/landing/hooks/useSmoothScroll";
 
@@ -27,7 +29,6 @@ export default function LandingHome() {
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-white antialiased">
       <Preloader />
-      <LandingHeader />
       <main>
         <Hero />
         <ScrollingSportStrip />
@@ -42,7 +43,6 @@ export default function LandingHome() {
         <CTABanner />
         <Inquiry />
       </main>
-      <LandingFooter />
     </div>
   );
 }

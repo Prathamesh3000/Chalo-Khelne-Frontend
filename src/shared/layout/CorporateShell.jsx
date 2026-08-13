@@ -6,18 +6,22 @@ import {
 } from "lucide-react";
 import { AuthContext } from "../../context/AuthContext";
 import { cn } from "../lib";
+import { useSidebarCollapse } from "./useSidebarCollapse";
+import SidebarFrame from "./SidebarFrame";
+import ShellHamburger from "./ShellHamburger";
 
 /**
  * Corporate workspace shell — dark sidebar + topbar.
  * Mirrors ManagerShell / ClubAdminShell chrome with Corporate-specific nav.
  */
 export default function CorporateShell({ children, searchPlaceholder }) {
+  const sidebar = useSidebarCollapse();
   return (
     <div className="ck-dark flex min-h-[100vh] bg-[#0F1117]">
-      <CorporateSidebar />
+      <CorporateSidebar {...sidebar} />
       <div className="flex-1 flex flex-col min-w-0 w-full">
-        <CorporateTopbar searchPlaceholder={searchPlaceholder} />
-        <main className="flex-1 px-6 py-6 max-w-[1280px] w-full mx-auto text-gray-200">
+        <CorporateTopbar searchPlaceholder={searchPlaceholder} onMenuClick={sidebar.toggle} />
+        <main className="flex-1 px-4 py-6 sm:px-6 max-w-[1280px] w-full mx-auto text-gray-200">
           {children}
         </main>
       </div>
@@ -62,7 +66,7 @@ const NAV_SECTIONS = [
   },
 ];
 
-function CorporateSidebar() {
+function CorporateSidebar({ open, isDesktop, close }) {
   const auth = useContext(AuthContext);
   const navigate = useNavigate();
   const user = auth?.user || auth?.auth;
@@ -84,7 +88,7 @@ function CorporateSidebar() {
   };
 
   return (
-    <aside className="w-[200px] flex-shrink-0 bg-[#0F1117] flex flex-col">
+    <SidebarFrame open={open} isDesktop={isDesktop} onClose={close} width={200}>
       {/* Logo */}
       <div
         className="px-5 py-5 flex items-center gap-2.5"
@@ -157,7 +161,7 @@ function CorporateSidebar() {
           <LogOut className="w-3 h-3" />
         </button>
       </div>
-    </aside>
+    </SidebarFrame>
   );
 }
 
@@ -170,7 +174,7 @@ const DATE_FMT = new Intl.DateTimeFormat("en-IN", {
   year: "numeric",
 });
 
-function CorporateTopbar({ searchPlaceholder }) {
+function CorporateTopbar({ searchPlaceholder, onMenuClick }) {
   const navigate = useNavigate();
   const [today] = useState(() => new Date());
   const [, force] = useState(0);
@@ -184,10 +188,14 @@ function CorporateTopbar({ searchPlaceholder }) {
 
   return (
     <header
-      className="h-14 flex items-center justify-between gap-4 px-6"
+      className="h-14 flex items-center justify-between gap-4 px-2 sm:px-6"
       style={{ background: "#0F1117", borderBottom: "1px solid rgba(255,255,255,0.06)" }}
     >
-      <span className="text-[13px] text-gray-400">{DATE_FMT.format(today)}</span>
+      <div className="flex items-center gap-2 min-w-0">
+        <ShellHamburger onClick={onMenuClick} />
+        {/* The date is the first thing to go when width is tight. */}
+        <span className="hidden sm:inline text-[13px] text-gray-400">{DATE_FMT.format(today)}</span>
+      </div>
 
       <div className="flex items-center gap-3 flex-shrink-0">
         <div className="relative">
@@ -195,7 +203,7 @@ function CorporateTopbar({ searchPlaceholder }) {
           <input
             type="text"
             placeholder={searchPlaceholder || "Search…"}
-            className="w-[200px] h-9 pl-9 pr-3 rounded-md text-[13px] text-gray-200 placeholder:text-gray-500 focus:outline-none"
+            className="w-full max-w-[200px] h-9 pl-9 pr-3 rounded-md text-[13px] text-gray-200 placeholder:text-gray-500 focus:outline-none"
             style={{
               background: "rgba(255,255,255,0.04)",
               border: "1px solid rgba(255,255,255,0.06)",

@@ -31,7 +31,11 @@ export function LandingFooter() {
   return (
     <footer className="bg-[#050505] text-white border-t border-white/10">
       <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-        <div className="grid gap-10 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
+        {/* Went straight from one column to four at lg (1024px), so every
+            tablet in portrait got the phone layout: four stacked blocks and a
+            very tall footer. Two columns is the right middle step — the brand
+            block carries a paragraph and would be squeezed at a quarter width. */}
+        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
           <div>
             <div className="flex items-center gap-2">
               <span className="grid h-9 w-9 place-items-center rounded-md bg-green-600 text-sm font-black text-white">

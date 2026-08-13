@@ -4,6 +4,9 @@ import { LogOut, Search, Bell } from "lucide-react";
 import { AuthContext } from "../../context/AuthContext";
 import { cn } from "../lib";
 import { getSidebarForRole } from "./sidebarConfig";
+import { useSidebarCollapse } from "./useSidebarCollapse";
+import SidebarFrame from "./SidebarFrame";
+import ShellHamburger from "./ShellHamburger";
 
 /**
  * Manager workspace shell — used by /mdashboard and any other manager pages
@@ -16,12 +19,13 @@ import { getSidebarForRole } from "./sidebarConfig";
  *   - No pipeline / tab slot — caller renders its own content
  */
 export default function ManagerShell({ children, searchPlaceholder }) {
+  const sidebar = useSidebarCollapse();
   return (
     <div className="ck-dark flex min-h-[100vh] bg-[#0F1117]">
-      <ManagerSidebar />
+      <ManagerSidebar {...sidebar} />
       <div className="flex-1 flex flex-col min-w-0 w-full">
-        <ManagerTopbar searchPlaceholder={searchPlaceholder} />
-        <main className="flex-1 px-6 py-6 max-w-[1280px] w-full mx-auto text-gray-200">
+        <ManagerTopbar searchPlaceholder={searchPlaceholder} onMenuClick={sidebar.toggle} />
+        <main className="flex-1 px-4 py-6 sm:px-6 max-w-[1280px] w-full mx-auto text-gray-200">
           {children}
         </main>
       </div>
@@ -36,7 +40,7 @@ export default function ManagerShell({ children, searchPlaceholder }) {
 // which shell wraps the page. We only adapt the config's {label, path, icon}
 // shape to this shell's {label, to, icon} and keep the dark visual styling here.
 
-function ManagerSidebar() {
+function ManagerSidebar({ open, isDesktop, close }) {
   const auth = useContext(AuthContext);
   const navigate = useNavigate();
   const user = auth?.user || auth?.auth;
@@ -62,7 +66,7 @@ function ManagerSidebar() {
   };
 
   return (
-    <aside className="w-[200px] flex-shrink-0 bg-[#0F1117] flex flex-col">
+    <SidebarFrame open={open} isDesktop={isDesktop} onClose={close} width={200}>
       {/* Logo */}
       <div
         className="px-5 py-5 flex items-center gap-2.5"
@@ -137,7 +141,7 @@ function ManagerSidebar() {
           <LogOut className="w-3 h-3" />
         </button>
       </div>
-    </aside>
+    </SidebarFrame>
   );
 }
 
@@ -150,7 +154,7 @@ const DATE_FMT = new Intl.DateTimeFormat("en-IN", {
   year: "numeric",
 });
 
-function ManagerTopbar({ searchPlaceholder }) {
+function ManagerTopbar({ searchPlaceholder, onMenuClick }) {
   const navigate = useNavigate();
   const [today] = useState(() => new Date());
   // Re-roll the date once at midnight in case the dashboard stays open. Cheap
@@ -166,18 +170,22 @@ function ManagerTopbar({ searchPlaceholder }) {
 
   return (
     <header
-      className="h-14 flex items-center justify-between gap-4 px-6"
+      className="h-14 flex items-center justify-between gap-4 px-2 sm:px-6"
       style={{ background: "#0F1117", borderBottom: "1px solid rgba(255,255,255,0.06)" }}
     >
-      <span className="text-[13px] text-gray-400">{DATE_FMT.format(today)}</span>
+      <div className="flex items-center gap-2 min-w-0">
+        <ShellHamburger onClick={onMenuClick} />
+        {/* The date is the first thing to go when width is tight. */}
+        <span className="hidden sm:inline text-[13px] text-gray-400">{DATE_FMT.format(today)}</span>
+      </div>
 
       <div className="flex items-center gap-3 flex-shrink-0">
-        <div className="relative">
+        <div className="relative hidden md:block">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500 pointer-events-none" />
           <input
             type="text"
             placeholder={searchPlaceholder || "Search tournaments, players…"}
-            className="w-[200px] h-9 pl-9 pr-3 rounded-md text-[13px] text-gray-200 placeholder:text-gray-500 focus:outline-none"
+            className="w-full max-w-[200px] h-9 pl-9 pr-3 rounded-md text-[13px] text-gray-200 placeholder:text-gray-500 focus:outline-none"
             style={{
               background: "rgba(255,255,255,0.04)",
               border: "1px solid rgba(255,255,255,0.06)",

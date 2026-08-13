@@ -7,6 +7,9 @@ import { AuthContext } from "../../context/AuthContext";
 import { cn, useTabSwitchSkeleton } from "../lib";
 import { Skeleton } from "../ui";
 import { getSidebarForRole } from "./sidebarConfig";
+import { useSidebarCollapse } from "./useSidebarCollapse";
+import SidebarFrame from "./SidebarFrame";
+import ShellHamburger from "./ShellHamburger";
 
 /**
  * Tournament-management shell — sidebar + topbar + page header + pipeline +
@@ -39,14 +42,15 @@ export default function TournamentShell({
   children,
 }) {
   const switching = useTabSwitchSkeleton(activeTabKey);
+  const sidebar = useSidebarCollapse();
   return (
     <div className="ck-dark flex min-h-[100vh] bg-[#0F1117]">
-      <ShellSidebar />
+      <ShellSidebar {...sidebar} />
 
       <div className="flex-1 flex flex-col min-w-0 w-full">
-        <ShellTopbar breadcrumbs={breadcrumbs} />
+        <ShellTopbar breadcrumbs={breadcrumbs} onMenuClick={sidebar.toggle} />
 
-        <main className="flex-1 px-6 py-6 max-w-[1280px] w-full mx-auto text-gray-200">
+        <main className="flex-1 px-4 py-6 sm:px-6 max-w-[1280px] w-full mx-auto text-gray-200">
           {tournament && <PageHeader tournament={tournament} />}
           {steps.length > 0 && (
             <div className="mt-5">
@@ -81,7 +85,7 @@ function TabSwitchSkeleton() {
 // Global nav comes from the single role-based sidebarConfig (same source as
 // AppLayout + ManagerShell) so navigation is identical across every shell.
 
-function ShellSidebar() {
+function ShellSidebar({ open, isDesktop, close }) {
   const auth = useContext(AuthContext);
   const navigate = useNavigate();
   const user = auth?.user || auth?.auth;
@@ -106,7 +110,7 @@ function ShellSidebar() {
   };
 
   return (
-    <aside className="w-[200px] flex-shrink-0 bg-[#0F1117] flex flex-col">
+    <SidebarFrame open={open} isDesktop={isDesktop} onClose={close} width={200}>
       {/* Logo */}
       <div className="px-5 py-5 flex items-center gap-2.5">
         <span className="w-2.5 h-2.5 rounded-full bg-orange-500 shadow-[0_0_12px_rgba(249,115,22,0.5)]" />
@@ -164,13 +168,13 @@ function ShellSidebar() {
       <div className="px-5 py-3 text-[10px] font-bold uppercase tracking-[0.16em] text-gray-600 border-t border-white/5">
         Chalo Khelne · MVP
       </div>
-    </aside>
+    </SidebarFrame>
   );
 }
 
 // ── Topbar ───────────────────────────────────────────────────────────────────
 
-function ShellTopbar({ breadcrumbs }) {
+function ShellTopbar({ breadcrumbs, onMenuClick }) {
   const navigate = useNavigate();
   const auth = useContext(AuthContext);
   const user = auth?.user || auth?.auth;
@@ -182,10 +186,11 @@ function ShellTopbar({ breadcrumbs }) {
   // drill-down?). React Router's navigate(-1) handles this cleanly.
   return (
     <header
-      className="h-14 flex items-center justify-between gap-4 px-6"
+      className="h-14 flex items-center justify-between gap-4 px-2 sm:px-6"
       style={{ background: "#0F1117", borderBottom: "1px solid rgba(255,255,255,0.06)" }}
     >
       <div className="flex items-center gap-2 min-w-0">
+        <ShellHamburger onClick={onMenuClick} />
         <button
           onClick={() => navigate(-1)}
           className="grid h-8 w-8 place-items-center rounded-md hover:bg-white/5 text-gray-400 transition w-auto flex-shrink-0"

@@ -8,6 +8,9 @@ import {
 } from "lucide-react";
 import { AuthContext } from "../../context/AuthContext";
 import { cn } from "../lib";
+import { useSidebarCollapse } from "./useSidebarCollapse";
+import SidebarFrame from "./SidebarFrame";
+import ShellHamburger from "./ShellHamburger";
 
 /**
  * ClubAdmin workspace shell — dark sidebar + dashboard topbar.
@@ -15,11 +18,12 @@ import { cn } from "../lib";
  * ClubAdminApp routes that need the dark dashboard look.
  */
 export default function ClubAdminShell({ children, searchPlaceholder }) {
+  const sidebar = useSidebarCollapse();
   return (
     <div className="ck-dark flex max-h-[100vh] min-h-[100vh] bg-[#0F1117] gap-[24px]">
-      <ClubAdminSidebar />
+      <ClubAdminSidebar {...sidebar} />
       <div className="flex flex-col min-w-0 w-full">
-        <ClubAdminTopbar searchPlaceholder={searchPlaceholder} />
+        <ClubAdminTopbar searchPlaceholder={searchPlaceholder} onMenuClick={sidebar.toggle} />
         <main className="w-full mx-auto text-gray-200 overflow-y-scroll">
           {children}
         </main>
@@ -111,7 +115,7 @@ const SCHOOL_NAV_SECTIONS = [
   },
 ];
 
-function ClubAdminSidebar() {
+function ClubAdminSidebar({ open, isDesktop, close }) {
   const auth = useContext(AuthContext);
   const navigate = useNavigate();
   const user = auth?.user || auth?.auth;
@@ -149,7 +153,7 @@ function ClubAdminSidebar() {
   };
 
   return (
-    <aside className="w-[200px] flex-shrink-0 bg-[#0F1117] flex flex-col">
+    <SidebarFrame open={open} isDesktop={isDesktop} onClose={close} width={200}>
       {/* Logo */}
       <div
         className="px-5 py-5 flex items-center gap-2.5"
@@ -222,7 +226,7 @@ function ClubAdminSidebar() {
           <LogOut className="w-3 h-3" />
         </button>
       </div>
-    </aside>
+    </SidebarFrame>
   );
 }
 
@@ -235,7 +239,7 @@ const DATE_FMT = new Intl.DateTimeFormat("en-IN", {
   year: "numeric",
 });
 
-function ClubAdminTopbar({ searchPlaceholder }) {
+function ClubAdminTopbar({ searchPlaceholder, onMenuClick }) {
   const navigate = useNavigate();
   const [today] = useState(() => new Date());
   const [, force] = useState(0);
@@ -249,10 +253,14 @@ function ClubAdminTopbar({ searchPlaceholder }) {
 
   return (
     <header
-      className="flex items-center justify-between gap-4 px-6 py-4 flex items-center gap-2.5"
+      className="h-14 flex items-center justify-between gap-4 px-2 sm:px-6"
       style={{ background: "#0F1117", borderBottom: "1px solid rgba(255,255,255,0.06)" }}
     >
-      <span className="text-[13px] text-gray-400">{DATE_FMT.format(today)}</span>
+      <div className="flex items-center gap-2 min-w-0">
+        <ShellHamburger onClick={onMenuClick} />
+        {/* The date is the first thing to go when width is tight. */}
+        <span className="hidden sm:inline text-[13px] text-gray-400">{DATE_FMT.format(today)}</span>
+      </div>
 
       <div className="flex items-center gap-3 flex-shrink-0">
         <div className="relative">
@@ -260,7 +268,7 @@ function ClubAdminTopbar({ searchPlaceholder }) {
           <input
             type="text"
             placeholder={searchPlaceholder || "Search…"}
-            className="w-[200px] h-9 pl-9 pr-3 rounded-md text-[13px] text-gray-200 placeholder:text-gray-500 focus:outline-none"
+            className="w-full max-w-[200px] h-9 pl-9 pr-3 rounded-md text-[13px] text-gray-200 placeholder:text-gray-500 focus:outline-none"
             style={{
               background: "rgba(255,255,255,0.04)",
               border: "1px solid rgba(255,255,255,0.06)",

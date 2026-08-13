@@ -109,8 +109,10 @@ export default function LNews() {
     return formatDate(date);
   };
 
+  // pt-12, not pt-28: LandingLayout now supplies the 64px offset for the
+  // fixed header, which this page used to carry on its own.
   return (
-    <div className="min-h-screen bg-white pt-28 pb-20">
+    <div className="min-h-screen bg-white pt-12 pb-20">
       {/* Hero Header */}
       <div className="relative overflow-hidden bg-gray-50 border-b border-gray-200">
         <div className="absolute inset-0">
@@ -189,7 +191,7 @@ export default function LNews() {
                   {/* Featured Image */}
                   <div className="md:w-1/2 h-64 md:h-auto relative overflow-hidden">
                     {news[0].thumbnail ? (
-                      <img
+                      <img loading="lazy"
                         src={news[0].thumbnail}
                         alt={news[0].title}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
@@ -273,7 +275,7 @@ export default function LNews() {
                     {/* Card Image */}
                     <div className="h-48 overflow-hidden relative">
                       {article.thumbnail ? (
-                        <img
+                        <img loading="lazy"
                           src={article.thumbnail}
                           alt={article.title}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
@@ -388,7 +390,7 @@ export default function LNews() {
               {/* Article Hero */}
               <div className="relative h-64 overflow-hidden">
                 {selectedArticle.thumbnail ? (
-                  <img
+                  <img loading="lazy"
                     src={selectedArticle.thumbnail}
                     alt={selectedArticle.title}
                     className="w-full h-full object-cover"
