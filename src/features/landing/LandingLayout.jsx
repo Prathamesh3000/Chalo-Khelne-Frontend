@@ -23,15 +23,23 @@ import { LandingFooter } from "./components/LandingFooter";
  *     already accounts for it; the inner pages do not, so the layout adds the
  *     offset for them.
  */
+/* Pages that paint their own dark, full-bleed hero behind the fixed header:
+   they want it transparent and must NOT get the pt-16 offset, or a 64px gap
+   opens above the hero. Everything else is a light inner page. /for-organizers
+   is mounted at the top level rather than under /l/* (the URL goes on posters
+   and bracket PDFs, and /l/* bounces authenticated users to their dashboard),
+   so it has to be listed here explicitly. */
+const DARK_HERO_ROUTES = ["/l", "/l/", "/l/home", "/for-organizers"];
+
 export default function LandingLayout() {
   const { pathname } = useLocation();
-  const isHome = pathname === "/l" || pathname === "/l/" || pathname === "/l/home";
+  const isDarkHero = DARK_HERO_ROUTES.includes(pathname);
 
   return (
     <>
-      <LandingHeader solid={!isHome} />
-      {/* h-16 header. Home paints its own full-bleed hero underneath it. */}
-      <div className={isHome ? undefined : "pt-16"}>
+      <LandingHeader solid={!isDarkHero} />
+      {/* h-16 header. Dark-hero pages paint their own full-bleed hero under it. */}
+      <div className={isDarkHero ? undefined : "pt-16"}>
         <Outlet />
       </div>
       <LandingFooter />

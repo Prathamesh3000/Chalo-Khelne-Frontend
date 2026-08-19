@@ -1,15 +1,26 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { Menu, X, ArrowRight } from "lucide-react";
 import { cn } from "../../../shared/lib";
 
+/* Two kinds of item:
+     href → a section anchor, which only exists on the home page
+     to   → a real route, rendered as a <Link> */
 const NAV = [
-  { label: "Tournaments", href: "#tournaments" },
-  { label: "Turfs",       href: "#turfs" },
-  { label: "Community",   href: "#social" },
-  { label: "Sports",      href: "#sports" },
-  { label: "For Clubs",   href: "#for-clubs" },
+  { label: "Tournaments",    href: "#tournaments" },
+  { label: "Turfs",          href: "#turfs" },
+  { label: "Community",      href: "#social" },
+  { label: "Sports",         href: "#sports" },
+  { label: "For Clubs",      href: "#for-clubs" },
+  { label: "For Organizers", to: "/for-organizers" },
 ];
+
+/* The home page is the only one carrying the #tournaments / #turfs / #social
+   sections. Anywhere else those anchors have to be sent back to it. */
+const HOME_PATHS = ["/l", "/l/", "/l/home"];
+/* Pages that render their own <Inquiry>, so "Get Started" should scroll down
+   the current page instead of navigating away from it. */
+const INQUIRY_PATHS = [...HOME_PATHS, "/for-organizers"];
 
 /**
  * @param {boolean} solid
@@ -25,9 +36,17 @@ export function LandingHeader({ solid = false }) {
   const [progress, setProgress] = useState(0);
   const [active, setActive] = useState("");
 
+  const { pathname } = useLocation();
   const opaque = solid || scrolled;
-  // On an inner page the section lives on home, so anchor there instead.
-  const anchor = (href) => (solid ? `/l/home${href}` : href);
+
+  /* Derived from the path, NOT from `solid`. Those were the same thing while
+     every dark page was the home page, but /for-organizers is dark (solid is
+     false) and yet does NOT have the home sections — so keying the anchors off
+     `solid` sent its nav to #tournaments, an id that is not on that page, and
+     the links silently did nothing. */
+  const onHome = HOME_PATHS.includes(pathname);
+  const anchor = (href) => (onHome ? href : `/l/home${href}`);
+  const inquireHref = INQUIRY_PATHS.includes(pathname) ? "#inquire" : "/l/home#inquire";
 
   /* scrolled state + reading progress */
   useEffect(() => {
@@ -41,9 +60,20 @@ export function LandingHeader({ solid = false }) {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  /* scroll-spy — highlight the section currently in view */
+  /* scroll-spy — highlight the section currently in view.
+     Route items carry no href, so they are filtered out before slicing.
+
+     Only ever runs on the home page. Off it, every anchor item navigates AWAY
+     (to /l/home#…), so lighting one up marks a link you are not on. That is
+     not hypothetical: /for-organizers reuses SportsGrid, which brings its
+     `id="sports"` with it, so the observer matched and left SPORTS lit green
+     beside FOR ORGANIZERS — two active tabs at once. */
   useEffect(() => {
-    const ids = NAV.map((n) => n.href.slice(1));
+    if (!onHome) {
+      setActive("");
+      return;
+    }
+    const ids = NAV.filter((n) => n.href).map((n) => n.href.slice(1));
     const els = ids.map((id) => document.getElementById(id)).filter(Boolean);
     if (!els.length) return;
     const obs = new IntersectionObserver(
@@ -56,7 +86,7 @@ export function LandingHeader({ solid = false }) {
     );
     els.forEach((el) => obs.observe(el));
     return () => obs.disconnect();
-  }, []);
+  }, [onHome]);
 
   /* lock body scroll when mobile menu open */
   useEffect(() => {
@@ -91,18 +121,25 @@ export function LandingHeader({ solid = false }) {
 
         <nav className="hidden items-center gap-1 lg:flex">
           {NAV.map((item) => {
-            const on = active === item.href;
-            return (
-              <a
-                key={item.href}
-                href={anchor(item.href)}
-                className={cn(
-                  "relative w-auto whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-semibold uppercase tracking-wide transition-colors",
-                  on ? "text-green-400" : "text-white/70 hover:text-white"
-                )}
-              >
+            // A route item is "on" when you are standing on it; an anchor item
+            // when scroll-spy says its section is in view.
+            const on = item.to ? pathname === item.to : active === item.href;
+            const cls = cn(
+              "relative w-auto whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-semibold uppercase tracking-wide transition-colors",
+              on ? "text-green-400" : "text-white/70 hover:text-white"
+            );
+            const underline = (
+              <span className={cn("absolute -bottom-0.5 left-3 right-3 h-0.5 rounded-full bg-green-500 transition-all duration-300", on ? "opacity-100" : "opacity-0")} />
+            );
+            return item.to ? (
+              <Link key={item.to} to={item.to} className={cls}>
                 {item.label}
-                <span className={cn("absolute -bottom-0.5 left-3 right-3 h-0.5 rounded-full bg-green-500 transition-all duration-300", on ? "opacity-100" : "opacity-0")} />
+                {underline}
+              </Link>
+            ) : (
+              <a key={item.href} href={anchor(item.href)} className={cls}>
+                {item.label}
+                {underline}
               </a>
             );
           })}
@@ -113,7 +150,7 @@ export function LandingHeader({ solid = false }) {
             Sign in
           </Link>
           <a
-            href={anchor("#inquire")}
+            href={inquireHref}
             className="group relative inline-flex h-10 w-auto shrink-0 items-center gap-1.5 overflow-hidden whitespace-nowrap rounded-md bg-green-600 px-4 text-sm font-bold uppercase tracking-wide text-white shadow-lg shadow-green-600/30 transition-all hover:bg-green-700 active:scale-[0.97]"
           >
             <span className="relative z-10">Get Started</span>
@@ -139,25 +176,28 @@ export function LandingHeader({ solid = false }) {
         className={cn("fixed inset-x-0 bottom-0 top-16 z-40 transition-opacity duration-300 lg:hidden", open ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0")}
       >
         <div className="flex h-full flex-col gap-2 px-6 pb-10 pt-8">
-          {NAV.map((item, i) => (
-            <a
-              key={item.href}
-              href={anchor(item.href)}
-              onClick={() => setOpen(false)}
-              style={{ transitionDelay: open ? `${100 + i * 70}ms` : "0ms", transform: open ? "translateY(0)" : "translateY(20px)", opacity: open ? 1 : 0 }}
-              className={cn(
-                "w-auto border-b border-white/10 py-4 text-3xl font-black uppercase tracking-tight transition-all duration-300",
-                active === item.href ? "text-green-400" : "text-white"
-              )}
-            >
-              {item.label}
-            </a>
-          ))}
+          {NAV.map((item, i) => {
+            const on = item.to ? pathname === item.to : active === item.href;
+            const style = { transitionDelay: open ? `${100 + i * 70}ms` : "0ms", transform: open ? "translateY(0)" : "translateY(20px)", opacity: open ? 1 : 0 };
+            const cls = cn(
+              "w-auto border-b border-white/10 py-4 text-3xl font-black uppercase tracking-tight transition-all duration-300",
+              on ? "text-green-400" : "text-white"
+            );
+            return item.to ? (
+              <Link key={item.to} to={item.to} onClick={() => setOpen(false)} style={style} className={cls}>
+                {item.label}
+              </Link>
+            ) : (
+              <a key={item.href} href={anchor(item.href)} onClick={() => setOpen(false)} style={style} className={cls}>
+                {item.label}
+              </a>
+            );
+          })}
           <div className="mt-auto flex flex-col gap-3">
             <Link to="/login" onClick={() => setOpen(false)} className="inline-flex h-12 w-auto items-center justify-center rounded-md border border-white/20 text-base font-bold uppercase tracking-wide text-white">
               Sign in
             </Link>
-            <a href={anchor("#inquire")} onClick={() => setOpen(false)} className="inline-flex h-12 w-auto items-center justify-center gap-1.5 rounded-md bg-green-600 text-base font-bold uppercase tracking-wide text-white">
+            <a href={inquireHref} onClick={() => setOpen(false)} className="inline-flex h-12 w-auto items-center justify-center gap-1.5 rounded-md bg-green-600 text-base font-bold uppercase tracking-wide text-white">
               Get Started <ArrowRight className="h-4 w-4" />
             </a>
           </div>

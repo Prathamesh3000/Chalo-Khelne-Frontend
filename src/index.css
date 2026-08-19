@@ -115,6 +115,50 @@ input[type="number"] {
 .scrollbar-hide::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }
 .scrollbar-hide { -ms-overflow-style: none !important; scrollbar-width: none !important; }
 
+/* Landing pages — hide both page scrollbars and contain horizontal overflow.
+   Scoped to <html class="ck-landing">, added on mount by the landing page and
+   removed on unmount, so dashboards keep their normal scrollbars.
+
+   Two separate problems are being solved here:
+
+   1. The global scrollbar above paints a LIGHT track (#F5F7FA) — fine on the
+      light dashboards, but it renders as a pale bar against the #0A0A0A
+      landing page. Hiding it is the visual fix.
+   2. Something on the page is wider than the viewport, which is what produced
+      the horizontal scrollbar. overflow-x contains it.
+
+   `!important` throughout is deliberate, not laziness: Tailwind is loaded from
+   the play-CDN <script> in index.html, so it injects its stylesheet at runtime
+   AFTER this file — a same-specificity rule from it would win on order alone.
+
+   overflow-x is `hidden` rather than `clip` because the landing header is
+   `position: fixed` (see LandingLayout), not sticky, so the usual objection to
+   `hidden` — that it creates a scroll container and breaks sticky — does not
+   apply here, and `hidden` has universal support. */
+html.ck-landing,
+html.ck-landing body {
+  overflow-x: hidden !important;
+  max-width: 100% !important;
+  scrollbar-width: none !important;      /* Firefox */
+  -ms-overflow-style: none !important;   /* legacy Edge */
+
+  /* index.html hardcodes an INLINE `background-color: #F5F7FA` on <body>, and
+     index.css repeats it. Home.jsx overrides both in JS on mount — so until
+     now the dark page depended on an effect having run, and any moment it had
+     not (first paint, a StrictMode cleanup, an HMR reload) showed as an
+     off-white band wherever content did not cover the viewport. `!important`
+     is what lets a stylesheet beat that inline attribute, making the dark
+     ground a guarantee rather than a race. */
+  background-color: #0A0A0A !important;
+}
+html.ck-landing::-webkit-scrollbar,
+html.ck-landing body::-webkit-scrollbar,
+html.ck-landing *::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
 /* ───────────────────────────────────────────────────────────────
    Landing-page motion. Kept as plain CSS so it works regardless of
    Tailwind v3/v4 token-resolution quirks. Each keyframe is named to

@@ -1747,6 +1747,17 @@ export default function Tournament({
 
   const currentGroup = filteredGroups.find(group => group._id === activeGroup) || filteredGroups[0];
 
+  // Per-category cutoff. These call sites passed neither sport nor category, so
+  // the standings highlight and the "Top N qualify" caption both showed the
+  // track default — a different number from the one transitionToKnockout
+  // applies, which resolves per group's category. Falls back to the track when
+  // the category sets none, so nothing changes for single-format tournaments.
+  const currentQualifyPerGroup = getQualifyPerGroup(
+    tournament,
+    propActiveSportId,
+    currentGroup?.category
+  );
+
   const filteredRound2Groups = (round2Groups || []).filter(group => {
     if (!selectedCategory) return true;
     const gCat = (group.category || "").toLowerCase().trim().replace(/_/g, " ");
@@ -2268,7 +2279,7 @@ export default function Tournament({
                         {standingsData[activeGroup].standings.map((p, idx) => (
                           <tr key={p.playerId} className={`border-t border-white/[0.05] ${
                             p.qualified ? "bg-green-500/10" : ""
-                          } ${idx < getQualifyPerGroup(tournament) ? "font-semibold" : ""}`}>
+                          } ${idx < currentQualifyPerGroup ? "font-semibold" : ""}`}>
                             <td className="px-3 py-2 text-gray-400">{p.rank}</td>
                             <td className="px-3 py-2 text-white flex items-center gap-1.5">
                               {p.playerName}
@@ -2315,7 +2326,7 @@ export default function Tournament({
                     )}
                   </button>
                   <p className="text-[11px] text-gray-500 text-center mt-1">
-                    All group matches must be completed. Top {getQualifyPerGroup(tournament)} per group will qualify.
+                    All group matches must be completed. Top {currentQualifyPerGroup} per group will qualify.
                   </p>
                 </div>
               )}

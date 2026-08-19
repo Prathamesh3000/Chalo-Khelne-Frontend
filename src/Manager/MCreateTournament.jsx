@@ -46,7 +46,7 @@ import {
 } from "./wizard";
 // Sub-step 5 — sport classification + unranked defaults
 import {
-  SPORT_SCORING_TYPES,
+  scoringTypeFor,
   isNestedSetSport,
   isTeamOnlySport,
   slugifyForSport,
@@ -228,7 +228,7 @@ function mapSportApiToFormSport(s, isFirst, legacyRootLevel = "") {
 
     sportName: s.sportName || "",
     sportSlug: s.sportSlug || slugifyForSport(s.sportName),
-    scoringType: s.matchFormat?.scoringType || SPORT_SCORING_TYPES[s.sportName] || "sets",
+    scoringType: s.matchFormat?.scoringType || scoringTypeFor(s.sportName) || "sets",
     // Per-sport tournament level. Edit-load fallback chain:
     //   sport entry's own level → legacy root tournamentLevel → "" (force pick)
     tournamentLevel: s.tournamentLevel || legacyRootLevel || "",
@@ -243,8 +243,19 @@ function mapSportApiToFormSport(s, isFirst, legacyRootLevel = "") {
           minAge: c.minAge ?? null,
           maxAge: c.maxAge ?? null,
           gender: c.gender || "any",
+          // Per-category format overrides — null means the row inherits the
+          // sport track, which is how every tournament saved before this
+          // feature loads.
+          type: c.type || null,
+          groupStageFormat: c.groupStageFormat || null,
+          knockoutFormat: c.knockoutFormat || null,
+          qualifyPerGroup: c.qualifyPerGroup ?? null,
+          drawSize: c.drawSize ?? null,
         }))
       : [{ templateId: null, name: "", fee: 0, minAge: null, maxAge: null, gender: "any" }],
+    // Which scope the tournament was authored in. Anything saved before this
+    // existed has no value and loads as "sport" — its original behaviour.
+    formatScope: s.formatScope === "category" ? "category" : "sport",
     groupStageFormat: s.groupStageFormat || null,
     knockoutFormat: s.knockoutFormat || null,
     davisCupFormatId: s.davisCupFormatId || null,
@@ -316,6 +327,9 @@ function newSportEntry({ expanded = false } = {}) {
     // First row is empty so the picker prompts the manager to select a
     // SuperAdmin template — there is no free-form category entry.
     categories: [{ templateId: null, name: "", fee: 0, minAge: null, maxAge: null, gender: "any" }],
+    // Format is declared once for the whole sport by default; the manager can
+    // switch to per-category in step 2.
+    formatScope: "sport",
     groupStageFormat: "Singles",
     knockoutFormat: "Singles",
     davisCupFormatId: null,
@@ -533,7 +547,7 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
       // Sport change: also reset per-sport format defaults + clear rule book
       // (matches the pre-Sub-step-3 userChangedSport reset behavior).
       const isTeam = isTeamOnlySport(value);
-      const scoringType = SPORT_SCORING_TYPES[value] || "sets";
+      const scoringType = scoringTypeFor(value) || "sets";
       updateSport(0, {
         sportName: value,
         sportSlug: slugifyForSport(value),
@@ -639,8 +653,11 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
             // snapshot label are required. Older categories created before
             // templates existed only have `name`, so we accept either signal
             // to stay backward-compatible with mid-flight tournaments.
+            // A template row carries a templateId; a custom row carries only a
+            // name. Either is valid — the wizard offers both.
             if (!c?.templateId && !c?.name?.trim()) {
-              errors[`${prefix}.categories[${j}].name`] = "Please select a category";
+              errors[`${prefix}.categories[${j}].name`] =
+                "Pick a category, or choose Custom and name it";
             }
             const minSet = c?.minAge !== null && c?.minAge !== undefined && c?.minAge !== "";
             const maxSet = c?.maxAge !== null && c?.maxAge !== undefined && c?.maxAge !== "";
@@ -821,10 +838,16 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
       //   - Path 3 (fresh sport, Section D never opened): _ruleBookValues is
       //     empty; fall back to sport-aware defaults via getUnrankedDefaults.
       const sportsPayload = formData.sports.map((s) => {
-        const scoringType = s.scoringType || SPORT_SCORING_TYPES[s.sportName] || "sets";
+        const scoringType = s.scoringType || scoringTypeFor(s.sportName) || "sets";
         const matchFormat = (s._ruleBookValues && Object.keys(s._ruleBookValues).length > 0)
           ? ruleBookValuesToMatchFormat(s._ruleBookValues, scoringType)
           : ruleBookValuesToMatchFormat(getUnrankedDefaults(s.sportName), scoringType);
+
+        // Per-category format is only sent when the manager chose that scope.
+        // Otherwise stale overrides — left behind by switching the scope or
+        // the tournament type back and forth — would keep winning on the
+        // server, where a category value always beats the track.
+        const perCategoryFormat = s.formatScope === "category";
 
         return {
           sportName: s.sportName,
@@ -832,11 +855,17 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
           scoringType,
           tournamentLevel: s.tournamentLevel || "",
           type: s.type,
+          formatScope: perCategoryFormat ? "category" : "sport",
           categories: (s.categories || []).map((c) => {
             const ageOrNull = (v) => {
               if (v === null || v === undefined || v === "") return null;
               const n = Number(v);
               return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : null;
+            };
+            const intOrNull = (v) => {
+              if (v === null || v === undefined || v === "") return null;
+              const n = Number(v);
+              return Number.isFinite(n) ? n : null;
             };
             return {
               templateId: c.templateId || null,
@@ -847,6 +876,13 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
               gender: ["male", "female", "any"].includes(c.gender)
                 ? c.gender
                 : "any",
+              // null = inherit the sport track, which is what the server's
+              // resolvers expect for every category the manager left alone.
+              type: perCategoryFormat ? c.type || null : null,
+              groupStageFormat: perCategoryFormat ? c.groupStageFormat || null : null,
+              knockoutFormat: perCategoryFormat ? c.knockoutFormat || null : null,
+              qualifyPerGroup: perCategoryFormat ? intOrNull(c.qualifyPerGroup) : null,
+              drawSize: perCategoryFormat ? intOrNull(c.drawSize) : null,
             };
           }),
           // Default to "Singles" (the same fallback the format-picker uses) so a

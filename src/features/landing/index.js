@@ -11,6 +11,13 @@ export { StatsBar } from "./components/StatsBar";
 export { HowItWorks } from "./components/HowItWorks";
 export { SportsGrid } from "./components/SportsGrid";
 export { ForClubs } from "./components/ForClubs";
+// /for-organizers only — not used by the consumer home page.
+export { OrganizerHero } from "./components/OrganizerHero";
+export { TurnUpDraws } from "./components/TurnUpDraws";
+export { TournamentDay } from "./components/TournamentDay";
+export { OldWayNewWay } from "./components/OldWayNewWay";
+export { OrganizerFAQ } from "./components/OrganizerFAQ";
+export { OrganizerInquiry } from "./components/OrganizerInquiry";
 export { Inquiry } from "./components/Inquiry";
 export { CTABanner } from "./components/CTABanner";
 export { LandingFooter } from "./components/LandingFooter";

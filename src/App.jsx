@@ -29,6 +29,12 @@ const TrainerApp = lazy(() => import("./TrainerApp"));
 const VendorApp = lazy(() => import("./VendorApp"));
 const AgencyApp = lazy(() => import("./AgencyApp"));
 const RegisterTurf = lazy(() => import("./pages/RegisterTurf"));
+// /for-organizers — the B2B page. LandingLayout is lazy too: importing it
+// statically would pull the landing header and footer into the main bundle for
+// every dashboard user, undoing the §4.1 split. Safe because the whole route
+// tree below already sits inside one <Suspense>.
+const ForOrganizers = lazy(() => import("./pages/landing/ForOrganizers"));
+const LandingLayout = lazy(() => import("./features/landing/LandingLayout"));
 const LAboutus = lazy(() => import('./Landing-Page/LAboutus'));
 const LPrivacyPolicy = lazy(() => import('./Landing-Page/LPrivacyPolicy'));
 const LTermsConditions = lazy(() => import('./Landing-Page/LTermsConditions'));
@@ -97,6 +103,19 @@ const App = () => {
       <Route path="/terms-and-conditions" element={<LTermsConditions />} />
       <Route path="/faq" element={<LFAQs />} />
       <Route path="/help-support" element={<LHelpandSupport />} />
+
+      {/* Public marketing page for tournament organizers.
+          Deliberately top-level rather than under /l/* for two reasons: the URL
+          goes on posters, QR codes and bracket PDF footers, where "/l/" means
+          nothing to a human — and /l/* redirects any authenticated visitor to
+          their dashboard, which would stop you opening your own sales page
+          mid-demo and stop a club admin forwarding it to a fellow organizer.
+          Wrapped in LandingLayout so it gets the landing header and footer.
+          The -isers spelling redirects in; -izers is canonical. */}
+      <Route element={<LandingLayout />}>
+        <Route path="/for-organizers" element={<ForOrganizers />} />
+      </Route>
+      <Route path="/for-organisers" element={<Navigate to="/for-organizers" replace />} />
 
       {/* Landing App routes */}
       <Route

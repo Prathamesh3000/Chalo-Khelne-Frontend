@@ -14,6 +14,7 @@ import BulkScoreUploadModal from "./BulkScoreUploadModal";
 import AssignUmpireModal from "./Tournament/AssignUmpireModal";
 import { buildRequestRounds, buildDefaultRoundsArray } from "./utils/knockoutDefaults";
 import { getSeedOrder } from "../utils/seedingUtils";
+import { pairDisplayName } from "../shared/utils/doublesPair";
 import SeedPositionsPreview from "./components/SeedPositionsPreview";
 import CourtPoolPreview from "./components/CourtPoolPreview";
 import CourtPicker from "./components/CourtPicker";
@@ -314,7 +315,15 @@ export default function MDirectKnockout() {
             const categoryName = matchedSport?.categoryName || b.category || b.selectedCategory || "General";
             return {
               playerId: b.userId?._id || b.userId || b._id,
-              userName: b.userName || b.userId?.name || "Unknown",
+              // Doubles: the entrant is the PAIR, so the draw lists "A & B".
+              // The partner is stored on the sportSelection for this category
+              // (a booking can cover several categories with different
+              // partners), which `matchedSport` above already resolved. A
+              // singles entry has no partner and the name is unchanged.
+              userName: pairDisplayName(
+                b.userName || b.userId?.name || "Unknown",
+                matchedSport?.partnerName
+              ),
               _id: b.userId?._id || b.userId || b._id,
               // The BOOKING id, kept distinct from playerId: for a registration
               // with an account those differ, and attendance is keyed on the

@@ -16,7 +16,7 @@ import {
   isTeamOnlySport,
   isIndividualOnlySport,
   isNestedSetSport,
-  SPORT_SCORING_TYPES,
+  scoringTypeFor,
   slugifyForSport,
   getUnrankedDefaults,
 } from "./sportClassification";
@@ -24,6 +24,10 @@ import {
 const SIG = "#F97316";
 const SIG_TINT = "rgba(249,115,22,0.10)";
 const SIG_TINT_RING = "rgba(249,115,22,0.25)";
+
+// Sentinel value for the picker's "Custom category…" entry. Not a template id,
+// so it can never collide with one.
+const CUSTOM_OPTION = "__custom__";
 
 // Module-level cache for category templates so every SportCard on the page
 // shares one network call. Refreshes on a hard reload — managers don't edit
@@ -64,7 +68,7 @@ function categoryBoundsSummary(cat) {
 
 function UnrankedCustomRules({ sport, onUpdate, locked = false }) {
   const v = sport._ruleBookValues || {};
-  const scoringType = sport.scoringType || SPORT_SCORING_TYPES[sport.sportName] || "sets";
+  const scoringType = sport.scoringType || scoringTypeFor(sport.sportName) || "sets";
 
   const setVal = (path, value) => {
     if (locked) return;
@@ -339,26 +343,33 @@ export default function SportCard({
     return () => { cancelled = true; };
   }, []);
 
-  // Edit-mode bridge: existing categories created before templates existed
-  // have a name but no templateId. Once templates load, look up each unlinked
-  // row by label (case-insensitive) and back-link the templateId so the
-  // picker pre-selects correctly. Snapshot fields (minAge/maxAge/gender) are
-  // intentionally NOT refreshed — preserves the rules in effect when the
-  // tournament was first saved.
+  // Edit-mode bridge, run once the templates load. Two jobs:
+  //
+  //   1. A row with a name but no templateId whose name MATCHES a template gets
+  //      back-linked, so the picker pre-selects correctly. Snapshot fields
+  //      (minAge/maxAge/gender) are intentionally NOT refreshed — that
+  //      preserves the rules in effect when the tournament was first saved.
+  //
+  //   2. A row whose name matches NOTHING is a custom category, so mark it as
+  //      one and it renders as an editable custom row. This also covers rows
+  //      saved before templates existed: they used to show as a dead "legacy"
+  //      option that could only be replaced, which meant a tournament could
+  //      not keep a category the SuperAdmin list does not contain.
   useEffect(() => {
     if (!categoryTemplates.length) return;
     const cats = sport.categories || [];
     if (!cats.length) return;
     let changed = false;
     const next = cats.map((c) => {
-      if (c.templateId || !c.name?.trim()) return c;
+      if (c.templateId || c._customEntry || !c.name?.trim()) return c;
       const wanted = c.name.trim().toLowerCase();
       const match = categoryTemplates.find(
         (t) => t.label.trim().toLowerCase() === wanted
       );
-      if (!match) return c;
       changed = true;
-      return { ...c, templateId: match._id };
+      return match
+        ? { ...c, templateId: match._id }
+        : { ...c, _customEntry: true };
     });
     if (changed) onUpdate({ categories: next });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -462,7 +473,7 @@ export default function SportCard({
       onUpdate({
         sportName: newName,
         sportSlug: slugifyForSport(newName),
-        scoringType: SPORT_SCORING_TYPES[newName] || "sets",
+        scoringType: scoringTypeFor(newName) || "sets",
         type: newType,
         knockoutFormat: newKnockoutFormat,
         groupStageFormat: newGroupStageFormat,
@@ -521,11 +532,32 @@ export default function SportCard({
   const addCategory = () => {
     // New rows start with no template picked. The manager must pick from the
     // SuperAdmin-controlled list — there is no free-form entry.
+    const blank = { templateId: null, name: "", fee: 0, minAge: null, maxAge: null, gender: "any" };
     onUpdate({
       categories: [
         ...(sport.categories || []),
-        { templateId: null, name: "", fee: 0, minAge: null, maxAge: null, gender: "any" },
+        // In per-category mode a new row starts from the sport's settings
+        // rather than blank, so adding a category never silently leaves its
+        // format unset. (seedCategoryFormat is assigned below in the same
+        // render; this only runs on click, after that.)
+        sport.formatScope === "category" ? seedCategoryFormat(blank) : blank,
       ],
+    });
+  };
+
+  // Turn a row into a custom category: no template behind it, the manager
+  // names it and supplies the age/gender bounds a template would have carried.
+  // `_customEntry` is UI-only — it marks intent while the name is still empty,
+  // which is the one state a name-plus-no-templateId check cannot detect. The
+  // submit payload in MCreateTournament is built field by field, so it never
+  // reaches the API.
+  const startCustomCategory = (i) => {
+    onUpdate({
+      categories: (sport.categories || []).map((c, idx) =>
+        idx === i
+          ? { ...c, _customEntry: true, templateId: null, name: "", minAge: null, maxAge: null, gender: "any" }
+          : c
+      ),
     });
   };
 
@@ -536,7 +568,7 @@ export default function SportCard({
       onUpdate({
         categories: (sport.categories || []).map((c, idx) =>
           idx === i
-            ? { ...c, templateId: null, name: "", minAge: null, maxAge: null, gender: "any" }
+            ? { ...c, _customEntry: false, templateId: null, name: "", minAge: null, maxAge: null, gender: "any" }
             : c
         ),
       });
@@ -549,6 +581,7 @@ export default function SportCard({
         idx === i
           ? {
               ...c,
+              _customEntry: false,
               templateId: tpl._id,
               name: tpl.label,
               minAge: tpl.minAge ?? null,
@@ -574,6 +607,66 @@ export default function SportCard({
     if ((sport.categories || []).length <= 1) return;
     onUpdate({
       categories: (sport.categories || []).filter((_, idx) => idx !== i),
+    });
+  };
+
+  // ── Where format is declared: once per sport, or under each category ──
+  //
+  // A sport track carries ONE format for all its categories, which cannot
+  // express "Men's Doubles plays its group stage in singles and advances the
+  // top 3, Women's Singles plays doubles and advances the top 2". The manager
+  // picks the scope here and the fields move accordingly. On the server a null
+  // category value means "inherit the track", so both modes stay valid data.
+  const formatScope = sport.formatScope === "category" ? "category" : "sport";
+
+  // Singles/doubles is meaningless for football and for the team-tie formats,
+  // so the choice is only offered where it changes something.
+  const supportsPerCategoryFormat =
+    !isFootball && (selectedTypeCard === "groupKO" || selectedTypeCard === "knockout");
+
+  // Values a category inherits when per-category mode is switched on: whatever
+  // the manager already chose at sport level, so they start from their own
+  // settings rather than an empty form.
+  const seedCategoryFormat = (c) => ({
+    ...c,
+    type: c.type ?? sport.type ?? null,
+    groupStageFormat:
+      c.groupStageFormat ??
+      (selectedTypeCard === "groupKO" ? sport.groupStageFormat || "Singles" : null),
+    knockoutFormat: c.knockoutFormat ?? sport.knockoutFormat ?? "Singles",
+    qualifyPerGroup:
+      c.qualifyPerGroup ??
+      (selectedTypeCard === "groupKO" ? Number(sport.qualifyPerGroup ?? 2) : null),
+    drawSize: c.drawSize ?? (selectedTypeCard === "knockout" ? sport.drawSize ?? null : null),
+  });
+
+  const clearCategoryFormat = (c) => ({
+    ...c,
+    type: null,
+    groupStageFormat: null,
+    knockoutFormat: null,
+    qualifyPerGroup: null,
+    drawSize: null,
+  });
+
+  const changeFormatScope = (scope) => {
+    if (scope === formatScope) return;
+    onUpdate({
+      formatScope: scope,
+      // Going back to sport level drops the overrides, so the track value is
+      // unambiguously the one that applies — otherwise a stale category value
+      // would keep winning and the manager could not see why.
+      categories: (sport.categories || []).map(
+        scope === "category" ? seedCategoryFormat : clearCategoryFormat
+      ),
+    });
+  };
+
+  const updateCategory = (i, patch) => {
+    onUpdate({
+      categories: (sport.categories || []).map((c, idx) =>
+        idx === i ? { ...c, ...patch } : c
+      ),
     });
   };
 
@@ -790,16 +883,75 @@ export default function SportCard({
             )}
           </div>
 
+          {/* Where the format is declared — one setting for the whole sport,
+              or a separate one under each category. */}
+          {supportsPerCategoryFormat && (
+            <div className="space-y-2">
+              <FieldLabel>Format applies to</FieldLabel>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  {
+                    key: "sport",
+                    title: "The whole sport",
+                    blurb: "One format for every category.",
+                  },
+                  {
+                    key: "category",
+                    title: "Each category",
+                    blurb: "Set format per category.",
+                  },
+                ].map((opt) => {
+                  const active = formatScope === opt.key;
+                  return (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => changeFormatScope(opt.key)}
+                      className={`text-left rounded-lg border px-3 py-2.5 transition ${
+                        active
+                          ? "bg-white/[0.07]"
+                          : "border-white/[0.08] bg-white/[0.02] hover:border-white/[0.16]"
+                      }`}
+                      style={active ? { borderColor: SIG } : undefined}
+                    >
+                      <span
+                        className="block text-[12px] font-semibold"
+                        style={{ color: active ? SIG : "#E5E7EB" }}
+                      >
+                        {opt.title}
+                      </span>
+                      <span className="block text-[11px] text-gray-400 mt-0.5">
+                        {opt.blurb}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              {formatScope === "category" && (
+                <p className="text-[11px] text-gray-400">
+                  Each category below carries its own format — e.g. Men&apos;s
+                  Doubles can run a singles group stage advancing the top 3,
+                  while Women&apos;s Singles runs a doubles group stage
+                  advancing the top 2.
+                </p>
+              )}
+            </div>
+          )}
+
           <div className="space-y-2.5">
             <FieldLabel>Categories &amp; registration fees</FieldLabel>
             <p className="text-[11px] text-gray-500 -mt-1">
-              Pick from the SuperAdmin-approved templates — age + gender bounds
-              are applied automatically.
+              Pick a SuperAdmin template — age + gender bounds are applied
+              automatically — or choose <strong>Custom category…</strong> and
+              set your own.
             </p>
             {categoryTemplates.length === 0 && (
               <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2 text-[12px] text-amber-300">
-                No active category templates exist yet. Ask your SuperAdmin to
-                seed templates under <strong>SuperAdmin · Category Templates</strong>.
+                No active category templates exist yet — use{" "}
+                <strong>Custom category…</strong> to add one by hand, or ask your
+                SuperAdmin to seed templates under{" "}
+                <strong>SuperAdmin · Category Templates</strong>.
               </div>
             )}
             <div className="space-y-2">
@@ -820,24 +972,23 @@ export default function SportCard({
                 const orphanedSelected =
                   selectedId &&
                   !categoryTemplates.some((t) => String(t._id) === selectedId);
-                // Legacy row: no templateId, but a name like "Open Category"
-                // saved from before templates existed AND no matching label.
-                // Surface it as a non-pickable option so the manager can see
-                // what is currently set and then pick a real template.
-                const legacyUnlinked =
-                  !selectedId &&
-                  !!cat.name?.trim() &&
-                  !categoryTemplates.some(
-                    (t) => t.label.trim().toLowerCase() === cat.name.trim().toLowerCase()
-                  );
+                // A custom category: named by the manager, with no template
+                // behind it. Also covers rows saved before templates existed —
+                // those used to render as a dead "legacy" option that could
+                // only be replaced, which meant a tournament could not keep a
+                // category the SuperAdmin list does not contain.
+                const isCustom = !!cat._customEntry;
                 return (
                   <div key={ci}>
                     <div className="flex gap-2 items-center">
                       <select
-                        value={selectedId || (legacyUnlinked ? `__legacy_${ci}` : "")}
+                        value={isCustom ? CUSTOM_OPTION : selectedId}
                         onChange={(e) => {
                           const v = e.target.value;
-                          if (v.startsWith("__legacy_")) return; // legacy option is informational only
+                          if (v === CUSTOM_OPTION) {
+                            startCustomCategory(ci);
+                            return;
+                          }
                           applyCategoryTemplate(ci, v);
                         }}
                         aria-invalid={!!nameError || undefined}
@@ -862,11 +1013,6 @@ export default function SportCard({
                             {cat.name || "(removed template)"} · archived
                           </option>
                         )}
-                        {legacyUnlinked && (
-                          <option value={`__legacy_${ci}`} className="bg-[#181A22]" disabled>
-                            {cat.name} · legacy (pick a template to migrate)
-                          </option>
-                        )}
                         {categoryTemplates.map((tpl) => {
                           const used = usedIds.has(String(tpl._id));
                           return (
@@ -881,6 +1027,13 @@ export default function SportCard({
                             </option>
                           );
                         })}
+                        {/* Escape hatch for a category the SuperAdmin list does
+                            not cover. The server never enforced the template
+                            list — it accepts any name — so this only lifts a
+                            restriction that lived in this dropdown. */}
+                        <option value={CUSTOM_OPTION} className="bg-[#181A22]">
+                          Custom category…
+                        </option>
                       </select>
                       <div className="relative w-24 flex-shrink-0">
                         <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500 text-[12px] pointer-events-none">
@@ -917,11 +1070,192 @@ export default function SportCard({
                         {nameError}
                       </p>
                     )}
-                    {(selectedId || legacyUnlinked) && (
+
+                    {/* Custom category: the manager supplies what a template
+                        would otherwise have provided. Age + gender are not
+                        cosmetic — the server rejects ineligible players at
+                        booking from these values, so leaving them blank makes
+                        the category open to everyone rather than unchecked. */}
+                    {isCustom && (
+                      <div className="mt-2 ml-0.5 pl-3 border-l-2 border-white/[0.06] space-y-2.5">
+                        <div>
+                          <FieldLabel htmlFor={`cat-name-${sport._key}-${ci}`}>
+                            Category name
+                          </FieldLabel>
+                          <input
+                            id={`cat-name-${sport._key}-${ci}`}
+                            type="text"
+                            value={cat.name || ""}
+                            onChange={(e) => updateCategory(ci, { name: e.target.value })}
+                            placeholder="e.g. Corporate Doubles"
+                            className={`w-full h-9 px-3 rounded-lg border text-[13px] text-gray-100 focus:outline-none focus:ring-2 transition ${
+                              nameError
+                                ? "border-red-400/50 bg-red-500/10"
+                                : "border-white/[0.08] bg-white/[0.04] hover:border-white/[0.16]"
+                            }`}
+                            style={{ "--tw-ring-color": SIG_TINT_RING }}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <FieldLabel htmlFor={`cat-minage-${sport._key}-${ci}`}>
+                              Min age
+                            </FieldLabel>
+                            <input
+                              id={`cat-minage-${sport._key}-${ci}`}
+                              type="number"
+                              min="0"
+                              value={cat.minAge ?? ""}
+                              onChange={(e) =>
+                                updateCategory(ci, {
+                                  minAge: e.target.value === "" ? null : Number(e.target.value),
+                                })
+                              }
+                              placeholder="Any"
+                              className="w-full h-9 px-3 rounded-lg border border-white/[0.08] bg-white/[0.04] text-[13px] font-mono tabular-nums text-gray-100 focus:outline-none focus:ring-2 transition"
+                              style={{ "--tw-ring-color": SIG_TINT_RING }}
+                            />
+                          </div>
+                          <div>
+                            <FieldLabel htmlFor={`cat-maxage-${sport._key}-${ci}`}>
+                              Max age
+                            </FieldLabel>
+                            <input
+                              id={`cat-maxage-${sport._key}-${ci}`}
+                              type="number"
+                              min="0"
+                              value={cat.maxAge ?? ""}
+                              onChange={(e) =>
+                                updateCategory(ci, {
+                                  maxAge: e.target.value === "" ? null : Number(e.target.value),
+                                })
+                              }
+                              placeholder="Any"
+                              className="w-full h-9 px-3 rounded-lg border border-white/[0.08] bg-white/[0.04] text-[13px] font-mono tabular-nums text-gray-100 focus:outline-none focus:ring-2 transition"
+                              style={{ "--tw-ring-color": SIG_TINT_RING }}
+                            />
+                          </div>
+                          <div>
+                            <FieldLabel htmlFor={`cat-gender-${sport._key}-${ci}`}>
+                              Gender
+                            </FieldLabel>
+                            <Select
+                              id={`cat-gender-${sport._key}-${ci}`}
+                              value={cat.gender || "any"}
+                              onChange={(e) => updateCategory(ci, { gender: e.target.value })}
+                              options={[
+                                { value: "any", label: "Any" },
+                                { value: "male", label: "Male" },
+                                { value: "female", label: "Female" },
+                              ]}
+                            />
+                          </div>
+                        </div>
+
+                        {errors[`categories[${ci}].ageRange`] && (
+                          <p className="text-[11px] text-red-400 font-medium">
+                            {errors[`categories[${ci}].ageRange`]}
+                          </p>
+                        )}
+                        <p className="text-[11px] text-gray-500">
+                          Leave age and gender empty to open this category to everyone.
+                        </p>
+                      </div>
+                    )}
+
+                    {!isCustom && selectedId && (
                       <p className="text-[11px] text-gray-500 mt-1 pl-0.5">
                         {categoryBoundsSummary(cat)}
                       </p>
                     )}
+
+                    {/* Per-category format. Only rendered once the row has a
+                        category — the fields make no sense on a blank row, and
+                        an unnamed category cannot be resolved on the server
+                        (the name is the link to the category row). A custom row
+                        qualifies as soon as it has been named. */}
+                    {supportsPerCategoryFormat &&
+                      formatScope === "category" &&
+                      (selectedId || (isCustom && !!cat.name?.trim())) && (
+                        <div className="mt-2 ml-0.5 pl-3 border-l-2 border-white/[0.06] space-y-2.5">
+                          {selectedTypeCard === "groupKO" && (
+                            <>
+                              <div>
+                                <FieldLabel htmlFor={`cat-gsformat-${sport._key}-${ci}`}>
+                                  Group stage format
+                                </FieldLabel>
+                                <Select
+                                  id={`cat-gsformat-${sport._key}-${ci}`}
+                                  value={cat.groupStageFormat || "Singles"}
+                                  onChange={(e) =>
+                                    updateCategory(ci, { groupStageFormat: e.target.value })
+                                  }
+                                  options={["Singles", "Doubles"]}
+                                />
+                              </div>
+                              <div>
+                                <FieldLabel htmlFor={`cat-qpg-${sport._key}-${ci}`}>
+                                  Qualify per group
+                                </FieldLabel>
+                                <Select
+                                  id={`cat-qpg-${sport._key}-${ci}`}
+                                  value={String(cat.qualifyPerGroup ?? 2)}
+                                  onChange={(e) =>
+                                    updateCategory(ci, {
+                                      qualifyPerGroup: Number(e.target.value),
+                                    })
+                                  }
+                                  options={[
+                                    { value: "1", label: "Top 1" },
+                                    { value: "2", label: "Top 2" },
+                                    { value: "3", label: "Top 3" },
+                                    { value: "4", label: "Top 4" },
+                                  ]}
+                                />
+                              </div>
+                            </>
+                          )}
+
+                          <div>
+                            <FieldLabel htmlFor={`cat-koformat-${sport._key}-${ci}`}>
+                              Knockout format
+                            </FieldLabel>
+                            <Select
+                              id={`cat-koformat-${sport._key}-${ci}`}
+                              value={cat.knockoutFormat || "Singles"}
+                              onChange={(e) =>
+                                updateCategory(ci, { knockoutFormat: e.target.value })
+                              }
+                              options={["Singles", "Doubles"]}
+                            />
+                          </div>
+
+                          {selectedTypeCard === "knockout" && (
+                            <div>
+                              <FieldLabel htmlFor={`cat-drawsize-${sport._key}-${ci}`}>
+                                Draw size
+                              </FieldLabel>
+                              <Select
+                                id={`cat-drawsize-${sport._key}-${ci}`}
+                                value={cat.drawSize == null ? "" : String(cat.drawSize)}
+                                onChange={(e) =>
+                                  updateCategory(ci, {
+                                    drawSize:
+                                      e.target.value === "" ? null : Number(e.target.value),
+                                  })
+                                }
+                                options={[
+                                  { value: "", label: "Auto" },
+                                  { value: "16", label: "16" },
+                                  { value: "32", label: "32" },
+                                  { value: "64", label: "64" },
+                                ]}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      )}
                   </div>
                 );
               })}
@@ -990,7 +1324,9 @@ export default function SportCard({
 
           {!!(sport.sportName && selectedTypeCard && !isFootball) && (
             <div>
-              {selectedTypeCard === "groupKO" && (
+              {/* Sport-level format — replaced by the per-category fields in
+                  the category list above when the manager picks that scope. */}
+              {selectedTypeCard === "groupKO" && formatScope === "sport" && (
                 <div className="space-y-3.5 pt-1">
                   <div>
                     <FieldLabel htmlFor={`gsformat-${sport._key}`}>
@@ -1042,7 +1378,7 @@ export default function SportCard({
                 </div>
               )}
 
-              {selectedTypeCard === "knockout" && (
+              {selectedTypeCard === "knockout" && formatScope === "sport" && (
                 <div className="space-y-3.5 pt-1">
                   <div>
                     <FieldLabel htmlFor={`koformat-${sport._key}`}>

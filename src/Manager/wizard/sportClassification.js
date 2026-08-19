@@ -1,6 +1,7 @@
 // Sport classification + scoring/format defaults.
 // Lifted out of MCreateTournament.jsx in Sub-step 5 so SportCard and
 // MCreateTournament share one source of truth.
+import { getScoringType } from "../../shared/utils/scoringConfig";
 
 export const TEAM_SPORTS = new Set([
   "Cricket", "Football", "Kabaddi", "Volleyball", "Basketball", "Hockey",
@@ -21,22 +22,25 @@ export const INDIVIDUAL_SPORTS = new Set([
 // Mirror of server/factories/MatchFactory.js → hasNestedGames signal.
 export const NESTED_SET_SPORTS = new Set(["Tennis"]);
 
-export const SPORT_SCORING_TYPES = {
-  "Table Tennis": "sets",
-  "Badminton":    "sets",
-  "Tennis":       "sets",
-  "Pickleball":   "sets",
-  "Volleyball":   "sets",
-  "Squash":       "sets",
-  "Cricket":      "innings",
-  "Football":     "time",
-  "Basketball":   "time",
-  "Hockey":       "time",
-  "Kabaddi":      "time",
-  "Chess":        "single",
-  "Carrom":       "single",
-  "Foosball":     "sets",
-};
+/**
+ * A sport's scoring type, from the server.
+ *
+ * §6.1 made the server the single source (GET /api/sports/scoring-config, kept
+ * synchronously in shared/utils/scoringConfig and warmed at app boot). The
+ * results path adopted it; this wizard did not, and kept its own hardcoded
+ * table — which said Carrom was "single" while the server said "board". Every
+ * Carrom tournament created from this screen was therefore saved with the wrong
+ * scoringType, because the value the wizard computes is what
+ * ruleBookValuesToMatchFormat folds into matchFormat.scoringType and the
+ * backend persists verbatim.
+ *
+ * `|| "sets"` at the call sites is preserved: getScoringType returns null for a
+ * sport the server does not know, and the wizard's historical fallback was
+ * "sets". Unlike the old object lookup this is case-insensitive.
+ */
+export function scoringTypeFor(sportName) {
+  return getScoringType(sportName);
+}
 
 export function isTeamOnlySport(sportName) {
   return !!sportName && TEAM_SPORTS.has(sportName);
@@ -93,7 +97,7 @@ export const UNRANKED_DEFAULTS = {
 };
 
 export function getUnrankedDefaults(sportName) {
-  const type = SPORT_SCORING_TYPES[sportName] || "sets";
+  const type = scoringTypeFor(sportName) || "sets";
   if (type === "sets") {
     return { ...(isNestedSetSport(sportName) ? UNRANKED_DEFAULTS.nestedSets : UNRANKED_DEFAULTS.sets) };
   }

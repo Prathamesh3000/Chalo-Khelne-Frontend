@@ -24,6 +24,26 @@ export default function LeaguePanel({ onEditGroup, onOpenMatchModal, onOpenBulkS
   const [showStandings, setShowStandings] = useState(false);
   const [transitionLoading, setTransitionLoading] = useState(false);
 
+  // The cutoff is per CATEGORY, not per sport: one Table Tennis track can
+  // advance the top 3 of Men's Doubles and the top 2 of Women's Singles.
+  // transitionToKnockout resolves it the same way, per group — reading the
+  // sport value here showed the manager a number the server would not use.
+  // Falls back to the track when the category sets none.
+  const qualifyPerGroup = getQualifyPerGroup(
+    tournament,
+    activeSportId,
+    currentGroup?.category
+  );
+
+  // Stage set can also differ per category (a knockout-only category inside a
+  // "knockout + group stage" track), so the transition button follows the
+  // group's category too.
+  const groupTournamentType = getTournamentType(
+    tournament,
+    activeSportId,
+    currentGroup?.category
+  );
+
   const fetchStandings = async (groupId) => {
     try {
       const res = await groupTabsApi.fetchStandings(tournamentId, groupId);
@@ -179,13 +199,13 @@ export default function LeaguePanel({ onEditGroup, onOpenMatchModal, onOpenBulkS
               )}
           </div>
 
-          {/* Standings Table — STEP 17b.ii: per-sport qualifyPerGroup */}
+          {/* Standings Table — per-category qualifyPerGroup */}
           {showStandings && standingsData[activeGroup] && (
-            <StandingsTable data={standingsData[activeGroup]} qualifyPerGroup={getQualifyPerGroup(tournament, activeSportId)} />
+            <StandingsTable data={standingsData[activeGroup]} qualifyPerGroup={qualifyPerGroup} />
           )}
 
-          {/* Transition to Knockout — STEP 17b.ii: per-sport type/stage */}
-          {getTournamentType(tournament, activeSportId) === "knockout + group stage" &&
+          {/* Transition to Knockout — per-category type/stage */}
+          {groupTournamentType === "knockout + group stage" &&
             getCurrentStage(tournament, activeSportId) !== "knockout" &&
             getCurrentStage(tournament, activeSportId) !== "completed" && (
               <div className="mt-4">
@@ -197,7 +217,7 @@ export default function LeaguePanel({ onEditGroup, onOpenMatchModal, onOpenBulkS
                   {transitionLoading ? "Processing..." : <><FiFlag /> Transition to Knockout</>}
                 </button>
                 <p className="text-[11px] text-gray-400 text-center mt-1">
-                  All group matches must be completed. Top {getQualifyPerGroup(tournament, activeSportId)} per group will qualify.
+                  All group matches must be completed. Top {qualifyPerGroup} per group will qualify.
                 </p>
               </div>
             )}
