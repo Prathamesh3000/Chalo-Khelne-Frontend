@@ -8,6 +8,7 @@ import SportsLibrary from "./SuperAdmin/SportsLibrary";
 import SportRuleBooks from "./SuperAdmin/SportRuleBooks";
 import CategoryTemplates from "./SuperAdmin/CategoryTemplates";
 import RbacManagement from "./SuperAdmin/RbacManagement";
+import PlansManagement from "./SuperAdmin/PlansManagement";
 import VendorMarketplace from "./SuperAdmin/VendorMarketplace";
 import TurfApprovals from "./SuperAdmin/TurfApprovals";
 import CreateClubAdmin from "./SuperAdmin/CreateClubAdmin";
@@ -38,6 +39,7 @@ const SuperAdminapp = () => {
         <Route path="/rule-books"         element={<SportRuleBooks />} />
         <Route path="/category-templates" element={<CategoryTemplates />} />
         <Route path="/rbac"               element={<RbacManagement />} />
+        <Route path="/plans"              element={<PlansManagement />} />
         <Route path="/bulk-user-upload"   element={<BulkUserUpload />} />
         <Route path="/vendor-marketplace" element={<VendorMarketplace />} />
         <Route path="/turf-approvals"     element={<TurfApprovals />} />

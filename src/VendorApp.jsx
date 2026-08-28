@@ -1,4 +1,5 @@
 import { Routes, Route } from "react-router-dom";
+import VendorBilling from "./Vendor/Billing";
 import { AppLayout } from "./shared/layout";
 import ProtectedRoute, { ROLES } from "./components/ProtectedRoute";
 import VendorDashboard from "./Vendor/VendorDashboard";
@@ -14,6 +15,7 @@ const VendorApp = () => {
       <Route element={<AppLayout role="vendor" />}>
         <Route element={<ProtectedRoute allowedRoles={ROLES.vendor} />}>
           <Route path="/vendor-dashboard" element={<VendorDashboard />} />
+          <Route path="/vendor-billing" element={<VendorBilling />} />
           <Route path="/vendor-incoming" element={<VendorIncoming />} />
           <Route path="/vendor-acquisitions" element={<VendorAcquisitions />} />
           <Route path="/vendor-profile" element={<VendorProfile />} />
