@@ -75,6 +75,25 @@ const STATIC_STEPS = [
 // Replaces the per-sport `availableLevels` API roundtrip.
 const FIXED_LEVELS = ["district", "state", "national", "international", "unranked"];
 
+// The registration deadline is held in the form as a local "YYYY-MM-DDTHH:mm"
+// string. The API stores/returns a UTC ISO instant ("...T12:30:00.000Z"),
+// which date/time inputs cannot display — convert at the boundary.
+function deadlineToForm(value) {
+  if (!value) return "";
+  const d = dayjs(value);
+  return d.isValid() ? d.format("YYYY-MM-DDTHH:mm") : "";
+}
+// Picking a date with no time used to leave the old datetime-local input
+// empty (so nothing was saved). A date alone now means end of that day.
+const DEFAULT_DEADLINE_TIME = "23:59";
+
+// A category's play day ("YYYY-MM-DD") must sit inside the tournament dates.
+// Single-day events drop the field on save, so they are never flagged.
+function categoryDateOutsideRange(c, start, end) {
+  if (!c?.date || !start || !end || start === end) return false;
+  return c.date < start || c.date > end;
+}
+
 // matchFormat schema fields that should NOT be flattened into _ruleBookValues
 // (they're metadata, not user-editable rule fields).
 const MATCHFORMAT_META_KEYS = new Set(["scoringType", "formatVersion"]);
@@ -243,6 +262,7 @@ function mapSportApiToFormSport(s, isFirst, legacyRootLevel = "") {
           minAge: c.minAge ?? null,
           maxAge: c.maxAge ?? null,
           gender: c.gender || "any",
+          date: c.date || null,
           // Per-category format overrides — null means the row inherits the
           // sport track, which is how every tournament saved before this
           // feature loads.
@@ -252,7 +272,7 @@ function mapSportApiToFormSport(s, isFirst, legacyRootLevel = "") {
           qualifyPerGroup: c.qualifyPerGroup ?? null,
           drawSize: c.drawSize ?? null,
         }))
-      : [{ templateId: null, name: "", fee: 0, minAge: null, maxAge: null, gender: "any" }],
+      : [{ templateId: null, name: "", fee: 0, minAge: null, maxAge: null, gender: "any", date: null }],
     // Which scope the tournament was authored in. Anything saved before this
     // existed has no value and loads as "sport" — its original behaviour.
     formatScope: s.formatScope === "category" ? "category" : "sport",
@@ -293,7 +313,7 @@ function mapTournamentToForm(t, defaults, auth) {
     endDate: t.endDate ? t.endDate.split("T")[0] : "",
     termsAndConditions: t.termsAndConditions || "",
     selectedTime: t.selectedTime || { startTime: "10:00", endTime: "18:00" },
-    registrationDeadline: t.registrationDeadline || "",
+    registrationDeadline: deadlineToForm(t.registrationDeadline),
     managerId: t.managerId || [auth?._id || ""],
     isPrivate: t.isPrivate || false,
     clientId: t.clientId || "",
@@ -326,7 +346,7 @@ function newSportEntry({ expanded = false } = {}) {
     type: "knockout + group stage",
     // First row is empty so the picker prompts the manager to select a
     // SuperAdmin template — there is no free-form category entry.
-    categories: [{ templateId: null, name: "", fee: 0, minAge: null, maxAge: null, gender: "any" }],
+    categories: [{ templateId: null, name: "", fee: 0, minAge: null, maxAge: null, gender: "any", date: null }],
     // Format is declared once for the whole sport by default; the manager can
     // switch to per-category in step 2.
     formatScope: "sport",
@@ -665,6 +685,10 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
               errors[`${prefix}.categories[${j}].ageRange`] =
                 "Max age must be greater than or equal to min age";
             }
+            if (categoryDateOutsideRange(c, formData.startDate, formData.endDate)) {
+              errors[`${prefix}.categories[${j}].date`] =
+                "Play day is outside the tournament dates — pick another day";
+            }
           });
         }
         // Rule-book validation only for sports whose Section D has fetched a
@@ -704,6 +728,21 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
         dayjs(formData.registrationDeadline).isAfter(dayjs(formData.startDate), "day")
       ) {
         errors.registrationDeadline = "Registration deadline must be on or before the start date";
+      }
+      // Daily schedule: end must be after start ("08:00 – 07:00" is almost
+      // always AM picked instead of PM).
+      const { startTime, endTime } = formData.selectedTime || {};
+      if (startTime && endTime && endTime <= startTime) {
+        errors.selectedTime = "Daily end time must be after the start time — check AM/PM";
+      }
+      // Changing the dates here can strand a category's play day (set in step 2).
+      const stranded = formData.sports.flatMap((s) =>
+        (s.categories || [])
+          .filter((c) => categoryDateOutsideRange(c, formData.startDate, formData.endDate))
+          .map((c) => c.name || "Unnamed category")
+      );
+      if (stranded.length > 0) {
+        errors.categoryDates = `These categories have a play day outside the new dates: ${stranded.join(", ")}. Update them in Sports & Format.`;
       }
     }
 
@@ -816,7 +855,13 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
 
       // Per-sport level: tournamentLevel is no longer sent at root; each
       // sport carries its own value inside the sports[] payload below.
-      if (formData.registrationDeadline) tournamentFormData.append("registrationDeadline", formData.registrationDeadline);
+      // Send an unambiguous UTC instant (the server would otherwise read the
+      // local string in ITS timezone). On edit an empty value clears it.
+      if (formData.registrationDeadline) {
+        tournamentFormData.append("registrationDeadline", dayjs(formData.registrationDeadline).toISOString());
+      } else if (isEditMode) {
+        tournamentFormData.append("registrationDeadline", "");
+      }
       if (formData.startDate) tournamentFormData.append("startDate", formData.startDate);
       if (formData.endDate) tournamentFormData.append("endDate", formData.endDate);
       if (formData.selectedTime) tournamentFormData.append("selectedTime", JSON.stringify(formData.selectedTime));
@@ -876,6 +921,9 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
               gender: ["male", "female", "any"].includes(c.gender)
                 ? c.gender
                 : "any",
+              // Only meaningful for multi-day events; a single-day event plays
+              // every category on its one day.
+              date: formData.startDate !== formData.endDate ? c.date || null : null,
               // null = inherit the sport track, which is what the server's
               // resolvers expect for every category the manager left alone.
               type: perCategoryFormat ? c.type || null : null,
@@ -1141,6 +1189,8 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
             errors={sliceSportErrors(idx)}
             fixedLevels={FIXED_LEVELS}
             rulesLocked={isRulesLocked}
+            tournamentStartDate={formData.startDate}
+            tournamentEndDate={formData.endDate}
           />
         ))}
 
@@ -1203,6 +1253,11 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
                 />
               </div>
             </div>
+            {fieldErrors.categoryDates && (
+              <p className="text-[11px] text-red-400 -mt-1 font-medium">
+                {fieldErrors.categoryDates}
+              </p>
+            )}
 
             <div>
               <FieldLabel>Daily schedule</FieldLabel>
@@ -1237,6 +1292,11 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
                   className="flex-1 bg-transparent border-none focus:outline-none focus:ring-0 text-[13px] font-mono tabular-nums text-gray-100 p-0"
                 />
               </div>
+              {fieldErrors.selectedTime && (
+                <p className="text-[11px] text-red-400 mt-1 font-medium">
+                  {fieldErrors.selectedTime}
+                </p>
+              )}
             </div>
           </WCard>
 
@@ -1261,14 +1321,43 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
 
             <div>
               <FieldLabel htmlFor="registrationDeadline">Registration Deadline</FieldLabel>
-              <TextInput
-                id="registrationDeadline"
-                type="datetime-local"
-                name="registrationDeadline"
-                value={formData.registrationDeadline}
-                onChange={handleInputChange}
-              />
-              <p className="text-xs text-gray-400 mt-1.5">Last date and time for players to register.</p>
+              <div className="grid grid-cols-2 gap-3">
+                <TextInput
+                  id="registrationDeadline"
+                  type="date"
+                  aria-label="Registration deadline date"
+                  max={formData.startDate || undefined}
+                  value={(formData.registrationDeadline || "").slice(0, 10)}
+                  onChange={(e) => {
+                    const date = e.target.value;
+                    const time = (formData.registrationDeadline || "").slice(11, 16) || DEFAULT_DEADLINE_TIME;
+                    handleInputChange({
+                      target: { name: "registrationDeadline", value: date ? `${date}T${time}` : "" },
+                    });
+                  }}
+                  error={fieldErrors.registrationDeadline}
+                />
+                <TextInput
+                  type="time"
+                  aria-label="Registration deadline time"
+                  disabled={!formData.registrationDeadline}
+                  value={(formData.registrationDeadline || "").slice(11, 16)}
+                  onChange={(e) => {
+                    const date = (formData.registrationDeadline || "").slice(0, 10);
+                    if (!date) return;
+                    handleInputChange({
+                      target: {
+                        name: "registrationDeadline",
+                        value: `${date}T${e.target.value || DEFAULT_DEADLINE_TIME}`,
+                      },
+                    });
+                  }}
+                  className="disabled:opacity-40"
+                />
+              </div>
+              <p className="text-xs text-gray-400 mt-1.5">
+                Last date and time for players to register. Time defaults to 11:59 PM; clear the date to remove the deadline.
+              </p>
             </div>
 
             <div>

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
-import { Trash2, ChevronDown } from "lucide-react";
+import dayjs from "dayjs";
+import { Trash2, ChevronDown, CalendarDays } from "lucide-react";
 import { generateFormFields } from "../../utils/ruleBookFormEngine";
 import TeamKnockoutFormatSelector from "../TeamKnockoutFormatSelector";
 import Card from "./Card";
@@ -318,6 +319,19 @@ function SectionDBody({ sport, tournamentLevel, onUpdate, locked = false }) {
   );
 }
 
+// Every day from start to end inclusive, as "YYYY-MM-DD" (capped so a
+// mistyped year can't build a huge dropdown).
+function tournamentDays(start, end) {
+  const s = dayjs(start);
+  const e = dayjs(end);
+  if (!start || !end || !s.isValid() || !e.isValid() || e.isBefore(s, "day")) return [];
+  const days = [];
+  for (let d = s; !d.isAfter(e, "day") && days.length < 62; d = d.add(1, "day")) {
+    days.push(d.format("YYYY-MM-DD"));
+  }
+  return days;
+}
+
 export default function SportCard({
   sport,
   index,
@@ -329,7 +343,12 @@ export default function SportCard({
   errors = {},
   fixedLevels = ["district", "state", "national", "international", "unranked"],
   rulesLocked = false,
+  tournamentStartDate = null,
+  tournamentEndDate = null,
 }) {
+  // Per-category play day is only offered for multi-day tournaments.
+  const eventDays = tournamentDays(tournamentStartDate, tournamentEndDate);
+  const isMultiDay = eventDays.length > 1;
   const [isSectionDOpen, setIsSectionDOpen] = useState(false);
   const [categoryTemplates, setCategoryTemplates] = useState(
     () => CATEGORY_TEMPLATES_CACHE || []
@@ -532,7 +551,7 @@ export default function SportCard({
   const addCategory = () => {
     // New rows start with no template picked. The manager must pick from the
     // SuperAdmin-controlled list — there is no free-form entry.
-    const blank = { templateId: null, name: "", fee: 0, minAge: null, maxAge: null, gender: "any" };
+    const blank = { templateId: null, name: "", fee: 0, minAge: null, maxAge: null, gender: "any", date: null };
     onUpdate({
       categories: [
         ...(sport.categories || []),
@@ -958,6 +977,10 @@ export default function SportCard({
               {(sport.categories || []).map((cat, ci) => {
                 const isFree = Number(cat.fee || 0) === 0;
                 const nameError = errors[`categories[${ci}].name`];
+                const dateError = errors[`categories[${ci}].date`];
+                // A saved day that no longer falls inside the tournament dates
+                // stays selectable (flagged) so it is visible, not silently lost.
+                const staleDate = cat.date && !eventDays.includes(cat.date);
                 // Build the set of already-used template IDs in this sport so
                 // the picker can grey them out — no duplicates within one sport.
                 const usedIds = new Set(
@@ -1068,6 +1091,49 @@ export default function SportCard({
                     {nameError && (
                       <p className="text-[11px] text-red-400 mt-1 font-medium">
                         {nameError}
+                      </p>
+                    )}
+
+                    {(isMultiDay || cat.date) && (
+                      <div className="flex items-center gap-2 mt-1.5">
+                        <CalendarDays className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
+                        <label
+                          htmlFor={`cat-date-${sport._key}-${ci}`}
+                          className="text-[11px] text-gray-400 flex-shrink-0"
+                        >
+                          Play day
+                        </label>
+                        <select
+                          id={`cat-date-${sport._key}-${ci}`}
+                          value={cat.date || ""}
+                          onChange={(e) => updateCategory(ci, { date: e.target.value || null })}
+                          aria-invalid={!!dateError || undefined}
+                          className={`flex-1 h-8 px-2.5 rounded-lg border text-[12px] text-gray-100 focus:outline-none focus:ring-2 transition appearance-none ${
+                            dateError || staleDate
+                              ? "border-red-400/50 bg-red-500/10"
+                              : "border-white/[0.08] bg-white/[0.04] hover:border-white/[0.16]"
+                          }`}
+                          style={{ "--tw-ring-color": SIG_TINT_RING }}
+                        >
+                          <option value="" className="bg-[#181A22]">
+                            All tournament days
+                          </option>
+                          {staleDate && (
+                            <option value={cat.date} className="bg-[#181A22]">
+                              {dayjs(cat.date).format("ddd, D MMM YYYY")} · outside tournament dates
+                            </option>
+                          )}
+                          {eventDays.map((d) => (
+                            <option key={d} value={d} className="bg-[#181A22]">
+                              {dayjs(d).format("ddd, D MMM YYYY")}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                    {dateError && (
+                      <p className="text-[11px] text-red-400 mt-1 font-medium">
+                        {dateError}
                       </p>
                     )}
 

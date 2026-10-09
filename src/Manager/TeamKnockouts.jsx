@@ -31,6 +31,14 @@ import { TextField } from "@mui/material";
 import dayjs from "dayjs";
 
 import { getAuthToken } from "../shared/api/authToken";
+
+// The tie's first doubles set (its number depends on the formula, e.g. set 2 in
+// Doubles BO3, set 3 in BO5). Away partner lives in awayPlayerB; older matches
+// may still carry awayPlayerZ.
+const findDoublesSet = (match) =>
+  (match?.sets || []).find((s) => /^doubles/i.test(s.type || ""));
+const awayPartnerOf = (set) => set?.awayPlayerB || set?.awayPlayerZ || "";
+
 const TeamKnockouts = () => {
   const navigate = useNavigate();
   // Declared up top: effects below (tournament-info fetch) reference it in their
@@ -574,7 +582,7 @@ const TeamKnockouts = () => {
           const doublesMatches = data.matches.filter(m =>
             m.status !== "BYE" &&
             m.sets &&
-            m.sets.some(s => s.setNumber === 3) // Assuming set 3 is doubles
+            findDoublesSet(m)
           );
 
           if (doublesMatches.length > 0) {
@@ -685,7 +693,7 @@ const TeamKnockouts = () => {
         const doublesMatches = nextRoundData.matches.filter(m =>
           m.status !== "BYE" &&
           m.sets &&
-          m.sets.some(s => s.setNumber === 3) // Assuming set 3 is doubles
+          findDoublesSet(m)
         );
 
         if (doublesMatches.length > 0) {
@@ -864,12 +872,11 @@ const TeamKnockouts = () => {
 
     useEffect(() => {
       if (currentMatchForSub) {
-        // Find the doubles set (Set 3)
-        const doublesSet = currentMatchForSub.sets.find(s => s.setNumber === 3);
+        const doublesSet = findDoublesSet(currentMatchForSub);
         if (doublesSet) {
           setSubData({
             homePlayerB: doublesSet.homePlayerB || "",
-            awayPlayerZ: doublesSet.awayPlayerZ || ""
+            awayPlayerZ: awayPartnerOf(doublesSet)
           });
         }
       }
@@ -887,7 +894,7 @@ const TeamKnockouts = () => {
               ...(token ? { Authorization: `Bearer ${token}` } : {}),
             },
             body: JSON.stringify({
-              setNumber: 3, // Doubles set
+              setNumber: findDoublesSet(currentMatchForSub)?.setNumber,
               homePlayerB: subData.homePlayerB,
               awayPlayerZ: subData.awayPlayerZ
             }),
@@ -977,6 +984,16 @@ const TeamKnockouts = () => {
       awayPlayerZ: ""
     });
     const [saving, setSaving] = useState(false);
+    const doublesSet = findDoublesSet(currentMatch);
+
+    // Prefill with the partners the formula already assigned (editable).
+    useEffect(() => {
+      setNominationData({
+        homePlayerB: doublesSet?.homePlayerB || "",
+        awayPlayerZ: awayPartnerOf(doublesSet),
+      });
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentMatch?._id]);
 
     // Get team names safely
     const team1Name = currentMatch?.team1Id?.teamName ||
@@ -1003,7 +1020,7 @@ const TeamKnockouts = () => {
               ...(token ? { Authorization: `Bearer ${token}` } : {}),
             },
             body: JSON.stringify({
-              setNumber: 3, // Doubles set
+              setNumber: doublesSet?.setNumber,
               homePlayerB: nominationData.homePlayerB,
               awayPlayerZ: nominationData.awayPlayerZ
             }),

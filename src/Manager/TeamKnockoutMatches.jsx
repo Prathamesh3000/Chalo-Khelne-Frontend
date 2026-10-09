@@ -2122,14 +2122,14 @@ const TeamKnockoutMatches = () => {
                                             <span>{set.awayPlayer}</span>
                                           </div>
                                           {(set.homePlayerB ||
-                                            set.awayPlayerZ) && (
+                                            set.awayPlayerB || set.awayPlayerZ) && (
                                               <div className="flex items-center gap-2 text-sm opacity-90 mt-1">
                                                 <Users className="w-4 h-4" />
                                                 <span>{set.homePlayerB}</span>
                                                 <span className="bg-white bg-opacity-20 px-2 py-1 rounded-full text-xs font-medium">
                                                   VS
                                                 </span>
-                                                <span>{set.awayPlayerZ}</span>
+                                                <span>{set.awayPlayerB || set.awayPlayerZ}</span>
                                               </div>
                                             )}
                                         </div>
