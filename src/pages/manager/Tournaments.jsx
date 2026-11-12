@@ -12,7 +12,7 @@ import { ManagerShell } from "../../shared/layout";
 import { Skeleton } from "../../shared/ui";
 import { cn } from "../../shared/lib";
 import { useAuth } from "../../features/auth";
-import { useTournaments, resolveManageUrl } from "../../features/tournaments";
+import { useMyTournaments, resolveManageUrl } from "../../features/tournaments";
 import MCreateTournament from "../../Manager/MCreateTournament";
 
 import { getAuthToken } from "../../shared/api/authToken";
@@ -174,15 +174,10 @@ export default function ManagerTournaments() {
     }
   };
 
-  // Scope the fetch to the logged-in manager. The manager-scoped endpoint
-  // returns the manager's own tournaments (public + private) and ignores
-  // tab/sport/q params, so we apply those client-side below.
-  const filters = useMemo(
-    () => (user?._id ? { managerId: user._id } : {}),
-    [user?._id]
-  );
-
-  const { data: tournaments = [], isLoading } = useTournaments(filters);
+  // The logged-in manager's own tournaments (public + private), shared with the
+  // dashboard via useMyTournaments. The endpoint ignores tab/sport/q params, so
+  // we apply those client-side below.
+  const { data: tournaments = [], isLoading } = useMyTournaments();
 
   const visible = useMemo(() => {
     const needle = q.trim().toLowerCase();

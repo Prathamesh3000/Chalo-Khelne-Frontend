@@ -10,7 +10,7 @@ import { ManagerShell } from "../../shared/layout";
 import { Skeleton } from "../../shared/ui";
 import { cn } from "../../shared/lib";
 import { useAuth } from "../../features/auth";
-import { useTournaments, resolveManageUrl } from "../../features/tournaments";
+import { useMyTournaments, resolveManageUrl } from "../../features/tournaments";
 
 const TIME_FMT = new Intl.DateTimeFormat("en-IN", {
   hour: "2-digit", minute: "2-digit", hour12: false,
@@ -34,7 +34,10 @@ const toneFor = (name) => {
 export default function ManagerDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { data: tournaments = [], isLoading } = useTournaments();
+  // Manager-scoped, same query as the tournaments list — so "My tournaments"
+  // here always equals what the list shows (the unscoped public listing used to
+  // back this: other clubs' events, no private ones, capped at 20).
+  const { data: tournaments = [], isLoading } = useMyTournaments();
   const firstName = user?.name?.split(" ")[0] ?? "Manager";
 
   // Derived counts — all from existing useTournaments data, no new fetches.
