@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import dayjs from "dayjs";
-import { Trash2, ChevronDown, CalendarDays } from "lucide-react";
+import { Trash2, ChevronDown, CalendarDays, Clock, Plus } from "lucide-react";
 import { generateFormFields } from "../../utils/ruleBookFormEngine";
 import TeamKnockoutFormatSelector from "../TeamKnockoutFormatSelector";
 import Card from "./Card";
@@ -13,6 +13,12 @@ import OptionCard from "./OptionCard";
 import DashedAddButton from "./DashedAddButton";
 import SportNumberBadge from "./SportNumberBadge";
 import { getAuthToken } from "../../shared/api/authToken";
+import {
+  MAX_CATEGORY_TIME_SLOTS,
+  defaultTimeSlot,
+  nextTimeSlot,
+  timeSlotError,
+} from "./categoryTimeSlots";
 import {
   isTeamOnlySport,
   isIndividualOnlySport,
@@ -345,6 +351,7 @@ export default function SportCard({
   rulesLocked = false,
   tournamentStartDate = null,
   tournamentEndDate = null,
+  tournamentDailyWindow = null,
 }) {
   // Per-category play day is only offered for multi-day tournaments.
   const eventDays = tournamentDays(tournamentStartDate, tournamentEndDate);
@@ -551,7 +558,16 @@ export default function SportCard({
   const addCategory = () => {
     // New rows start with no template picked. The manager must pick from the
     // SuperAdmin-controlled list — there is no free-form entry.
-    const blank = { templateId: null, name: "", fee: 0, minAge: null, maxAge: null, gender: "any", date: null };
+    //
+    // They DO start with one time slot covering the tournament's daily window,
+    // so there is always a row to edit. Categories loaded from a tournament
+    // saved before time slots existed deliberately start empty instead — see
+    // the empty state below — so opening an old tournament to change something
+    // else never stamps times onto it.
+    const blank = {
+      templateId: null, name: "", fee: 0, minAge: null, maxAge: null, gender: "any", date: null,
+      timeSlots: [defaultTimeSlot(tournamentDailyWindow)],
+    };
     onUpdate({
       categories: [
         ...(sport.categories || []),
@@ -686,6 +702,34 @@ export default function SportCard({
       categories: (sport.categories || []).map((c, idx) =>
         idx === i ? { ...c, ...patch } : c
       ),
+    });
+  };
+
+  // ── Per-category time slots ──
+  //
+  // Slots are kept in the order the manager added them while editing, not
+  // sorted on every keystroke — re-sorting mid-edit moves the row out from
+  // under the cursor. The submit payload and the server both sort, so what
+  // gets stored is in order regardless.
+  const slotsOf = (cat) => (Array.isArray(cat?.timeSlots) ? cat.timeSlots : []);
+
+  const addTimeSlot = (i) => {
+    const slots = slotsOf((sport.categories || [])[i]);
+    if (slots.length >= MAX_CATEGORY_TIME_SLOTS) return;
+    updateCategory(i, { timeSlots: [...slots, nextTimeSlot(slots, tournamentDailyWindow)] });
+  };
+
+  const updateTimeSlot = (i, si, patch) => {
+    updateCategory(i, {
+      timeSlots: slotsOf((sport.categories || [])[i]).map((s, ix) =>
+        ix === si ? { ...s, ...patch } : s
+      ),
+    });
+  };
+
+  const removeTimeSlot = (i, si) => {
+    updateCategory(i, {
+      timeSlots: slotsOf((sport.categories || [])[i]).filter((_, ix) => ix !== si),
     });
   };
 
@@ -981,6 +1025,7 @@ export default function SportCard({
                 // A saved day that no longer falls inside the tournament dates
                 // stays selectable (flagged) so it is visible, not silently lost.
                 const staleDate = cat.date && !eventDays.includes(cat.date);
+                const catSlots = slotsOf(cat);
                 // Build the set of already-used template IDs in this sport so
                 // the picker can grey them out — no duplicates within one sport.
                 const usedIds = new Set(
@@ -1136,6 +1181,114 @@ export default function SportCard({
                         {dateError}
                       </p>
                     )}
+
+                    {/* Time slots — when this category plays on its day. A
+                        list, not one window: a category can run a group stage
+                        in the morning and its finals in the afternoon. */}
+                    <div className="mt-1.5">
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
+                        <span className="text-[11px] text-gray-400 flex-shrink-0">
+                          Time slots
+                        </span>
+                        {catSlots.length === 0 && (
+                          <span className="text-[11px] text-gray-500">
+                            none — plays any time during the day
+                          </span>
+                        )}
+                      </div>
+
+                      {catSlots.length > 0 && (
+                        <div className="mt-1.5 space-y-1.5 ml-[22px]">
+                          {catSlots.map((slot, si) => {
+                            // The step validator and the live check say the
+                            // same thing; the stored one wins so the message
+                            // the manager saw on Next doesn't change under them.
+                            const slotError =
+                              errors[`categories[${ci}].timeSlots[${si}]`] ||
+                              timeSlotError(slot);
+                            return (
+                              <div key={si} className="flex items-start gap-2">
+                                <div className="flex-1">
+                                  <div
+                                    className={`flex items-center gap-2 px-2.5 h-8 rounded-lg border focus-within:ring-2 transition ${
+                                      slotError
+                                        ? "border-red-400/50 bg-red-500/10"
+                                        : "border-white/[0.08] bg-white/[0.04] hover:border-white/[0.16]"
+                                    }`}
+                                    style={{
+                                      "--tw-ring-color": slotError
+                                        ? "rgba(239,68,68,0.25)"
+                                        : SIG_TINT_RING,
+                                    }}
+                                  >
+                                    <input
+                                      type="time"
+                                      aria-label={`Slot ${si + 1} start time`}
+                                      value={slot.startTime || ""}
+                                      onChange={(e) =>
+                                        updateTimeSlot(ci, si, { startTime: e.target.value })
+                                      }
+                                      aria-invalid={!!slotError || undefined}
+                                      className="flex-1 bg-transparent border-none focus:outline-none focus:ring-0 text-[12px] font-mono tabular-nums text-gray-100 p-0"
+                                    />
+                                    <span className="text-gray-600">—</span>
+                                    <input
+                                      type="time"
+                                      aria-label={`Slot ${si + 1} end time`}
+                                      value={slot.endTime || ""}
+                                      onChange={(e) =>
+                                        updateTimeSlot(ci, si, { endTime: e.target.value })
+                                      }
+                                      aria-invalid={!!slotError || undefined}
+                                      className="flex-1 bg-transparent border-none focus:outline-none focus:ring-0 text-[12px] font-mono tabular-nums text-gray-100 p-0"
+                                    />
+                                  </div>
+                                  {slotError && (
+                                    <p className="text-[11px] text-red-400 mt-1 font-medium">
+                                      {slotError}
+                                    </p>
+                                  )}
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => removeTimeSlot(ci, si)}
+                                  aria-label={`Remove slot ${si + 1}`}
+                                  className="h-7 w-7 mt-0.5 inline-flex items-center justify-center rounded-md text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition flex-shrink-0"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {catSlots.length < MAX_CATEGORY_TIME_SLOTS ? (
+                        <button
+                          type="button"
+                          onClick={() => addTimeSlot(ci)}
+                          className="mt-1.5 ml-[22px] inline-flex items-center gap-1 h-7 px-2 rounded-md border border-dashed border-white/[0.12] hover:border-white/[0.20] hover:bg-white/[0.03] text-[11px] font-semibold transition"
+                          style={{ color: SIG }}
+                        >
+                          <Plus className="w-3 h-3" />
+                          Add time slot
+                        </button>
+                      ) : (
+                        <p className="text-[11px] text-gray-500 mt-1.5 ml-[22px]">
+                          Maximum {MAX_CATEGORY_TIME_SLOTS} slots per category.
+                        </p>
+                      )}
+
+                      {/* A slot with no day is ambiguous on a multi-day event —
+                          it would read as "these times, every day". */}
+                      {catSlots.length > 0 && isMultiDay && !cat.date && (
+                        <p className="text-[11px] text-amber-300/90 mt-1.5 ml-[22px]">
+                          Pick a play day too, or these times apply to every day
+                          of the tournament.
+                        </p>
+                      )}
+                    </div>
 
                     {/* Custom category: the manager supplies what a template
                         would otherwise have provided. Age + gender are not

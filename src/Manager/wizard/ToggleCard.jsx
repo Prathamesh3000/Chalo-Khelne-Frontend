@@ -9,6 +9,7 @@ export default function ToggleCard({
   description,
   checked,
   onChange,
+  ariaLabel,
   className = "",
 }) {
   return (
@@ -31,6 +32,7 @@ export default function ToggleCard({
       <Switch
         checked={!!checked}
         onChange={(e) => onChange?.(e.target.checked)}
+        slotProps={ariaLabel ? { input: { role: "switch", "aria-label": ariaLabel } } : undefined}
         sx={{
           "& .MuiSwitch-switchBase.Mui-checked": { color: SIG },
           "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": {

@@ -1,4 +1,4 @@
-import React, { useState, useContext, useEffect, useCallback } from "react";
+import React, { useState, useContext, useEffect, useCallback, useRef } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 import {
@@ -28,6 +28,12 @@ import {
   generateFormFields,
   validateRuleBookForm,
 } from "../utils/ruleBookFormEngine";
+import {
+  DEFAULT_DAILY_WINDOW,
+  defaultTimeSlot,
+  timeSlotError,
+  usableTimeSlots,
+} from "./wizard/categoryTimeSlots";
 // Sub-step 4 — wizard design primitives (Sub-step 1)
 // Sub-step 6 — SportCard + DashedAddButton for the new Step 2
 // Sub-step 7 — Select for the Cancellation Policy dropdown in Step 3
@@ -232,7 +238,10 @@ function ruleBookValuesToMatchFormat(values, scoringType) {
  * Map a single API sport entry to the unified form-sport shape.
  * Used for every entry in t.sports[] — no more primary/additional split.
  */
-function mapSportApiToFormSport(s, isFirst, legacyRootLevel = "") {
+// `dailyWindow` seeds the default time slot for the blank category a saved
+// sport with no categories falls back to. Saved categories keep their own
+// slots, empty included.
+function mapSportApiToFormSport(s, isFirst, legacyRootLevel = "", dailyWindow = null) {
   return {
     _key: Math.random().toString(36).slice(2, 10),
     _expanded: !!isFirst, // first card auto-expanded, others collapsed
@@ -263,6 +272,15 @@ function mapSportApiToFormSport(s, isFirst, legacyRootLevel = "") {
           maxAge: c.maxAge ?? null,
           gender: c.gender || "any",
           date: c.date || null,
+          // Loaded as-is, including empty. A tournament saved before time
+          // slots existed has none, and seeding a default here would stamp
+          // times onto it the first time someone edited anything else.
+          timeSlots: Array.isArray(c.timeSlots)
+            ? c.timeSlots.map((s) => ({
+                startTime: s.startTime || "",
+                endTime: s.endTime || "",
+              }))
+            : [],
           // Per-category format overrides — null means the row inherits the
           // sport track, which is how every tournament saved before this
           // feature loads.
@@ -272,7 +290,10 @@ function mapSportApiToFormSport(s, isFirst, legacyRootLevel = "") {
           qualifyPerGroup: c.qualifyPerGroup ?? null,
           drawSize: c.drawSize ?? null,
         }))
-      : [{ templateId: null, name: "", fee: 0, minAge: null, maxAge: null, gender: "any", date: null }],
+      : [{
+          templateId: null, name: "", fee: 0, minAge: null, maxAge: null, gender: "any", date: null,
+          timeSlots: [defaultTimeSlot(dailyWindow)],
+        }],
     // Which scope the tournament was authored in. Anything saved before this
     // existed has no value and loads as "sport" — its original behaviour.
     formatScope: s.formatScope === "category" ? "category" : "sport",
@@ -297,9 +318,10 @@ function mapTournamentToForm(t, defaults, auth) {
   // so existing tournaments with mixed-or-uniform levels load correctly even
   // before any sports[i].tournamentLevel field has been written.
   const legacyRootLevel = t.tournamentLevel || "";
+  const dailyWindow = t.selectedTime || DEFAULT_DAILY_WINDOW;
 
   const sports = (Array.isArray(t.sports) && t.sports.length > 0)
-    ? t.sports.map((s, idx) => mapSportApiToFormSport(s, idx === 0, legacyRootLevel))
+    ? t.sports.map((s, idx) => mapSportApiToFormSport(s, idx === 0, legacyRootLevel, dailyWindow))
     : [newSportEntry({ expanded: true })];
 
   return {
@@ -312,7 +334,7 @@ function mapTournamentToForm(t, defaults, auth) {
     startDate: t.startDate ? t.startDate.split("T")[0] : "",
     endDate: t.endDate ? t.endDate.split("T")[0] : "",
     termsAndConditions: t.termsAndConditions || "",
-    selectedTime: t.selectedTime || { startTime: "10:00", endTime: "18:00" },
+    selectedTime: t.selectedTime || { ...DEFAULT_DAILY_WINDOW },
     registrationDeadline: deadlineToForm(t.registrationDeadline),
     managerId: t.managerId || [auth?._id || ""],
     isPrivate: t.isPrivate || false,
@@ -345,8 +367,12 @@ function newSportEntry({ expanded = false } = {}) {
     tournamentLevel: "",
     type: "knockout + group stage",
     // First row is empty so the picker prompts the manager to select a
-    // SuperAdmin template — there is no free-form category entry.
-    categories: [{ templateId: null, name: "", fee: 0, minAge: null, maxAge: null, gender: "any", date: null }],
+    // SuperAdmin template — there is no free-form category entry. It does
+    // carry one default time slot, which the manager can edit or remove.
+    categories: [{
+      templateId: null, name: "", fee: 0, minAge: null, maxAge: null, gender: "any", date: null,
+      timeSlots: [defaultTimeSlot(DEFAULT_DAILY_WINDOW)],
+    }],
     // Format is declared once for the whole sport by default; the manager can
     // switch to per-category in step 2.
     formatScope: "sport",
@@ -359,6 +385,12 @@ function newSportEntry({ expanded = false } = {}) {
   };
 }
 
+// Stable string of what the manager has actually entered, used to tell whether
+// closing the popup would throw work away. Keys starting with "_" are UI-only
+// bookkeeping (random _key, _expanded, fetched rule books) and are skipped so
+// they can't make an untouched form look edited.
+const serializeForm = (fd) =>
+  JSON.stringify(fd, (k, v) => (k.startsWith("_") ? undefined : v));
 
 const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialData = null, onSuccess, redirectOnSuccess = true }) => {
   const isEditMode = mode === "edit";
@@ -386,6 +418,11 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
   // Wizard step
   const [currentStep, setCurrentStep] = useState(0);
 
+  // Unsaved-changes guard: baselineRef holds the form as it was when the popup
+  // opened; confirmDiscard shows the "discard changes?" prompt.
+  const baselineRef = useRef(null);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+
   // Sports list (active sports for the dropdowns)
   const [sportsList, setSportsList] = useState([]);
 
@@ -399,7 +436,7 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
     cancellationPolicy: "YES",
     eventLocation: "",
     managerId: [auth?._id || ""],
-    selectedTime: { startTime: "10:00", endTime: "18:00" },
+    selectedTime: { ...DEFAULT_DAILY_WINDOW },
     startDate: dayjs().format("YYYY-MM-DD"),
     endDate: dayjs().add(7, "day").format("YYYY-MM-DD"),
     termsAndConditions: "",
@@ -420,17 +457,22 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
   useEffect(() => {
     if (!showPopup) return; // Component returns null anyway when !showPopup
 
+    let nextForm;
     if (isEditMode && initialData) {
-      setFormData(mapTournamentToForm(initialData, defaultFormData, auth));
+      nextForm = mapTournamentToForm(initialData, defaultFormData, auth);
+      setFormData(nextForm);
       setImage(initialData.tournamentLogo ? `/uploads/tournaments/${initialData.tournamentLogo}` : null);
       setIsDescriptionOpen(!!initialData.description);
       setIsTermsOpen(!!initialData.termsAndConditions);
     } else {
-      setFormData({ ...defaultFormData, sports: [newSportEntry({ expanded: true })] });
+      nextForm = { ...defaultFormData, sports: [newSportEntry({ expanded: true })] };
+      setFormData(nextForm);
       setImage(null);
       setIsDescriptionOpen(false);
       setIsTermsOpen(false);
     }
+    baselineRef.current = serializeForm(nextForm);
+    setConfirmDiscard(false);
     setImageFile(null);
     setFieldErrors({});
     setSuccess("");
@@ -689,6 +731,12 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
               errors[`${prefix}.categories[${j}].date`] =
                 "Play day is outside the tournament dates — pick another day";
             }
+            // Each time slot is validated on its own so the message lands on
+            // the row that's wrong, not on the category.
+            (c?.timeSlots || []).forEach((slot, k) => {
+              const err = timeSlotError(slot);
+              if (err) errors[`${prefix}.categories[${j}].timeSlots[${k}]`] = err;
+            });
           });
         }
         // Rule-book validation only for sports whose Section D has fetched a
@@ -924,6 +972,11 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
               // Only meaningful for multi-day events; a single-day event plays
               // every category on its one day.
               date: formData.startDate !== formData.endDate ? c.date || null : null,
+              // Time slots DO apply to a single-day event — that's where they
+              // matter most — so unlike `date` they're sent either way. Sorted
+              // and de-duplicated here as well as on the server, so what the
+              // manager sees next time matches what they sent.
+              timeSlots: usableTimeSlots(c.timeSlots),
               // null = inherit the sport track, which is what the server's
               // resolvers expect for every category the manager left alone.
               type: perCategoryFormat ? c.type || null : null,
@@ -1006,6 +1059,17 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
 
   if (!showPopup) return null;
 
+  // X and Cancel go through here. A saved form (success) or an untouched one
+  // closes straight away; anything else asks first.
+  const hasUnsavedChanges =
+    !success &&
+    (!!imageFile ||
+      (baselineRef.current !== null && serializeForm(formData) !== baselineRef.current));
+  const requestClose = () => {
+    if (hasUnsavedChanges) setConfirmDiscard(true);
+    else setShowPopup(false);
+  };
+
   const activeStep = steps[currentStep];
   const isLastStep = currentStep === steps.length - 1;
 
@@ -1053,16 +1117,19 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
           </div>
 
           {/* Public/Private toggle card */}
+          {/* Switch ON = Public, so the label next to it always describes what
+              the switch is doing. The stored field is still `isPrivate`. */}
           <ToggleCard
             icon={formData.isPrivate ? <Lock className="w-5 h-5" /> : <Users className="w-5 h-5" />}
-            title={formData.isPrivate ? "Private Tournament" : "Public Tournament"}
+            title="Tournament visibility"
             description={
               formData.isPrivate
-                ? "Hidden from public listing. Only you can manage registrations via bulk upload."
-                : "Visible to everyone. Players can self-register via the app."
+                ? "Private: invite only"
+                : "Public: anyone can find and register"
             }
-            checked={formData.isPrivate}
-            onChange={(b) => setFormData((prev) => ({ ...prev, isPrivate: b }))}
+            ariaLabel={formData.isPrivate ? "Private: invite only. Turn on to make public" : "Public: anyone can find and register. Turn off to make private"}
+            checked={!formData.isPrivate}
+            onChange={(isPublic) => setFormData((prev) => ({ ...prev, isPrivate: !isPublic }))}
           />
 
           {/* Client ID slide-in (auto-controlled by isPrivate). Sub-step 9:
@@ -1191,6 +1258,7 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
             rulesLocked={isRulesLocked}
             tournamentStartDate={formData.startDate}
             tournamentEndDate={formData.endDate}
+            tournamentDailyWindow={formData.selectedTime}
           />
         ))}
 
@@ -1436,7 +1504,8 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
             </h2>
           </div>
           <button
-            onClick={() => setShowPopup(false)}
+            onClick={requestClose}
+            aria-label="Close"
             className="h-8 w-8 inline-flex items-center justify-center rounded-md hover:bg-white/[0.06] text-gray-400 hover:text-gray-100 flex-shrink-0"
           >
             <X className="w-4 h-4" />
@@ -1502,7 +1571,7 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
           <div className="px-6 py-3 border-t border-white/[0.06] flex items-center justify-between bg-[#181A22]">
             <button
               type="button"
-              onClick={currentStep === 0 ? () => setShowPopup(false) : goPrev}
+              onClick={currentStep === 0 ? requestClose : goPrev}
               className="h-9 px-3 inline-flex items-center gap-1.5 text-[12px] font-medium text-gray-300 hover:bg-white/[0.06] rounded-lg transition"
             >
               {currentStep === 0 ? (
@@ -1568,6 +1637,47 @@ const MCreateTournament = ({ showPopup, setShowPopup, mode = "create", initialDa
           </div>
         )}
       </div>
+
+      {confirmDiscard && (
+        <div
+          className="absolute inset-0 z-10 flex items-center justify-center bg-black/50 p-4"
+          onKeyDown={(e) => { if (e.key === "Escape") setConfirmDiscard(false); }}
+        >
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="discard-title"
+            aria-describedby="discard-desc"
+            className="w-full max-w-sm rounded-xl border border-white/[0.08] bg-[#181A22] p-5 shadow-[0_24px_64px_rgba(0,0,0,0.6)]"
+          >
+            <h3 id="discard-title" className="text-[16px] font-semibold text-white">
+              {isEditMode ? "Discard your changes?" : "Discard this tournament?"}
+            </h3>
+            <p id="discard-desc" className="mt-1.5 text-[13px] text-gray-400">
+              {isEditMode
+                ? "You have unsaved changes. If you close now, they will be lost."
+                : "You've entered details that haven't been saved. If you close now, they will be lost."}
+            </p>
+            <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => { setConfirmDiscard(false); setShowPopup(false); }}
+                className="h-10 px-4 text-[13px] font-semibold text-red-400 hover:bg-red-500/10 rounded-lg transition focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400/50"
+              >
+                Discard
+              </button>
+              <button
+                type="button"
+                autoFocus
+                onClick={() => setConfirmDiscard(false)}
+                className="h-10 px-5 text-[13px] font-semibold text-white rounded-lg bg-orange-500 hover:bg-orange-600 active:bg-orange-700 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[#181A22]"
+              >
+                Keep editing
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
