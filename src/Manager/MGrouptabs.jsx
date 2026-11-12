@@ -30,6 +30,8 @@ import KnockoutFormatPanel, { hasFormatPanelErrors } from "./components/Knockout
 import { buildRequestRounds, isSetBasedSport } from "./utils/knockoutDefaults";
 import { getAuthToken } from "../shared/api/authToken";
 import DialogA11y from "../shared/components/DialogA11y";
+import Modal from "../shared/components/Modal";
+import { describeGroupDeletion, groupDeletionLines } from "./groupDeletion";
 import {
   getCategories,
   getMatchFormat as getMatchFormatHelper,
@@ -148,6 +150,10 @@ export default function Tournament({
   const [standingsData, setStandingsData] = useState({});
   const [showStandings, setShowStandings] = useState(false);
   const [transitionLoading, setTransitionLoading] = useState(false);
+
+  // "Delete Group" confirmation: { id, name, playerCount, matchCount, completedCount, hasResults }
+  const [groupToDelete, setGroupToDelete] = useState(null);
+  const [deletingGroup, setDeletingGroup] = useState(false);
 
   // Round 2 Top Players groups
   const [round2Groups, setRound2Groups] = useState([]);
@@ -1747,6 +1753,39 @@ export default function Tournament({
 
   const currentGroup = filteredGroups.find(group => group._id === activeGroup) || filteredGroups[0];
 
+  // Runs after the manager confirms in the modal. Updates local state in place —
+  // no page reload. The server still refuses (409) once the tournament has moved
+  // past the group stage with completed matches.
+  const confirmDeleteGroup = async () => {
+    const target = groupToDelete;
+    if (!target) return;
+    setDeletingGroup(true);
+    try {
+      const res = await axios.delete(`/api/tournaments/bookinggroups/${target.id}`);
+      toast.success(res.data?.message || "Group deleted");
+      const removedId = target.id;
+      setGroups((prev) => prev.filter((g) => g._id !== removedId));
+      setGroupsWithMatches((prev) => {
+        const next = new Set(prev);
+        next.delete(removedId);
+        return next;
+      });
+      const remaining = filteredGroups.filter((g) => g._id !== removedId);
+      setActiveGroup(remaining[0]?._id || null);
+    } catch (err) {
+      const status = err.response?.status;
+      const msg = err.response?.data?.message || err.message;
+      if (status === 409) {
+        toast.warn(msg); // Block message (past group_stage with completed matches)
+      } else {
+        toast.error("Failed to delete group: " + msg);
+      }
+    } finally {
+      setDeletingGroup(false);
+      setGroupToDelete(null);
+    }
+  };
+
   // Per-category cutoff. These call sites passed neither sport nor category, so
   // the standings highlight and the "Top N qualify" caption both showed the
   // track default — a different number from the one transitionToKnockout
@@ -2219,38 +2258,55 @@ export default function Tournament({
                   )}
                   <button
                     className="flex-1 min-w-[160px] py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 text-red-400 bg-red-500/15 hover:bg-red-500/25 border border-red-500/20"
-                    onClick={async () => {
-                      const matchCount = matchesData[activeGroup]?.length || 0;
-                      const name = currentGroup?.groupName || "this group";
-                      const tail = matchCount > 0 ? ` and its ${matchCount} match${matchCount === 1 ? "" : "es"}` : "";
-                      if (!window.confirm(`Delete "${name}"${tail}? This cannot be undone.`)) return;
-                      try {
-                        const res = await axios.delete(`/api/tournaments/bookinggroups/${activeGroup}`);
-                        toast.success(res.data?.message || "Group deleted");
-                        const removedId = activeGroup;
-                        setGroups((prev) => prev.filter((g) => g._id !== removedId));
-                        setGroupsWithMatches((prev) => {
-                          const next = new Set(prev);
-                          next.delete(removedId);
-                          return next;
-                        });
-                        const remaining = filteredGroups.filter((g) => g._id !== removedId);
-                        setActiveGroup(remaining[0]?._id || null);
-                      } catch (err) {
-                        const status = err.response?.status;
-                        const msg = err.response?.data?.message || err.message;
-                        if (status === 409) {
-                          toast.warn(msg); // Block message (past group_stage with completed matches)
-                        } else {
-                          toast.error("Failed to delete group: " + msg);
-                        }
-                      }
-                    }}
+                    onClick={() =>
+                      setGroupToDelete({
+                        id: activeGroup,
+                        ...describeGroupDeletion({ group: currentGroup, matches: matchesData[activeGroup] }),
+                      })
+                    }
                   >
                     <FiTrash2 size={14} />
                     Delete Group
                   </button>
                 </div>
+
+                <Modal
+                  open={!!groupToDelete}
+                  onClose={() => { if (!deletingGroup) setGroupToDelete(null); }}
+                  title={groupToDelete ? `Delete “${groupToDelete.name}”?` : ""}
+                  size="sm"
+                  closeOnBackdrop={false}
+                  footer={
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setGroupToDelete(null)}
+                        disabled={deletingGroup}
+                        className="h-9 px-3 w-auto rounded-lg text-[13px] font-medium text-gray-300 hover:bg-white/[0.08] disabled:opacity-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={confirmDeleteGroup}
+                        disabled={deletingGroup}
+                        className="h-9 px-4 w-auto rounded-lg text-[13px] font-semibold text-white bg-red-600 hover:bg-red-700 disabled:opacity-60"
+                      >
+                        {deletingGroup ? "Deleting…" : groupToDelete?.hasResults ? "Delete group and results" : "Delete group"}
+                      </button>
+                    </>
+                  }
+                >
+                  <ul className="space-y-2">
+                    {groupToDelete &&
+                      groupDeletionLines(groupToDelete).map((l, i) => (
+                        <li key={i} className={`text-[13px] ${l.tone === "warn" ? "text-amber-300" : "text-gray-300"}`}>
+                          {l.text}
+                        </li>
+                      ))}
+                  </ul>
+                  <p className="mt-3 text-[12px] text-gray-400">This cannot be undone.</p>
+                </Modal>
               </div>
 
               {/* Inline Standings Table */}
