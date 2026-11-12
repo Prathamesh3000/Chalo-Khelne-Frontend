@@ -11,6 +11,7 @@ import { Skeleton } from "../../shared/ui";
 import { cn } from "../../shared/lib";
 import { useAuth } from "../../features/auth";
 import { useMyTournaments, resolveManageUrl } from "../../features/tournaments";
+import { STATUS_LABEL } from "../../features/tournaments/lib/tournamentStatus";
 
 const TIME_FMT = new Intl.DateTimeFormat("en-IN", {
   hour: "2-digit", minute: "2-digit", hour12: false,
@@ -44,6 +45,8 @@ export default function ManagerDashboard() {
   const myTournamentsCount = tournaments.length;
   const activeTournaments = tournaments.filter((t) => t.status === "live");
   const activeCount = activeTournaments.length;
+  // Ended, matches were generated, never closed: the manager should wrap these up.
+  const wrapupCount = tournaments.filter((t) => t.status === "needs_wrapup").length;
   // Pending = payment proofs awaiting this manager's review (real data,
   // shaped to match what PendingApprovalRow expects).
   const [pendingBookings, setPendingBookings] = useState([]);
@@ -129,9 +132,18 @@ export default function ManagerDashboard() {
             </span>
           }
           sublineNode={
-            activeCount > 0 ? (
-              <span className="text-[11px] text-emerald-400">
-                {activeCount} match{activeCount === 1 ? "" : "es"} in progress
+            activeCount > 0 || wrapupCount > 0 ? (
+              <span className="flex flex-wrap items-center gap-x-2">
+                {activeCount > 0 && (
+                  <span className="text-[11px] text-emerald-400">
+                    {activeCount} tournament{activeCount === 1 ? "" : "s"} in progress
+                  </span>
+                )}
+                {wrapupCount > 0 && (
+                  <Link to="/mtournament-management" className="text-[11px] text-amber-300 hover:underline">
+                    {wrapupCount} need{wrapupCount === 1 ? "s" : ""} wrap-up
+                  </Link>
+                )}
               </span>
             ) : (
               <span className="text-[11px] text-gray-400">All quiet</span>
@@ -425,7 +437,12 @@ function CompactTournamentRow({ tournament, isLast, onClick }) {
   const t = tournament;
   // Spec: open/live = #f97316, completed = #888. Inline style avoids Tailwind
   // arbitrary-value resolution edge cases for the muted gray.
-  const dotBg = t.status === "completed" ? "#888" : "#f97316";
+  const dotBg =
+    t.status === "completed" || t.status === "ended"
+      ? "#888"
+      : t.status === "needs_wrapup"
+      ? "#fbbf24"
+      : "#f97316";
   return (
     <button
       onClick={onClick}
@@ -441,7 +458,7 @@ function CompactTournamentRow({ tournament, isLast, onClick }) {
       <div className="flex-1 min-w-0">
         <p className="text-[13px] font-medium text-white truncate">{t.title || t.name}</p>
         <p className="text-[11px] text-gray-400 mt-0.5 truncate">
-          {t.sport || "—"} · <span className="capitalize">{t.status}</span>
+          {t.sport || "—"} · <span>{STATUS_LABEL[t.status] || t.status}</span>
         </p>
       </div>
       <StatusBadge status={t.status} small />
@@ -530,9 +547,11 @@ function TeamColumn({ name, align = "left" }) {
 
 function StatusBadge({ status, small }) {
   const map = {
-    live:      { bg: "bg-red-500/15",   text: "text-red-400",   label: "Live",      dot: true  },
-    upcoming:  { bg: "bg-blue-500/15",  text: "text-blue-300",  label: "Open",      dot: false },
-    completed: { bg: "bg-white/[0.06]", text: "text-gray-400",  label: "Completed", dot: false },
+    live:         { bg: "bg-red-500/15",   text: "text-red-400",   label: STATUS_LABEL.live,         dot: true  },
+    upcoming:     { bg: "bg-blue-500/15",  text: "text-blue-300",  label: STATUS_LABEL.upcoming,     dot: false },
+    completed:    { bg: "bg-white/[0.06]", text: "text-gray-400",  label: STATUS_LABEL.completed,    dot: false },
+    ended:        { bg: "bg-white/[0.06]", text: "text-gray-400",  label: STATUS_LABEL.ended,        dot: false },
+    needs_wrapup: { bg: "bg-amber-500/15", text: "text-amber-300", label: STATUS_LABEL.needs_wrapup, dot: false },
   };
   const s = map[status] || map.upcoming;
   return (

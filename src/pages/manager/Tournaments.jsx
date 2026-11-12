@@ -5,7 +5,7 @@ import axios from "axios";
 import { toast } from "react-toastify";
 import {
   ShieldCheck, Plus, Search, Filter, Trophy, Calendar, MapPin,
-  ArrowRight, Users, Edit2, FileSpreadsheet, Download, FileText, Target, X, Trash2,
+  ArrowRight, Users, Edit2, FileSpreadsheet, Download, FileText, Target, X, Trash2, CheckCircle2,
 } from "lucide-react";
 import { getTournamentType } from "../../utils/sportTrack";
 import { ManagerShell } from "../../shared/layout";
@@ -13,6 +13,9 @@ import { Skeleton } from "../../shared/ui";
 import { cn } from "../../shared/lib";
 import { useAuth } from "../../features/auth";
 import { useMyTournaments, resolveManageUrl } from "../../features/tournaments";
+import { completeTournament } from "../../features/tournaments/api/tournaments";
+import { statusMatchesTab, canMarkCompleted, STATUS_LABEL } from "../../features/tournaments/lib/tournamentStatus";
+import Modal from "../../shared/components/Modal";
 import MCreateTournament from "../../Manager/MCreateTournament";
 
 import { getAuthToken } from "../../shared/api/authToken";
@@ -22,6 +25,8 @@ const TABS = [
   { key: "live",      label: "Live"      },
   { key: "upcoming",  label: "Upcoming"  },
   { key: "completed", label: "Completed" },
+  // Only shown while at least one tournament is waiting to be closed out.
+  { key: "needs_wrapup", label: "Needs wrap-up" },
 ];
 
 const SPORTS = ["All Sports", "Cricket", "Football", "Badminton", "Tennis", "Basketball", "Volleyball"];
@@ -182,7 +187,7 @@ export default function ManagerTournaments() {
   const visible = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return tournaments.filter((t) => {
-      if (tab !== "all" && t.status !== tab) return false;
+      if (!statusMatchesTab(t.status, tab)) return false;
       if (sport !== "All Sports" && t.sport !== sport) return false;
       if (needle) {
         const hay = `${t.title || ""} ${t.sport || ""}`.toLowerCase();
@@ -193,6 +198,28 @@ export default function ManagerTournaments() {
   }, [tournaments, tab, sport, q]);
 
   const liveCount = tournaments.filter((t) => t.status === "live").length;
+  const wrapupCount = tournaments.filter((t) => t.status === "needs_wrapup").length;
+  const visibleTabs = TABS.filter((x) => x.key !== "needs_wrapup" || wrapupCount > 0 || tab === "needs_wrapup");
+
+  // "Mark as completed" — the owner closes a tournament by hand (nothing else
+  // moves a tournament to the completed stage). Confirmed in a modal; there is
+  // no reopen.
+  const [completing, setCompleting] = useState(null);
+  const [completingBusy, setCompletingBusy] = useState(false);
+  const confirmComplete = async () => {
+    if (!completing) return;
+    setCompletingBusy(true);
+    try {
+      await completeTournament(completing._id);
+      toast.success(`"${completing.title || completing.name || "Tournament"}" marked as completed.`);
+      queryClient.invalidateQueries({ queryKey: ["tournaments"] });
+      setCompleting(null);
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to mark the tournament as completed");
+    } finally {
+      setCompletingBusy(false);
+    }
+  };
 
   return (
     <ManagerShell searchPlaceholder="Search tournaments…">
@@ -224,22 +251,22 @@ export default function ManagerTournaments() {
       {/* Tabs + filters row */}
       <div className="mb-5 flex flex-wrap items-center gap-3">
         {/* Pill tabs — same primitive as dashboard / tournament shell */}
-        <div className="inline-flex items-center gap-1 bg-white/[0.04] p-1 rounded-md border border-white/[0.06] w-fit">
-          {TABS.map((t) => {
+        <div className="inline-flex items-center gap-1 bg-white/[0.04] p-1 rounded-md border border-white/[0.06] w-fit max-w-full overflow-x-auto">
+          {visibleTabs.map((t) => {
             const isActive = tab === t.key;
             return (
               <button
                 key={t.key}
                 onClick={() => setTab(t.key)}
                 className={cn(
-                  "inline-flex items-center gap-1.5 h-7 px-3 rounded-[5px] text-[12px] font-medium transition w-auto",
+                  "inline-flex items-center gap-1.5 h-7 px-3 rounded-[5px] text-[12px] font-medium transition w-auto whitespace-nowrap flex-shrink-0",
                   isActive
                     ? "bg-[#181A22] text-white shadow-[0_1px_2px_rgba(0,0,0,0.3)]"
                     : "text-gray-400 hover:text-white"
                 )}
               >
                 {t.label}
-                {t.key === "live" && liveCount > 0 && (
+                {((t.key === "live" && liveCount > 0) || (t.key === "needs_wrapup" && wrapupCount > 0)) && (
                   <span
                     className="tabular-nums text-[10px] font-bold rounded-full px-1.5 min-w-[1.1rem] h-4 inline-flex items-center justify-center"
                     style={{
@@ -247,7 +274,7 @@ export default function ManagerTournaments() {
                       color:      isActive ? "#fff"    : "#9ca3af",
                     }}
                   >
-                    {liveCount}
+                    {t.key === "live" ? liveCount : wrapupCount}
                   </span>
                 )}
               </button>
@@ -316,6 +343,7 @@ export default function ManagerTournaments() {
               onClick={() => handleManage(t)}
               onEdit={(e) => handleEdit(t._id, e)}
               onDelete={(e) => handleDelete(t, e)}
+              onComplete={canMarkCompleted(t.status) ? (e) => { e.stopPropagation(); setCompleting(t); } : undefined}
               onBulkUpload={(e) => {
                 e.stopPropagation();
                 navigate(`/bulk-booking?tournamentId=${t._id}`);
@@ -396,13 +424,48 @@ export default function ManagerTournaments() {
           </div>
         </div>
       )}
+
+      <Modal
+        open={!!completing}
+        onClose={() => { if (!completingBusy) setCompleting(null); }}
+        title="Mark as completed?"
+        size="sm"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setCompleting(null)}
+              disabled={completingBusy}
+              className="h-9 px-3 w-auto rounded-lg text-[13px] font-medium text-gray-300 hover:bg-white/[0.08] disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={confirmComplete}
+              disabled={completingBusy}
+              className="h-9 px-4 w-auto rounded-lg text-[13px] font-semibold text-white bg-orange-500 hover:bg-orange-600 disabled:opacity-60"
+            >
+              {completingBusy ? "Saving…" : "Mark as completed"}
+            </button>
+          </>
+        }
+      >
+        <p className="text-[13px] text-gray-300">
+          “{completing?.title || completing?.name || "This tournament"}” will be closed: every sport
+          in it moves to the Completed stage, and it stops showing as live or needing wrap-up.
+        </p>
+        <p className="mt-2 text-[12px] text-gray-400">
+          Players, matches and results are kept. This can’t be reopened from here.
+        </p>
+      </Modal>
     </ManagerShell>
   );
 }
 
 // ── Tournament card (grid variant) ──────────────────────────────────────────
 
-function TournamentGridCard({ tournament, onClick, onEdit, onDelete, onBulkUpload }) {
+function TournamentGridCard({ tournament, onClick, onEdit, onDelete, onComplete, onBulkUpload }) {
   const t = tournament;
   const accent = SPORT_ACCENT[t.sport] || t.bannerColor || "#F97316";
   const status = STATUS_TONES[t.status] || STATUS_TONES.upcoming;
@@ -482,6 +545,17 @@ function TournamentGridCard({ tournament, onClick, onEdit, onDelete, onBulkUploa
             >
               <FileSpreadsheet className="w-3.5 h-3.5" />
             </button>
+            {onComplete && (
+              <button
+                type="button"
+                onClick={onComplete}
+                title="Mark as completed"
+                aria-label="Mark as completed"
+                className="inline-flex items-center justify-center w-6 h-6 rounded-md text-gray-400 hover:text-emerald-400 hover:bg-emerald-500/[0.12] transition"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+              </button>
+            )}
             {onEdit && (
               <button
                 type="button"
@@ -559,9 +633,11 @@ function TournamentGridCard({ tournament, onClick, onEdit, onDelete, onBulkUploa
 // ── Status badge ────────────────────────────────────────────────────────────
 
 const STATUS_TONES = {
-  live:      { bg: "bg-red-500/15",   text: "text-red-400",    label: "Live",      dot: true  },
-  upcoming:  { bg: "bg-blue-500/15",  text: "text-blue-300",   label: "Open",      dot: false },
-  completed: { bg: "bg-white/[0.06]", text: "text-gray-400",   label: "Completed", dot: false },
+  live:         { bg: "bg-red-500/15",   text: "text-red-400",   label: STATUS_LABEL.live,         dot: true  },
+  upcoming:     { bg: "bg-blue-500/15",  text: "text-blue-300",  label: STATUS_LABEL.upcoming,     dot: false },
+  completed:    { bg: "bg-white/[0.06]", text: "text-gray-400",  label: STATUS_LABEL.completed,    dot: false },
+  ended:        { bg: "bg-white/[0.06]", text: "text-gray-400",  label: STATUS_LABEL.ended,        dot: false },
+  needs_wrapup: { bg: "bg-amber-500/15", text: "text-amber-300", label: STATUS_LABEL.needs_wrapup, dot: false },
 };
 
 function StatusBadge({ status }) {

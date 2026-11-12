@@ -21,6 +21,8 @@ const STATUS = {
   live:      { label: "Live",      bg: "bg-red-50",       text: "text-red-600",      ring: "ring-red-200",      dot: true  },
   upcoming:  { label: "Upcoming",  bg: "bg-blue-50",      text: "text-blue-600",     ring: "ring-blue-200",     dot: false },
   completed: { label: "Completed", bg: "bg-gray-100",     text: "text-gray-500",     ring: "ring-gray-200",     dot: false },
+  ended:     { label: "Ended",     bg: "bg-gray-100",     text: "text-gray-500",     ring: "ring-gray-200",     dot: false },
+  needs_wrapup: { label: "Needs wrap-up", bg: "bg-amber-50", text: "text-amber-700", ring: "ring-amber-200",    dot: false },
 };
 
 function formatDateRange(start, end) {

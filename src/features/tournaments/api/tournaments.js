@@ -1,5 +1,6 @@
 import { api, USE_MOCK } from "../../../shared/api";
 import * as mocks from "./mocks";
+import { deriveTournamentStatus } from "../lib/tournamentStatus";
 
 /**
  * Map a real backend tournament (rich, nested) into the flat shape the card
@@ -48,7 +49,7 @@ function normalizeTournament(t) {
     organizerName: t.organizerName || "",
     startDate: t.startDate || null,
     endDate: t.endDate || null,
-    status: deriveStatus(t),
+    status: deriveTournamentStatus(t),
     fee,
     // Capacity + registered come from separate endpoints in the legacy API.
     // Leave undefined here so the card hides the progress bar instead of
@@ -61,17 +62,6 @@ function normalizeTournament(t) {
     tournamentLevel: t.tournamentLevel || null,
     isPrivate: !!t.isPrivate,
   };
-}
-
-function deriveStatus(t) {
-  if (t.status) return String(t.status).toLowerCase();
-  const start = t.startDate ? new Date(t.startDate) : null;
-  const end = t.endDate ? new Date(t.endDate) : null;
-  const now = new Date();
-  if (start && end && start <= now && now <= end) return "live";
-  if (start && now < start) return "upcoming";
-  if (end && now > end) return "completed";
-  return "upcoming";
 }
 
 export async function listTournaments(filters = {}) {
@@ -101,4 +91,13 @@ export async function listTournamentsByManager(managerId) {
   const { data } = await api.get(`/tournaments/manager/${managerId}`);
   const list = Array.isArray(data) ? data : data?.tournaments || [];
   return list.map(normalizeTournament);
+}
+
+/**
+ * "Mark as completed": moves every sport of the tournament to the completed
+ * stage. Owner-only on the server; 409 if it hasn't started.
+ */
+export async function completeTournament(id) {
+  const { data } = await api.patch(`/tournaments/${id}/complete`);
+  return data;
 }
