@@ -6,15 +6,16 @@ import FollowListModal from "./FollowListModal";
 import { assetUrl } from "../../shared/lib/assetUrl";
 import socialApi from "./socialApi";
 import followApi from "./followApi";
+import { supportsFollow } from "./followSupport";
 
 /**
  * Unified profile view — works for the current user (own) and any other user.
  * Shows avatar, name, role, bio, Posts/Followers/Following counts (tappable),
  * a Follow button (when not self), and tabs: Posts (everyone) + Saved (own only).
  *
- * Props: userId, currentUserId, onOpenProfile, dark
+ * Props: userId, currentUserId, currentUser (optional), onOpenProfile, dark
  */
-export default function ProfileView({ userId, currentUserId, onOpenProfile, dark = false, initialTab = "posts" }) {
+export default function ProfileView({ userId, currentUserId, currentUser, onOpenProfile, dark = false, initialTab = "posts" }) {
   const [status, setStatus] = useState(null);
   const [posts, setPosts] = useState([]);
   const [saved, setSaved] = useState([]);
@@ -23,12 +24,15 @@ export default function ProfileView({ userId, currentUserId, onOpenProfile, dark
   const [list, setList] = useState(null); // { mode } for FollowListModal
 
   const isSelf = status?.isSelf || String(userId) === String(currentUserId);
+  // A manager viewing their own profile: managers have no follow graph (the
+  // status endpoint 404s for them), so don't ask — use the session's details.
+  const noFollowGraph = String(userId) === String(currentUserId) && !supportsFollow(currentUser);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const [st, ps] = await Promise.all([
-        followApi.status(userId).catch(() => null),
+        noFollowGraph ? Promise.resolve(null) : followApi.status(userId).catch(() => null),
         socialApi.fetchUserPosts(userId).catch(() => []),
       ]);
       setStatus(st);
@@ -39,7 +43,7 @@ export default function ProfileView({ userId, currentUserId, onOpenProfile, dark
     } finally {
       setLoading(false);
     }
-  }, [userId, currentUserId]);
+  }, [userId, currentUserId, noFollowGraph]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -51,7 +55,11 @@ export default function ProfileView({ userId, currentUserId, onOpenProfile, dark
     return <div className={`text-center py-12 text-[13px] ${t.empty}`}>Loading profile…</div>;
   }
 
-  const user = status?.user || {};
+  const user =
+    status?.user ||
+    (noFollowGraph
+      ? { name: currentUser?.name, role: currentUser?.role, profileImage: currentUser?.image || currentUser?.profileImage }
+      : {});
   const shown = tab === "saved" ? saved : posts;
 
   const Stat = ({ value, label, onClick }) => (
@@ -68,8 +76,12 @@ export default function ProfileView({ userId, currentUserId, onOpenProfile, dark
         <Avatar user={user} size={72} dark={dark} />
         <div className="flex-1 flex items-center justify-around">
           <Stat value={posts.length} label="Posts" />
-          <Stat value={status?.followersCount} label="Followers" onClick={() => setList({ mode: "followers" })} />
-          <Stat value={status?.followingCount} label="Following" onClick={() => setList({ mode: "following" })} />
+          {!noFollowGraph && (
+            <>
+              <Stat value={status?.followersCount} label="Followers" onClick={() => setList({ mode: "followers" })} />
+              <Stat value={status?.followingCount} label="Following" onClick={() => setList({ mode: "following" })} />
+            </>
+          )}
         </div>
       </div>
 

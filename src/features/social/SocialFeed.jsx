@@ -216,6 +216,7 @@ export default function SocialFeed({
         onClose={() => setProfile(null)}
         userId={profile?.userId}
         currentUserId={userId}
+        currentUser={auth}
         initialTab={profile?.tab}
         onOpenProfile={(id) => openProfile(id, "posts")}
         dark={dark}

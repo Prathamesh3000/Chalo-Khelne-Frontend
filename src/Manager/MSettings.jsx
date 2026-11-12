@@ -33,7 +33,9 @@ export default function MSettings() {
     if (!managerId) { setLoading(false); return; }
     (async () => {
       try {
-        const res = await axios.get(`/api/managers/${managerId}/profile`);
+        // managerRoute is mounted at /api/manager (server/routes/index.js), so the
+        // full path is /api/manager/managers/:id/profile.
+        const res = await axios.get(`/api/manager/managers/${managerId}/profile`);
         if (res.data?.success) {
           setProfile(res.data.manager);
           setNameInput(res.data.manager.name || "");
@@ -54,7 +56,7 @@ export default function MSettings() {
       if (field === "name")  data.name  = nameInput.trim();
       if (field === "email") data.email = emailInput.trim();
 
-      const res = await axios.put(`/api/managers/${managerId}/profile`, data);
+      const res = await axios.put(`/api/manager/managers/${managerId}/profile`, data);
       if (res.data?.success) {
         setProfile((p) => ({ ...p, ...res.data.manager }));
         toast.success(`${field === "name" ? "Name" : "Email"} updated!`);
@@ -84,7 +86,7 @@ export default function MSettings() {
 
     setChangingPassword(true);
     try {
-      const res = await axios.put(`/api/managers/${managerId}/change-password`, {
+      const res = await axios.put(`/api/manager/managers/${managerId}/change-password`, {
         currentPassword: passwordForm.currentPassword,
         newPassword: passwordForm.newPassword,
       });

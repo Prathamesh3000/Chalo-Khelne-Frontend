@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Home, User, Bookmark, Search } from "lucide-react";
 import Avatar from "./Avatar";
 import followApi from "./followApi";
+import { supportsFollow } from "./followSupport";
 
 /**
  * Left column — logged-in user's profile card + navigation shortcuts.
@@ -12,16 +13,19 @@ import followApi from "./followApi";
 export default function SocialSidebar({ currentUser, dark = false, onFeed, onProfile, onSaved, onFindPeople }) {
   const userId = currentUser?._id || currentUser?.id;
   const [counts, setCounts] = useState({ followers: 0, following: 0 });
+  // Managers have no follow graph (the status endpoint 404s for them): skip the
+  // request and don't show a permanent, meaningless 0 / 0.
+  const followable = supportsFollow(currentUser);
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || !followable) return;
     let alive = true;
     followApi
       .status(userId)
       .then((s) => { if (alive && s) setCounts({ followers: s.followersCount || 0, following: s.followingCount || 0 }); })
       .catch(() => {});
     return () => { alive = false; };
-  }, [userId]);
+  }, [userId, followable]);
 
   const meUser = { name: currentUser?.name, profileImage: currentUser?.image || currentUser?.profileImage };
 
@@ -47,16 +51,18 @@ export default function SocialSidebar({ currentUser, dark = false, onFeed, onPro
             <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${t.role}`}>{currentUser.role}</span>
           )}
         </div>
-        <div className="flex items-center gap-6 mt-3">
-          <div className="text-center">
-            <div className={`text-[15px] font-bold ${t.count}`}>{counts.followers}</div>
-            <div className={`text-[11px] ${t.countLbl}`}>Followers</div>
+        {followable && (
+          <div className="flex items-center gap-6 mt-3">
+            <div className="text-center">
+              <div className={`text-[15px] font-bold ${t.count}`}>{counts.followers}</div>
+              <div className={`text-[11px] ${t.countLbl}`}>Followers</div>
+            </div>
+            <div className="text-center">
+              <div className={`text-[15px] font-bold ${t.count}`}>{counts.following}</div>
+              <div className={`text-[11px] ${t.countLbl}`}>Following</div>
+            </div>
           </div>
-          <div className="text-center">
-            <div className={`text-[15px] font-bold ${t.count}`}>{counts.following}</div>
-            <div className={`text-[11px] ${t.countLbl}`}>Following</div>
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Navigation shortcuts */}

@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import axios from "axios";
 import { Dumbbell, Mail, Globe, Calendar, Search, User, Loader2, AlertCircle } from "lucide-react";
 import { ManagerShell } from "../shared/layout";
+import { assetUrl } from "../shared/lib/assetUrl";
 
 const MTrainers = () => {
   const [trainers, setTrainers] = useState([]);
@@ -99,20 +100,25 @@ function TrainerCard({ trainer }) {
   const email = trainer.userId?.email || "";
   const sports = trainer.sports || [];
   const languages = trainer.languages || [];
-  const profileImage = trainer.profileImage ? `/uploads/${trainer.profileImage}` : null;
+  // The API already returns "/uploads/trainer-profiles/…"; assetUrl normalises
+  // that (and bare/relative/absolute forms) instead of prefixing /uploads/ twice.
+  const profileImage = trainer.profileImage ? assetUrl(trainer.profileImage) : null;
   const initial = name.charAt(0)?.toUpperCase() || "T";
+  // Some legacy photos point at a folder the server no longer serves; fall back
+  // to the initial avatar rather than leaving an empty banner.
+  const [imgFailed, setImgFailed] = useState(false);
 
   return (
     <article className="bg-[#181A22] border border-white/[0.06] rounded-lg overflow-hidden group transition hover:border-white/[0.12]">
       {/* Avatar banner */}
       <div className="h-28 bg-gradient-to-br from-orange-500/[0.18] to-orange-500/[0.06] flex items-center justify-center relative">
-        {profileImage ? (
+        {profileImage && !imgFailed ? (
           <img loading="lazy"
             src={profileImage}
             alt={name}
             className="w-20 h-20 rounded-full object-cover"
             style={{ border: "3px solid #181A22" }}
-            onError={(e) => { e.currentTarget.style.display = "none"; }}
+            onError={() => setImgFailed(true)}
           />
         ) : (
           <div className="w-20 h-20 rounded-full bg-orange-500/15 grid place-items-center text-orange-400 text-[24px] font-medium" style={{ border: "3px solid #181A22" }}>

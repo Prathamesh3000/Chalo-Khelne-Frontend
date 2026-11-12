@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { ManagerShell } from "../shared/layout";
 import { Modal, Pagination } from "../shared/ui";
+import { loadTournamentSummaries, buildTournamentTabs } from "./notificationTournaments";
 
 // The manager id is read straight from the stored session on every call rather
 // than threaded through state — the page already trusts localStorage for it.
@@ -121,51 +122,19 @@ const NotificationPage = () => {
         if (quoted) titleFromMessage.set(n.tournamentId, quoted[1]);
       }
 
-      const statusMap = {};
-      const tabs = [];
-      const now = new Date();
-
-      // Was one sequential request per tournament. At 21 tournaments that is 21
-      // round trips before a single tab can render; a manager with a season's
-      // history waits through all of them.
-      const CONCURRENCY = 6;
-      for (let i = 0; i < tournamentIds.length; i += CONCURRENCY) {
-        const batch = await Promise.all(
-          tournamentIds.slice(i, i + CONCURRENCY).map(async (tournamentId) => {
-            try {
-              const r = await axios.get(`/api/tournaments/${tournamentId}`);
-              if (r.data.success && r.data.tournament) return { tournamentId, t: r.data.tournament };
-            } catch {
-              // 404 = the tournament was deleted; the rows outlived it.
-            }
-            return { tournamentId, t: null };
-          })
-        );
-
-        for (const { tournamentId, t } of batch) {
-          if (!t) {
-            statusMap[tournamentId] = "unknown";
-            tabs.push({ _id: tournamentId, title: titleFromMessage.get(tournamentId) || null, status: "unknown" });
-            continue;
-          }
-          const endDate = t.endDate ? new Date(t.endDate) : null;
-          if (endDate) endDate.setHours(23, 59, 59, 999);
-          statusMap[tournamentId] = endDate && endDate < now ? "expired" : "active";
-          tabs.push({
-            _id: tournamentId,
-            title: t.title || titleFromMessage.get(tournamentId) || null,
-            status: statusMap[tournamentId],
-          });
-        }
-      }
+      // One batched lookup (ids that no longer exist are simply absent) instead
+      // of one request per tournament; see notificationTournaments.js.
+      const found = await loadTournamentSummaries(axios, tournamentIds);
 
       // Every tournament in the inbox gets a tab, not just the running ones.
       // The old rule pushed only unexpired tournaments, so a manager whose
       // events have all finished saw NO filter at all — 174 rows across 21
-      // tournaments and no way to narrow them. Running events lead; sort is
-      // stable, so recency holds within each group.
-      const rank = { active: 0, expired: 1, unknown: 2 };
-      tabs.sort((a, b) => rank[a.status] - rank[b.status]);
+      // tournaments and no way to narrow them. Running events lead.
+      const { statusMap, tabs } = buildTournamentTabs({
+        ids: tournamentIds,
+        found,
+        titleFromMessage,
+      });
 
       setTournamentStatusMap(statusMap);
       setTournamentTabs(tabs);
